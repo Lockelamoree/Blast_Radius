@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800" role="img" font-family="'DejaVu Sans Mono',monospace">
+  <title>Blast Radius — the decision card</title>
+  <desc>An AI coding agent proposes installing a misspelled package; three choices approve, sandbox, reject are shown with a cursor frozen over the hot Reject button.</desc>
+  <defs>
+    <radialGradient id="rim" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#F5513B" stop-opacity="0.16"/>
+      <stop offset="55%" stop-color="#F5513B" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="#F5513B" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="800" fill="#0B0D0F"/>
+  <circle cx="860" cy="470" r="430" fill="url(#rim)"/>
+
+  <text x="176" y="104" fill="#5A6169" font-size="21" letter-spacing="4" font-weight="bold">OPENAI BUILD WEEK · DEVELOPER TOOLS</text>
+
+  <rect x="170" y="148" width="860" height="474" rx="20" fill="#14181C" stroke="#232A31" stroke-width="1.5"/>
+
+  <circle cx="206" cy="192" r="6.5" fill="#F5513B"/>
+  <circle cx="228" cy="192" r="6.5" fill="#FF8B3D"/>
+  <circle cx="250" cy="192" r="6.5" fill="#2EE6A6"/>
+  <text x="996" y="199" text-anchor="end" fill="#7D8590" font-size="21">gpt-5.6 · proposed action</text>
+
+  <rect x="206" y="238" width="788" height="124" rx="12" fill="#0B0F13" stroke="#1C242B" stroke-width="1.5"/>
+  <text x="232" y="298" font-size="31"><tspan fill="#E6EDF3">$ pip install </tspan><tspan fill="#F5513B" font-weight="bold">reqeusts</tspan></text>
+  <text x="232" y="338" fill="#7D8590" font-size="19"># not on PyPI — published 14h ago, 1 download</text>
+
+  <rect x="206" y="406" width="228" height="116" rx="14" fill="none" stroke="#2E3640" stroke-width="1.5"/>
+  <text x="320" y="479" text-anchor="middle" fill="#6E7681" font-size="30" font-weight="bold" letter-spacing="1">APPROVE</text>
+
+  <rect x="452" y="406" width="228" height="116" rx="14" fill="none" stroke="#2E3640" stroke-width="1.5"/>
+  <text x="566" y="479" text-anchor="middle" fill="#6E7681" font-size="30" font-weight="bold" letter-spacing="1">SANDBOX</text>
+
+  <rect x="690" y="398" width="304" height="132" rx="18" fill="none" stroke="#F5513B" stroke-width="3" opacity="0.35"/>
+  <rect x="698" y="406" width="288" height="116" rx="14" fill="#F5513B"/>
+  <text x="842" y="484" text-anchor="middle" fill="#0B0D0F" font-size="42" font-weight="bold" letter-spacing="2">REJECT</text>
+
+  <path d="M940 454 L940 550 L962 531 L978 568 L991 562 L976 527 L1000 527 Z" fill="#0B0D0F" stroke="#E6EDF3" stroke-width="3.5" stroke-linejoin="round"/>
+
+  <text x="600" y="586" text-anchor="middle" fill="#7D8590" font-size="21">reject it — then tell the critic why, and it grades your reasoning</text>
+
+  <text x="178" y="742" fill="#E6EDF3" font-family="'DejaVu Sans',sans-serif" font-size="46" font-weight="bold" letter-spacing="1">BLAST RADIUS</text>
+  <text x="1022" y="742" text-anchor="end" fill="#7D8590" font-size="22">you're the operator</text>
+</svg>

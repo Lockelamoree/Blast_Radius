@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800" role="img" font-family="'DejaVu Sans Mono',monospace">
+  <title>Blast Radius — the verdict stamp</title>
+  <desc>A ghosted agent proposal behind a large graded verdict reading GOOD CALL with a green check, the reward for a correct decision.</desc>
+
+  <rect x="0" y="0" width="1200" height="800" fill="#0B0D0F"/>
+
+  <g fill="#1A2027">
+    <text x="150" y="150" font-size="26">$ pip install reqeusts</text>
+    <text x="150" y="196" font-size="26"># not on PyPI · 1 download</text>
+    <text x="150" y="672" font-size="26">APPROVE      SANDBOX      REJECT</text>
+  </g>
+
+  <text x="176" y="104" fill="#5A6169" font-size="21" letter-spacing="4" font-weight="bold">OPENAI BUILD WEEK · DEVELOPER TOOLS</text>
+
+  <g transform="rotate(7 950 300)">
+    <rect x="812" y="250" width="286" height="96" rx="10" fill="none" stroke="#F5513B" stroke-width="3" opacity="0.5"/>
+    <text x="955" y="313" text-anchor="middle" fill="#F5513B" font-size="44" font-weight="bold" letter-spacing="3" opacity="0.55">REJECTED</text>
+  </g>
+
+  <g transform="rotate(-3 600 410)">
+    <rect x="250" y="286" width="700" height="250" rx="16" fill="#0E1A16" stroke="#2EE6A6" stroke-width="3"/>
+    <path d="M300 410 L332 444 L398 372" fill="none" stroke="#2EE6A6" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="438" y="432" fill="#E6EDF3" font-family="'DejaVu Sans',sans-serif" font-size="86" font-weight="bold" letter-spacing="1">GOOD CALL</text>
+    <text x="300" y="492" fill="#8B98A0" font-size="24">sandboxed it — receipts checked, nothing leaked</text>
+  </g>
+
+  <text x="954" y="214" text-anchor="middle" fill="#7D8590" font-size="21">gpt-5.6 critic</text>
+
+  <text x="178" y="742" fill="#E6EDF3" font-family="'DejaVu Sans',sans-serif" font-size="46" font-weight="bold" letter-spacing="1">BLAST RADIUS</text>
+  <text x="1022" y="742" text-anchor="end" fill="#7D8590" font-size="22">it grades your call</text>
+</svg>
