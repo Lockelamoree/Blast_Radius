@@ -1,0 +1,23 @@
+[Unit]
+Description=Blast Radius web application
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=blast-radius
+Group=blast-radius
+WorkingDirectory=/opt/blast-radius
+EnvironmentFile=/etc/blast-radius.env
+ExecStart=/opt/blast-radius/.venv/bin/python -m uvicorn blast_radius.main:app --host 127.0.0.1 --port 8000 --workers 2
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/blast-radius
+
+[Install]
+WantedBy=multi-user.target
+
