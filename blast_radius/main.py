@@ -11,8 +11,11 @@ from blast_radius.engine import TrustEngine
 from blast_radius.storage import SessionStore
 
 def create_app(config: Settings = settings) -> FastAPI:
-    engine = TrustEngine(config)
     store = SessionStore(config.database_path, config.session_ttl_minutes)
+    engine = TrustEngine(
+        config,
+        allow_llm_call=lambda: store.try_consume_llm_call(config.daily_llm_budget),
+    )
     application = FastAPI(
         title="Blast Radius",
         version="0.1.0",
@@ -35,7 +38,8 @@ def create_app(config: Settings = settings) -> FastAPI:
         return {
             "status": "ok",
             "bank_scenarios": len(engine.bank.scenarios),
-            "live_generation": engine.openai.enabled,
+            "live_generation": engine.openai.generation_enabled,
+            "reasoning_grading": engine.openai.grading_enabled,
         }
 
     return application

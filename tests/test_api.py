@@ -1,3 +1,10 @@
+from dataclasses import replace
+
+from fastapi.testclient import TestClient
+
+from blast_radius.main import create_app
+
+
 def create_started_session(client):
     created = client.post("/api/sessions", json={"mode": "demo"})
     assert created.status_code == 201
@@ -24,6 +31,13 @@ def test_round_response_hides_ground_truth(client) -> None:
     body = response.json()
     assert "ground_truth" not in str(body)
     assert "correct_action" not in str(body)
+
+
+def test_gate_catch_rejects_planted_hallucination_without_leaking_it(client) -> None:
+    response = client.get("/api/demo/gate-catch")
+    assert response.status_code == 200
+    assert response.json() == {"passed": False, "reasons": ["unknown template_ref"]}
+    assert "ground_truth" not in response.text
 
 
 def test_duplicate_decision_is_rejected(client) -> None:
@@ -84,3 +98,21 @@ def test_full_demo_session(client) -> None:
     assert result.status_code == 200
     assert result.json()["delta"] == 5
     assert result.json()["rounds_played"] == 6
+    assert "pre 0/5 → post 5/5" in result.json()["share_text"]
+
+
+def test_session_creation_has_a_per_ip_limit(test_settings) -> None:
+    settings = replace(test_settings, session_create_limit_per_hour=1)
+    with TestClient(create_app(settings)) as limited_client:
+        assert limited_client.post("/api/sessions", json={"mode": "demo"}).status_code == 201
+        blocked = limited_client.post("/api/sessions", json={"mode": "demo"})
+    assert blocked.status_code == 429
+
+
+def test_round_requests_have_a_per_session_cap(test_settings) -> None:
+    settings = replace(test_settings, session_round_request_cap=1)
+    with TestClient(create_app(settings)) as limited_client:
+        session_id = create_started_session(limited_client)
+        assert limited_client.post(f"/api/sessions/{session_id}/rounds/next").status_code == 200
+        blocked = limited_client.post(f"/api/sessions/{session_id}/rounds/next")
+    assert blocked.status_code == 429

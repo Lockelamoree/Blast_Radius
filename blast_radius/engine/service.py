@@ -1,19 +1,24 @@
 from __future__ import annotations
 
+import logging
+from collections.abc import Callable
+
 from blast_radius.config import Settings
 from blast_radius.engine.bank import ScenarioBank
 from blast_radius.engine.gate import CorrectnessGate
-from blast_radius.engine.grader import grade_decision
+from blast_radius.engine.grader import grade_decision, merge_reasoning
 from blast_radius.engine.openai_adapter import OpenAIAdapter
 from blast_radius.models import GradeResult, PlayerDecision, Scenario, ScenarioFamily
 
+logger = logging.getLogger(__name__)
+
 
 class TrustEngine:
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, allow_llm_call: Callable[[], bool] | None = None):
         self.settings = settings
         self.bank = ScenarioBank(settings.data_dir)
         self.gate = CorrectnessGate(self.bank)
-        self.openai = OpenAIAdapter(settings)
+        self.openai = OpenAIAdapter(settings, allow_llm_call=allow_llm_call)
 
     async def next_scenario(
         self,
@@ -26,7 +31,7 @@ class TrustEngine:
         seed: str,
     ) -> tuple[Scenario, str | None]:
         failure_reason: str | None = None
-        if self.openai.enabled and family is not None:
+        if self.openai.generation_enabled and family is not None:
             template = next(
                 (row for row in self.bank.templates.values() if row["family"] == family.value),
                 None,
@@ -57,23 +62,15 @@ class TrustEngine:
 
     async def grade(self, scenario: Scenario, decision: PlayerDecision) -> GradeResult:
         grade = grade_decision(scenario, decision)
-        if not self.openai.enabled:
+        if not self.openai.grading_enabled:
             return grade
-        review = await self.openai.critique_reasoning(scenario, decision)
+        try:
+            review = await self.openai.critique_reasoning(scenario, decision)
+        except Exception as exc:
+            logger.warning("OpenAI reasoning critique failed (%s)", type(exc).__name__)
+            return grade
         if review is None:
             return grade
-        allowed = set(scenario.ground_truth.tells)
-        matched = list(dict.fromkeys(tell for tell in review.matched_tells if tell in allowed))
-        grade.matched_tells = matched
-        grade.missed_tells = [tell for tell in scenario.ground_truth.tells if tell not in matched]
-        grade.reasoning_score = round(100 * len(matched) / len(scenario.ground_truth.tells))
-        grade.socratic_followup = review.followup
-        if grade.action_correct and grade.reasoning_score >= 60 and (
-            grade.blast_radius_score is None or grade.blast_radius_score >= 70
-        ):
-            grade.verdict = "correct"
-        elif grade.action_correct or grade.reasoning_score >= 50:
-            grade.verdict = "partial"
-        else:
-            grade.verdict = "wrong"
+        grade = merge_reasoning(grade, scenario, review.matched_tells, review.followup)
+        grade.graded_by = self.settings.critic_model
         return grade

@@ -163,6 +163,7 @@ class GradeResult(BaseModel):
     receipts: list[Receipt]
     explanation: str
     socratic_followup: str
+    graded_by: str = "deterministic"
 
 
 class TestQuestion(BaseModel):

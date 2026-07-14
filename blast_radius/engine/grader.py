@@ -83,3 +83,39 @@ def grade_decision(scenario: Scenario, decision: PlayerDecision) -> GradeResult:
         socratic_followup=followup,
     )
 
+
+def merge_reasoning(
+    base: GradeResult,
+    scenario: Scenario,
+    llm_matched_tells: list[str],
+    followup: str | None,
+) -> GradeResult:
+    """Merge model tell recognition without allowing it to alter immutable truth."""
+    allowed_tells = scenario.ground_truth.tells
+    allowed = set(allowed_tells)
+    matched = list(
+        dict.fromkeys(
+            [*base.matched_tells, *(tell for tell in llm_matched_tells if tell in allowed)]
+        )
+    )
+    missed = [tell for tell in allowed_tells if tell not in matched]
+    reasoning_score = round(100 * len(matched) / len(allowed_tells))
+
+    if base.action_correct and reasoning_score >= 60 and (
+        base.blast_radius_score is None or base.blast_radius_score >= 70
+    ):
+        verdict = "correct"
+    elif base.action_correct or reasoning_score >= 50:
+        verdict = "partial"
+    else:
+        verdict = "wrong"
+
+    return base.model_copy(
+        update={
+            "matched_tells": matched,
+            "missed_tells": missed,
+            "reasoning_score": reasoning_score,
+            "verdict": verdict,
+            "socratic_followup": followup or base.socratic_followup,
+        }
+    )

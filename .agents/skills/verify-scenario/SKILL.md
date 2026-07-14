@@ -1,20 +1,25 @@
 ---
 name: verify-scenario
-description: Verify a Blast Radius scenario against its cited template and immutable evidence before it can be shown to a learner.
+description: Verify Blast Radius scenarios with the production ScenarioBank and CorrectnessGate. Use before adding or changing a scenario, template, receipt, immutable ground truth, or gate rule.
 ---
 
 # Verify Scenario
 
-Use this skill before adding or changing a scenario, template, receipt, or gate rule.
+Run the production gate rather than recreating its logic:
 
-1. Parse the scenario with `Scenario.model_validate`.
-2. Confirm `template_ref` exists in `blast_radius/data/templates.json`.
-3. Confirm every tell is backed by at least one concrete evidence record with a source,
-   claim, excerpt, and retrieval date.
-4. Confirm the presented artifacts support `correct_action` and the safe sandbox policy.
-5. Confirm no executable artifact is invoked during verification.
-6. Run `python -m pytest tests/test_gate.py tests/test_bank.py`.
+```powershell
+python .agents/skills/verify-scenario/scripts/verify_scenarios.py
+```
 
-A failed verification is terminal for that generated scenario. The runtime must discard it
-and select a compatible verified scenario from the fallback bank.
+For one curated scenario:
 
+```powershell
+python .agents/skills/verify-scenario/scripts/verify_scenarios.py --scenario cmd-exfil-1
+```
+
+Treat a nonzero exit as a release blocker. Never weaken the gate to make a scenario pass.
+Fix the template, evidence, immutable truth, or presented artifact, then rerun the script and
+`python -m pytest tests/test_gate.py tests/test_bank.py`.
+
+Never execute scenario artifacts during verification. A generated scenario that fails is
+discarded in favor of a compatible curated fallback.

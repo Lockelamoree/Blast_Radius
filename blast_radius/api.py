@@ -46,6 +46,25 @@ class SlidingWindowLimiter:
 def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -> APIRouter:
     router = APIRouter(prefix="/api")
     limiter = SlidingWindowLimiter()
+    session_create_limiter = SlidingWindowLimiter(
+        limit=settings.session_create_limit_per_hour,
+        window_seconds=60 * 60,
+    )
+    round_ip_limiter = SlidingWindowLimiter(
+        limit=settings.round_request_limit_per_minute,
+        window_seconds=60,
+    )
+    round_session_limiter = SlidingWindowLimiter(
+        limit=settings.session_round_request_cap,
+        window_seconds=settings.session_ttl_minutes * 60,
+    )
+
+    def client_host(request: Request) -> str:
+        return request.client.host if request.client else "unknown"
+
+    def limit_round_request(request: Request, session_id: str) -> None:
+        round_ip_limiter.check(f"round-ip:{client_host(request)}")
+        round_session_limiter.check(f"round-session:{session_id}")
 
     def load_session(session_id: str, request: Request) -> SessionState:
         limiter.check(f"{request.client.host if request.client else 'unknown'}:{session_id}")
@@ -67,9 +86,17 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
             for answer, question in zip(answers, engine.bank.questions, strict=True)
         )
 
+    @router.get("/demo/gate-catch")
+    def demo_gate_catch() -> dict:
+        planted = engine.bank.get("dep-typo-1").model_copy(deep=True)
+        planted.id = "demo-planted-hallucination"
+        planted.template_ref = "invented-cve-2099-fake-package"
+        result = engine.gate.verify(planted)
+        return {"passed": result.passed, "reasons": result.reasons}
+
     @router.post("/sessions", status_code=status.HTTP_201_CREATED)
     def create_session(payload: CreateSessionRequest, request: Request) -> dict:
-        limiter.check(request.client.host if request.client else "unknown")
+        session_create_limiter.check(f"session-create:{client_host(request)}")
         session_id = str(uuid4())
         state = SessionState(
             id=session_id,
@@ -82,7 +109,7 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
             "mode": state.mode,
             "rounds_total": len(state.scenario_order),
             "pretest": [question.public_view() for question in engine.bank.questions],
-            "live_generation_available": engine.openai.enabled,
+            "live_generation_available": engine.openai.generation_enabled,
         }
 
     @router.post("/sessions/{session_id}/pretest")
@@ -98,7 +125,8 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
         return {"score": state.pretest_score, "total": len(engine.bank.questions)}
 
     @router.post("/sessions/{session_id}/rounds/next")
-    async def next_round(state: SessionDep) -> dict:
+    async def next_round(session_id: str, request: Request, state: SessionDep) -> dict:
+        limit_round_request(request, session_id)
         if state.pretest_score is None:
             raise HTTPException(status_code=409, detail="Complete the pre-test first.")
         if state.posttest_score is not None:
@@ -144,7 +172,13 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
         }
 
     @router.post("/sessions/{session_id}/decisions")
-    async def submit_decision(decision: PlayerDecision, state: SessionDep) -> dict:
+    async def submit_decision(
+        session_id: str,
+        request: Request,
+        decision: PlayerDecision,
+        state: SessionDep,
+    ) -> dict:
+        limit_round_request(request, session_id)
         if not state.active_scenario_json or not state.active_scenario_id:
             raise HTTPException(status_code=409, detail="Request a round before answering.")
         if decision.scenario_id != state.active_scenario_id:
@@ -197,8 +231,9 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
             competency_map=state.competency,
             average_reasoning_score=average,
             share_text=(
-                f"I completed Blast Radius: {len(state.grades)} agent decisions, "
-                f"{average}% reasoning score, and a {delta:+d} competency delta."
+                f"I completed Blast Radius: pre {state.pretest_score}/5 → "
+                f"post {state.posttest_score}/5, {len(state.grades)} agent decisions, "
+                f"and {average}% average reasoning."
             ),
         )
 

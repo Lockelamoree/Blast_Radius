@@ -1,19 +1,19 @@
 # Blast Radius
 
 **Blast Radius is a browser game that teaches developers to operate AI coding agents
-without rubber-stamping dangerous actions.** Inspect a proposed command, dependency,
-tool manifest, diff, retrieved instruction, or marketplace skill; choose **approve**,
-**sandbox**, or **reject**; then explain the tell. The verdict grades the decision and the
-reasoning separately and always shows concrete evidence receipts.
+without rubber-stamping dangerous actions.** Inspect a proposed command, dependency, tool
+manifest, diff, retrieved instruction, or marketplace skill; choose **approve**,
+**sandbox**, or **reject**; then explain the tell. The verdict grades the decision and
+reasoning separately and shows concrete evidence receipts.
 
-The hosted application is designed for the OpenAI Build Week 2026 Developer Tools track.
-It never executes scenario content.
+The application is designed for the OpenAI Build Week 2026 Developer Tools track. It never
+executes scenario content.
 
 ## Why it is different
 
-Most security games ask you to attack a system. Blast Radius trains the increasingly
-important defender/operator reflex: deciding what an AI coding agent should be allowed to
-do. Its core is a verification loop, not a quiz answer key:
+Most security games ask you to attack a system. Blast Radius trains the defender/operator
+reflex: deciding what an AI coding agent should be allowed to do. Its core is a verification
+loop, not a quiz answer key:
 
 ```text
 verified template -> bounded variation -> correctness gate -> player decision
@@ -21,19 +21,22 @@ verified template -> bounded variation -> correctness gate -> player decision
 ```
 
 - 18 curated, receipt-backed scenarios across six threat families.
-- Mandatory pre-display gate with a tested rejection path.
+- Mandatory pre-display gate with a tested rejection path and visible self-catch demo.
 - Decision, reasoning, and sandbox quality scored independently.
-- Five-question pre/post test and a session-local competency map.
+- Five-question pre/post test, session-local competency map, and shareable measured result.
 - Deterministic judge mode that remains playable without an OpenAI API key.
-- Optional GPT-5.6 live variations with automatic fallback to the verified bank.
+- GPT-5.6 reasoning critique whenever a key is present; live generation remains opt-in.
 
-## Run it locally
+## Try it
+
+Hosted demo: **TODO — add the public HTTPS URL only after the VPS/domain deployment is
+complete and verified from a logged-out browser.**
 
 ### Requirements
 
 - Python 3.11 or newer
-- A modern desktop or mobile browser
-- Optional: an OpenAI API key with GPT-5.6 access for live variation mode
+- A current Chrome, Edge, Firefox, or Safari browser
+- Optional: a server-side OpenAI API key with GPT-5.6 access
 
 Windows PowerShell:
 
@@ -54,15 +57,19 @@ cp .env.example .env
 python -m uvicorn blast_radius.main:app --reload
 ```
 
-Open <http://127.0.0.1:8000>. The verified run works immediately. To enable live mode,
-set these values in `.env`:
+Open <http://127.0.0.1:8000>. The verified run works immediately. Setting only
+`OPENAI_API_KEY` enables GPT-5.6 reasoning critique while keeping every scenario curated.
+Fresh scenario generation is a separate opt-in:
 
 ```dotenv
 OPENAI_API_KEY=your_server_side_key
 BLAST_RADIUS_LIVE_GENERATION=true
+BLAST_RADIUS_DAILY_LLM_BUDGET=100
 ```
 
-The API key is read only by the server. It is never included in browser responses or logs.
+The key stays server-side and is never included in browser responses or model-payload logs.
+Once the UTC daily call budget is exhausted, grading degrades transparently to the
+deterministic path.
 
 ## Test it
 
@@ -70,15 +77,16 @@ The API key is read only by the server. It is never included in browser response
 .\.venv\Scripts\python -m pytest
 ```
 
-The suite covers model validation, all curated scenarios, the correctness gate, grounded
-grading, sandbox under/over-scoping, prompt injection in player reasoning, API leakage,
-duplicate decisions, and the complete six-round demo session.
+The suite covers model validation, every curated scenario, the correctness gate, grounded
+grading, model failure and budget fallback, sandbox scoping, adversarial player text, API
+leakage, rate limits, duplicate decisions, and the complete six-round demo session.
 
 Useful endpoints:
 
 | Endpoint | Purpose |
 |---|---|
 | `GET /healthz` | Non-sensitive deployment health |
+| `GET /api/demo/gate-catch` | Show the gate rejecting a planted hallucination |
 | `POST /api/sessions` | Start a `demo` or `live` session |
 | `POST /api/sessions/{id}/pretest` | Submit the five baseline answers |
 | `POST /api/sessions/{id}/rounds/next` | Retrieve a presentation-only scenario |
@@ -90,86 +98,89 @@ Useful endpoints:
 ## Architecture and safety model
 
 FastAPI serves the interface and API from one Python process. Pydantic owns every trust
-boundary. SQLite stores opaque session state with an expiration time; there are no user
-accounts or personal profiles.
+boundary. SQLite stores opaque session state, expiration data, and the atomic UTC daily
+model-call budget; there are no accounts or personal profiles.
 
 Scenario ground truth stays server-side. The browser receives only the ask and artifacts
-until a decision is committed. The deterministic correctness gate verifies:
+until a decision is committed. The deterministic correctness gate verifies template
+membership, family consistency, tell/evidence coverage, visible artifact support, sandbox
+policy safety, and receipt completeness. If generation times out, returns malformed output,
+or fails either gate, a compatible curated fallback is selected. Commands remain inert
+strings with no execution path.
 
-1. the scenario belongs to a known, cited template;
-2. template and scenario families agree;
-3. every tell has a matching keyword/evidence group;
-4. at least one declared tell is visible in the presented artifacts;
-5. sandbox answers include a safe policy; and
-6. evidence identifiers and receipts are complete.
-
-If live generation times out, returns malformed structured output, or fails the gate, the
-server selects a compatible curated fallback. Scenario commands are strings only; there is
-no execution path in the application.
+```text
+Browser
+  -> FastAPI session/API boundary
+      -> deterministic bank + correctness gate
+      -> GPT-5.6 augmentation (optional, budgeted)
+      -> immutable grade + receipts
+      -> SQLite session and daily-budget store
+```
 
 ### GPT-5.6 roles
 
 All model IDs live in `blast_radius/config.py`:
 
-- `gpt-5.6-luna`: bounded scenario generation.
-- `gpt-5.6-terra`: reserved for adaptive blind-spot targeting.
-- `gpt-5.6-sol`: critic/gate configuration for the live verification path.
+- `gpt-5.6-luna`: bounded scenario generation at medium effort.
+- `gpt-5.6-terra`: adaptive blind-spot targeting at low effort.
+- `gpt-5.6-sol`: semantic reasoning critique at high effort and generated-scenario critique
+  at max effort.
 
-The current build uses the Responses API with Structured Outputs for optional generation.
-Immutable curated evidence remains the grading authority, so an LLM cannot rewrite the
-correct answer. The default demo does not spend API tokens.
+The build uses the Responses API with Structured Outputs. Sol may add only recognized tells
+from the immutable allowlist and write the follow-up. It cannot rewrite the correct action,
+evidence, receipts, or sandbox policy. Without a key—or after the daily budget is
+exhausted—the same flow uses deterministic grading.
 
-## Supported platforms and judge testing
+## Deployment and supported platforms
 
-- Browsers: current Chrome, Edge, Firefox, and Safari; responsive down to mobile widths.
+- Browsers: current Chrome, Edge, Firefox, and Safari; responsive to mobile widths.
 - Self-hosting: Windows, macOS, and Linux with Python 3.11+.
-- Judge path: start the application and click **Start verified run**. It requires no login,
-  API key, background worker, Node build, Docker image, or live generation.
+- Judge path: **Start verified run** requires no login, API key, Node, Docker, or rebuild.
 
-Production deployment files for an Ubuntu VPS are in `deploy/`. Install into
-`/opt/blast-radius`, configure the environment, enable the systemd unit, and use the Caddy
-snippet for HTTPS. Keep the instance free and unrestricted through August 5, 2026, the end
-of the official judging period.
+Production files are in `deploy/`. With DNS already pointed at an Ubuntu VPS:
+
+```bash
+sudo OPENAI_API_KEY='spend-capped-key' bash deploy/deploy.sh your-domain.example
+```
+
+The script installs the Python service and Caddy, enables HTTPS, and checks `/healthz`.
 
 ## Built with Codex
 
-This repository was implemented with Codex beginning July 14, 2026. The collaboration
-artifacts are part of the submission evidence:
+This repository was implemented with Codex beginning July 14, 2026. Evidence in the public
+tree is limited to artifacts a judge can inspect:
 
-- The original plan and research package is preserved in the numbered Markdown files.
-- `AGENTS.md` encodes the non-negotiable trust and security boundaries.
-- `.agents/skills/verify-scenario/SKILL.md` packages the bank-verification workflow.
-- Tests were written with the engine and API, including an adversarial scenario designed
-  to prove that player prompt injection cannot alter immutable ground truth.
-- The primary Codex `/feedback` session ID must be added here only after it is generated:
-  **`PENDING — do not replace with an invented value`**.
+- `AGENTS.md` and nested guidance encode the non-negotiable engine and UI boundaries.
+- `.agents/skills/verify-scenario/SKILL.md` invokes the real bank-verification workflow.
+- Tests include adversarial player text proving prompt injection cannot alter ground truth.
+- The dated commit history distinguishes the implementation work.
+- Codex `/feedback` Session ID: **TODO — add the real ID from the primary build thread; do
+  not invent one.**
 
-No productivity, learning-delta, latency, or accuracy number is claimed here unless it was
-measured from the running product.
+Measured developer pre/post result: **TODO — add one real named run; no result has been
+claimed yet.** No productivity, learning-delta, latency, or accuracy number is claimed
+without a captured measurement.
 
 ## Prior work and exclusions
 
-The application code in this repository is new work for the July 13–21, 2026 submission
-period. The planning archive was produced before implementation and was imported as
-historical/source material.
+The application code in this repository was implemented during the July 13–21, 2026
+submission period; the dated commit history is the evidence for that work.
 
-MaRa SIFT is prior, external work and is **not integrated into this submission build**.
-The forensic-triage round from the original concept is deferred; no MaRa code, output, or
-capability is copied or claimed. The six implemented families are dangerous commands,
-poisoned dependencies, over-scoped tools, malicious diffs, poisoned context, and the
-fictional skill marketplace.
+MaRa SIFT is prior, external work and is **not integrated into this submission build**. The
+forensic-triage round is deferred; no MaRa code, output, or capability is copied or claimed.
+The six implemented families are dangerous commands, poisoned dependencies, over-scoped
+tools, malicious diffs, poisoned context, and the fictional skill marketplace.
 
 ## Submission checklist
 
 - [ ] Hosted URL tested from a logged-out browser
 - [ ] Public YouTube demo is under three minutes and has audio
 - [ ] Video shows both Codex collaboration and GPT-5.6 usage
-- [ ] `/feedback` session ID replaces the truthful placeholder above
-- [ ] Repository is public and the MIT license is visible
+- [ ] Real `/feedback` Session ID replaces the truthful TODO
+- [ ] One named developer’s measured pre/post result replaces the truthful TODO
 - [ ] Fresh-machine setup instructions have been rehearsed
 - [ ] Demo remains available through August 5, 2026
 
 ## License
 
 MIT — see [LICENSE](LICENSE).
-

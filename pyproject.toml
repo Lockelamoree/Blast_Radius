@@ -31,9 +31,7 @@ packages = ["blast_radius"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
-asyncio_mode = "auto"
 
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-

@@ -1,5 +1,3 @@
-from copy import deepcopy
-
 from blast_radius.engine.bank import ScenarioBank
 from blast_radius.engine.gate import CorrectnessGate
 
@@ -35,4 +33,3 @@ def test_gate_rejects_unsupported_tells(test_settings) -> None:
     result = gate.verify(scenario)
     assert not result.passed
     assert "presented artifacts do not support any declared tell" in result.reasons
-

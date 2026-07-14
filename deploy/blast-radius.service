@@ -9,7 +9,7 @@ User=blast-radius
 Group=blast-radius
 WorkingDirectory=/opt/blast-radius
 EnvironmentFile=/etc/blast-radius.env
-ExecStart=/opt/blast-radius/.venv/bin/python -m uvicorn blast_radius.main:app --host 127.0.0.1 --port 8000 --workers 2
+ExecStart=/opt/blast-radius/.venv/bin/python -m uvicorn blast_radius.main:app --host 127.0.0.1 --port 8000 --workers 1
 Restart=on-failure
 RestartSec=3
 NoNewPrivileges=true
@@ -20,4 +20,3 @@ ReadWritePaths=/opt/blast-radius
 
 [Install]
 WantedBy=multi-user.target
-

@@ -17,7 +17,8 @@ scenario. Never expose `ground_truth` through a public API.
 
 - Generation: `gpt-5.6-luna`.
 - Adaptation: `gpt-5.6-terra`.
-- Gate and reasoning critic: `gpt-5.6-sol`, max reasoning effort.
+- Generated-scenario gate: `gpt-5.6-sol`, max reasoning effort.
+- Reasoning critic: `gpt-5.6-sol`, high reasoning effort.
 - The deterministic bank must remain fully usable without an API key.
 
 ## Commands
@@ -35,4 +36,3 @@ python -m venv .venv
 - Ground truth is immutable; an LLM may explain it but cannot rewrite it.
 - MaRa is not part of this build. Do not copy or claim integration with it.
 - No accounts, multiplayer, command execution, or persistent personal profiles.
-

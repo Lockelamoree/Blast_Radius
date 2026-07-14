@@ -6,6 +6,7 @@
   <meta name="description" content="Blast Radius teaches developers to safely approve, sandbox, or reject AI coding-agent actions.">
   <title>Blast Radius — Size the risk before you approve</title>
   <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/improvements.css">
 </head>
 <body>
   <div class="noise" aria-hidden="true"></div>
@@ -27,6 +28,14 @@
           <button class="button ghost" data-start="live">Try live variation</button>
         </div>
         <p id="live-note" class="microcopy">Live mode falls back to verified scenarios if generation is unavailable.</p>
+        <div class="integrity-check">
+          <div>
+            <p class="kicker">INTEGRITY CHECK</p>
+            <p>Watch the deterministic gate block a planted hallucination before it can become a round.</p>
+          </div>
+          <button id="gate-catch" class="button ghost" type="button">Run self-catch</button>
+          <output id="gate-catch-result" aria-live="polite">Ready to verify.</output>
+        </div>
       </div>
       <aside class="hero-terminal" aria-label="Example agent approval">
         <div class="terminal-bar"><span></span><span></span><span></span><b>agent_request.log</b></div>
@@ -93,7 +102,7 @@
 
     <section id="screen-verdict" class="screen verdict-screen" aria-live="polite">
       <div class="verdict-hero">
-        <p class="kicker">CRITIC VERDICT / RECEIPTS ATTACHED</p>
+        <p class="kicker" id="verdict-kicker">DETERMINISTIC CHECK</p>
         <div id="verdict-seal" class="verdict-seal">CORRECT</div>
         <h2 id="verdict-heading">You contained the blast radius.</h2>
         <p id="verdict-explanation" class="lede"></p>
@@ -111,6 +120,11 @@
       <div class="result-card">
         <p class="kicker">SESSION COMPLETE / OPERATOR PROFILE</p>
         <h2>Your approval reflex<br>now has receipts.</h2>
+        <div class="shareable-summary" aria-label="Shareable session result">
+          <span>MEASURED THIS SESSION</span>
+          <strong id="result-summary-line">Pre 0/5 → post 0/5</strong>
+          <small>No score is hardcoded; this line comes from your completed session.</small>
+        </div>
         <div class="delta-block"><span>COMPETENCY DELTA</span><strong id="result-delta">+0</strong><small id="result-tests">0/5 → 0/5</small></div>
         <div class="result-stats"><div><strong id="result-reasoning">0%</strong><span>reasoning score</span></div><div><strong id="result-rounds">0</strong><span>rounds reviewed</span></div></div>
         <button id="share-result" class="button primary">Copy result</button>
@@ -126,6 +140,8 @@
   </main>
   <footer><span>BLAST RADIUS / BUILD WEEK 2026</span><span>Nothing shown here is executed.</span></footer>
   <script src="/static/app.js" defer></script>
+  <script src="/static/verdict-label.js" defer></script>
+  <script src="/static/integrity-check.js" defer></script>
+  <script src="/static/results-summary.js" defer></script>
 </body>
 </html>
-

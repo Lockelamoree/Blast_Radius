@@ -26,6 +26,10 @@ class SessionStore:
                 "CREATE TABLE IF NOT EXISTS sessions ("
                 "id TEXT PRIMARY KEY, state_json TEXT NOT NULL, updated_at TEXT NOT NULL)"
             )
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS llm_daily_usage ("
+                "usage_day TEXT PRIMARY KEY, calls INTEGER NOT NULL)"
+            )
 
     def save(self, state: SessionState) -> None:
         state.updated_at = datetime.now(UTC)
@@ -53,3 +57,23 @@ class SessionStore:
     def delete(self, session_id: str) -> None:
         with self._lock, self._connect() as connection:
             connection.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+
+    def try_consume_llm_call(self, daily_limit: int, now: datetime | None = None) -> bool:
+        """Atomically reserve one model call from the UTC daily budget."""
+        if daily_limit <= 0:
+            return False
+        usage_day = (now or datetime.now(UTC)).date().isoformat()
+        with self._lock, self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT calls FROM llm_daily_usage WHERE usage_day = ?", (usage_day,)
+            ).fetchone()
+            calls = int(row[0]) if row else 0
+            if calls >= daily_limit:
+                return False
+            connection.execute(
+                "INSERT INTO llm_daily_usage(usage_day, calls) VALUES (?, 1) "
+                "ON CONFLICT(usage_day) DO UPDATE SET calls=calls + 1",
+                (usage_day,),
+            )
+        return True

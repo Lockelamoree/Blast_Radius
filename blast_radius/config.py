@@ -22,6 +22,16 @@ class Settings:
     openai_api_key: str | None = os.getenv("OPENAI_API_KEY")
     live_generation: bool = _as_bool(os.getenv("BLAST_RADIUS_LIVE_GENERATION"))
     session_ttl_minutes: int = int(os.getenv("BLAST_RADIUS_SESSION_TTL_MINUTES", "180"))
+    daily_llm_budget: int = int(os.getenv("BLAST_RADIUS_DAILY_LLM_BUDGET", "100"))
+    session_create_limit_per_hour: int = int(
+        os.getenv("BLAST_RADIUS_SESSION_CREATE_LIMIT_PER_HOUR", "12")
+    )
+    round_request_limit_per_minute: int = int(
+        os.getenv("BLAST_RADIUS_ROUND_REQUEST_LIMIT_PER_MINUTE", "30")
+    )
+    session_round_request_cap: int = int(
+        os.getenv("BLAST_RADIUS_SESSION_ROUND_REQUEST_CAP", "30")
+    )
     generator_model: str = "gpt-5.6-luna"
     adaptation_model: str = "gpt-5.6-terra"
     critic_model: str = "gpt-5.6-sol"
