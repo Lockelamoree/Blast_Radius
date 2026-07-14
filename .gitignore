@@ -9,3 +9,8 @@ htmlcov/
 blast_radius.db
 *.db-shm
 *.db-wal
+
+# Local hackathon strategy archive; intentionally excluded from the public submission.
+/0[0-6]_*.md
+/judge/
+/research/
