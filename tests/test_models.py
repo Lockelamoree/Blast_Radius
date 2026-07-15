@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from blast_radius.models import BlastRadiusConfig, PlayerDecision
+from blast_radius.models import BlastRadiusConfig, PlayerDecision, TestQuestion as QuestionModel
 
 
 def test_sandbox_paths_cannot_escape_workspace() -> None:
@@ -27,3 +27,13 @@ def test_reasoning_has_minimum_signal() -> None:
     with pytest.raises(ValidationError):
         PlayerDecision(scenario_id="scenario-1", action="reject", reasoning_text="no")
 
+
+def test_question_rejects_unknown_competency() -> None:
+    with pytest.raises(ValidationError):
+        QuestionModel(
+            id="q-unknown",
+            prompt="Which competency does this question test?",
+            options=["Known", "Unknown"],
+            correct_index=0,
+            competency="raw tell string",
+        )

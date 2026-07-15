@@ -23,9 +23,11 @@ verified template -> bounded variation -> correctness gate -> player decision
 - 18 curated, receipt-backed scenarios across six threat families.
 - Mandatory pre-display gate with a tested rejection path and visible self-catch demo.
 - Decision, reasoning, and sandbox quality scored independently.
-- Five-question pre/post test, session-local competency map, and shareable measured result.
-- Deterministic judge mode that remains playable without an OpenAI API key.
-- GPT-5.6 reasoning critique whenever a key is present; live generation remains opt-in.
+- Five-question pre/post test, five-category competency map, and measured category deltas.
+- Deterministic judge mode that reorders only the remaining verified deck toward the
+  learner's weakest measured competency and remains playable without an OpenAI API key.
+- GPT-5.6 reasoning critique when the configured critic is verified; deterministic grading
+  remains the fallback, and live generation stays opt-in.
 
 ## Try it
 

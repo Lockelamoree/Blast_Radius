@@ -2,7 +2,9 @@ from dataclasses import replace
 
 from fastapi.testclient import TestClient
 
+from blast_radius.engine import TrustEngine
 from blast_radius.main import create_app
+from blast_radius.models import Competency
 
 
 def create_started_session(client):
@@ -100,7 +102,66 @@ def test_full_demo_session(client) -> None:
     assert result.status_code == 200
     assert result.json()["delta"] == 5
     assert result.json()["rounds_played"] == 6
+    assert result.json()["test_total"] == 5
+    assert set(result.json()["competency_map"]) == {item.value for item in Competency}
+    for competency in result.json()["competency_map"].values():
+        assert competency["pre_score"] == 0
+        assert competency["pre_total"] == 1
+        assert competency["post_score"] == 1
+        assert competency["post_total"] == 1
+        assert competency["test_delta"] == 1
+        assert competency["label"]
+    assert "hidden credential upload" not in result.text
     assert "pre 0/5 → post 5/5" in result.json()["share_text"]
+
+
+def test_demo_reorders_only_the_verified_deck_by_weakest_competency(
+    test_settings, monkeypatch
+) -> None:
+    async def generation_must_not_run(*args, **kwargs):
+        raise AssertionError("demo adaptation must not invoke live generation")
+
+    monkeypatch.setattr(TrustEngine, "next_scenario", generation_must_not_run)
+    expected_ids = {
+        "cmd-cleanup-2",
+        "dep-typo-1",
+        "tool-scope-1",
+        "diff-exfil-1",
+        "context-injection-1",
+        "market-egress-1",
+    }
+
+    with TestClient(create_app(test_settings)) as adaptive_client:
+        created = adaptive_client.post("/api/sessions", json={"mode": "demo"}).json()
+        session_id = created["session_id"]
+        pretest = adaptive_client.post(
+            f"/api/sessions/{session_id}/pretest",
+            json={"answers": [1, 1, 0, 1, 1]},
+        )
+        assert pretest.status_code == 200
+
+        played = []
+        for _ in range(6):
+            round_data = adaptive_client.post(
+                f"/api/sessions/{session_id}/rounds/next"
+            ).json()
+            scenario_id = round_data["scenario"]["id"]
+            played.append(scenario_id)
+            decision = adaptive_client.post(
+                f"/api/sessions/{session_id}/decisions",
+                json={
+                    "scenario_id": scenario_id,
+                    "action": "reject",
+                    "reasoning_text": (
+                        "The evidence shows an excessive capability or egress mismatch."
+                    ),
+                },
+            )
+            assert decision.status_code == 200
+
+    assert played[:2] == ["tool-scope-1", "market-egress-1"]
+    assert set(played) == expected_ids
+    assert len(played) == len(set(played)) == 6
 
 
 def test_session_creation_has_a_per_ip_limit(test_settings) -> None:

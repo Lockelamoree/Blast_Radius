@@ -61,6 +61,12 @@
   font: 24px/1.2 var(--serif);
 }
 
+.mastery-delta {
+  margin-top: 5px;
+  color: var(--muted);
+  font: 9px var(--mono);
+}
+
 @media (max-width: 620px) {
   .integrity-check {
     grid-template-columns: 1fr;

@@ -1,5 +1,5 @@
 from blast_radius.engine.bank import ScenarioBank
-from blast_radius.models import ScenarioFamily
+from blast_radius.models import Competency, ScenarioFamily
 
 
 def test_bank_has_full_requested_coverage(test_settings) -> None:
@@ -7,6 +7,7 @@ def test_bank_has_full_requested_coverage(test_settings) -> None:
     assert len(bank.scenarios) >= 18
     assert {scenario.family for scenario in bank.scenarios.values()} == set(ScenarioFamily)
     assert len(bank.questions) == 5
+    assert {question.competency for question in bank.questions} == set(Competency)
 
 
 def test_public_view_never_contains_ground_truth(test_settings) -> None:
@@ -15,4 +16,3 @@ def test_public_view_never_contains_ground_truth(test_settings) -> None:
         payload = scenario.public_view()
         assert "ground_truth" not in payload
         assert "correct_action" not in str(payload)
-

@@ -22,6 +22,36 @@ class ScenarioFamily(StrEnum):
     SKILL_MARKETPLACE = "skill_marketplace"
 
 
+class Competency(StrEnum):
+    SCOPE = "scope"
+    PROVENANCE = "provenance"
+    CAPABILITIES = "capabilities"
+    DIFF_REVIEW = "diff_review"
+    PROMPT_INJECTION = "prompt_injection"
+
+
+COMPETENCY_LABELS: dict[Competency, str] = {
+    Competency.SCOPE: "Scope discipline",
+    Competency.PROVENANCE: "Dependency provenance",
+    Competency.CAPABILITIES: "Capability boundaries",
+    Competency.DIFF_REVIEW: "Diff review",
+    Competency.PROMPT_INJECTION: "Prompt injection",
+}
+
+FAMILY_COMPETENCIES: dict[ScenarioFamily, Competency] = {
+    ScenarioFamily.DANGEROUS_COMMAND: Competency.SCOPE,
+    ScenarioFamily.POISONED_DEPENDENCY: Competency.PROVENANCE,
+    ScenarioFamily.OVERSCOPED_TOOL: Competency.CAPABILITIES,
+    ScenarioFamily.MALICIOUS_DIFF: Competency.DIFF_REVIEW,
+    ScenarioFamily.POISONED_CONTEXT: Competency.PROMPT_INJECTION,
+    ScenarioFamily.SKILL_MARKETPLACE: Competency.CAPABILITIES,
+}
+
+
+def competency_for_family(family: ScenarioFamily) -> Competency:
+    return FAMILY_COMPETENCIES[family]
+
+
 class Artifact(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -171,7 +201,7 @@ class TestQuestion(BaseModel):
     prompt: str
     options: list[str] = Field(min_length=2, max_length=5)
     correct_index: int = Field(ge=0)
-    competency: str
+    competency: Competency
 
     def public_view(self) -> dict[str, Any]:
         return self.model_dump(exclude={"correct_index"})
@@ -184,8 +214,10 @@ class SessionState(BaseModel):
     mode: str = Field(pattern=r"^(demo|live)$")
     pretest_answers: list[int] | None = None
     pretest_score: int | None = None
+    pretest_competency: dict[str, dict[str, int]] = Field(default_factory=dict)
     posttest_answers: list[int] | None = None
     posttest_score: int | None = None
+    posttest_competency: dict[str, dict[str, int]] = Field(default_factory=dict)
     scenario_order: list[str]
     current_index: int = 0
     active_scenario_id: str | None = None
@@ -196,12 +228,25 @@ class SessionState(BaseModel):
     competency: dict[str, dict[str, int]] = Field(default_factory=dict)
 
 
+class CompetencyProgress(BaseModel):
+    label: str
+    hits: int = Field(ge=0)
+    misses: int = Field(ge=0)
+    mastery_percent: int = Field(ge=0, le=100)
+    pre_score: int = Field(ge=0)
+    pre_total: int = Field(ge=0)
+    post_score: int = Field(ge=0)
+    post_total: int = Field(ge=0)
+    test_delta: int
+
+
 class LearnerProgress(BaseModel):
     session_id: str
     pretest_score: int
     posttest_score: int
+    test_total: int
     delta: int
     rounds_played: int
-    competency_map: dict[str, dict[str, int]]
+    competency_map: dict[Competency, CompetencyProgress]
     average_reasoning_score: int
     share_text: str

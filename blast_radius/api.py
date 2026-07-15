@@ -9,10 +9,14 @@ from pydantic import BaseModel, ConfigDict, Field
 from blast_radius.config import Settings
 from blast_radius.engine import TrustEngine
 from blast_radius.models import (
+    COMPETENCY_LABELS,
+    Competency,
+    CompetencyProgress,
     LearnerProgress,
     PlayerDecision,
     Scenario,
     SessionState,
+    competency_for_family,
 )
 from blast_radius.storage import SessionStore
 
@@ -75,16 +79,53 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
 
     SessionDep = Annotated[SessionState, Depends(load_session)]
 
-    def score_test(answers: list[int]) -> int:
+    demo_rank = {
+        scenario_id: index for index, scenario_id in enumerate(engine.bank.demo_order())
+    }
+
+    def score_test(answers: list[int]) -> tuple[int, dict[str, dict[str, int]]]:
         if len(answers) != len(engine.bank.questions):
             raise HTTPException(status_code=422, detail="Exactly five answers are required.")
+        competency_scores = {
+            competency.value: {"score": 0, "total": 0} for competency in Competency
+        }
         for question, answer in zip(engine.bank.questions, answers, strict=True):
             if answer < 0 or answer >= len(question.options):
                 raise HTTPException(status_code=422, detail="An answer index is out of range.")
-        return sum(
-            answer == question.correct_index
-            for answer, question in zip(answers, engine.bank.questions, strict=True)
+            record = competency_scores[question.competency.value]
+            record["total"] += 1
+            record["score"] += int(answer == question.correct_index)
+        return sum(record["score"] for record in competency_scores.values()), competency_scores
+
+    def competency_accuracy(state: SessionState, competency: Competency) -> float:
+        test_record = state.pretest_competency.get(
+            competency.value, {"score": 0, "total": 0}
         )
+        round_record = state.competency.get(
+            competency.value, {"hits": 0, "misses": 0}
+        )
+        hits = test_record.get("score", 0) + round_record.get("hits", 0)
+        total = (
+            test_record.get("total", 0)
+            + round_record.get("hits", 0)
+            + round_record.get("misses", 0)
+        )
+        return hits / total if total else 1.0
+
+    def reorder_demo_suffix(state: SessionState, start: int) -> None:
+        if state.mode != "demo":
+            return
+        remaining = state.scenario_order[start:]
+        remaining.sort(
+            key=lambda scenario_id: (
+                competency_accuracy(
+                    state,
+                    competency_for_family(engine.bank.get(scenario_id).family),
+                ),
+                demo_rank[scenario_id],
+            )
+        )
+        state.scenario_order[start:] = remaining
 
     @router.get("/demo/gate-catch")
     def demo_gate_catch() -> dict:
@@ -121,7 +162,8 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
         if state.pretest_answers is not None:
             raise HTTPException(status_code=409, detail="Pre-test was already submitted.")
         state.pretest_answers = payload.answers
-        state.pretest_score = score_test(payload.answers)
+        state.pretest_score, state.pretest_competency = score_test(payload.answers)
+        reorder_demo_suffix(state, 0)
         store.save(state)
         return {"score": state.pretest_score, "total": len(engine.bank.questions)}
 
@@ -146,11 +188,7 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
                 raise HTTPException(status_code=503, detail="Curated scenario failed verification.")
         else:
             target = engine.bank.get(state.scenario_order[state.current_index])
-            weakest = min(
-                state.competency,
-                key=lambda key: state.competency[key].get("hits", 0),
-                default=target.family.value,
-            )
+            weakest = min(Competency, key=lambda item: competency_accuracy(state, item)).value
             difficulty = min(5, 1 + state.current_index)
             scenario, fallback_reason = await engine.next_scenario(
                 family=target.family,
@@ -188,14 +226,16 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
             raise HTTPException(status_code=409, detail="This round was already answered.")
         scenario = Scenario.model_validate_json(state.active_scenario_json)
         grade = await engine.grade(scenario, decision)
+        competency = competency_for_family(scenario.family).value
+        record = state.competency.setdefault(competency, {"hits": 0, "misses": 0})
         for tell in scenario.ground_truth.tells:
-            record = state.competency.setdefault(tell, {"hits": 0, "misses": 0})
             record["hits" if tell in grade.matched_tells else "misses"] += 1
         state.grades.append(grade)
         state.answered_scenario_ids.append(scenario.id)
         state.current_index += 1
         state.active_scenario_id = None
         state.active_scenario_json = None
+        reorder_demo_suffix(state, state.current_index)
         store.save(state)
         return {
             "grade": grade.model_dump(mode="json"),
@@ -209,7 +249,7 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
         if state.posttest_answers is not None:
             raise HTTPException(status_code=409, detail="Post-test was already submitted.")
         state.posttest_answers = payload.answers
-        state.posttest_score = score_test(payload.answers)
+        state.posttest_score, state.posttest_competency = score_test(payload.answers)
         store.save(state)
         return {"score": state.posttest_score, "total": len(engine.bank.questions)}
 
@@ -223,17 +263,44 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
             else 0
         )
         delta = state.posttest_score - state.pretest_score
+        competency_map: dict[Competency, CompetencyProgress] = {}
+        for competency in Competency:
+            round_record = state.competency.get(
+                competency.value, {"hits": 0, "misses": 0}
+            )
+            pre = state.pretest_competency.get(
+                competency.value, {"score": 0, "total": 0}
+            )
+            post = state.posttest_competency.get(
+                competency.value, {"score": 0, "total": 0}
+            )
+            hits = round_record.get("hits", 0)
+            misses = round_record.get("misses", 0)
+            total_signals = hits + misses
+            competency_map[competency] = CompetencyProgress(
+                label=COMPETENCY_LABELS[competency],
+                hits=hits,
+                misses=misses,
+                mastery_percent=round(100 * hits / total_signals) if total_signals else 0,
+                pre_score=pre.get("score", 0),
+                pre_total=pre.get("total", 0),
+                post_score=post.get("score", 0),
+                post_total=post.get("total", 0),
+                test_delta=post.get("score", 0) - pre.get("score", 0),
+            )
+        test_total = len(engine.bank.questions)
         return LearnerProgress(
             session_id=state.id,
             pretest_score=state.pretest_score,
             posttest_score=state.posttest_score,
+            test_total=test_total,
             delta=delta,
             rounds_played=len(state.grades),
-            competency_map=state.competency,
+            competency_map=competency_map,
             average_reasoning_score=average,
             share_text=(
-                f"I completed Blast Radius: pre {state.pretest_score}/5 → "
-                f"post {state.posttest_score}/5, {len(state.grades)} agent decisions, "
+                f"I completed Blast Radius: pre {state.pretest_score}/{test_total} → "
+                f"post {state.posttest_score}/{test_total}, {len(state.grades)} agent decisions, "
                 f"and {average}% average reasoning."
             ),
         )
