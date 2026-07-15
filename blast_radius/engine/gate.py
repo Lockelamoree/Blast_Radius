@@ -33,16 +33,12 @@ class CorrectnessGate:
         combined_artifacts = "\n".join(
             artifact.content.lower() for artifact in scenario.presentation.artifacts
         )
-        supported_groups = 0
-        for keywords in truth.tell_keywords.values():
-            if any(keyword.lower() in combined_artifacts for keyword in keywords):
-                supported_groups += 1
-        if supported_groups == 0:
-            reasons.append("presented artifacts do not support any declared tell")
+        for tell, keywords in truth.tell_keywords.items():
+            if not any(keyword.lower() in combined_artifacts for keyword in keywords):
+                reasons.append(f"presented artifacts do not support declared tell: {tell}")
 
         return GateResult(
             passed=not reasons,
             reasons=reasons,
             scenario_id=scenario.id,
         )
-

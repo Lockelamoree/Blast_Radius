@@ -1,7 +1,13 @@
 import pytest
 from pydantic import ValidationError
 
-from blast_radius.models import BlastRadiusConfig, PlayerDecision, TestQuestion as QuestionModel
+from blast_radius.models import (
+    BlastRadiusConfig,
+    Evidence,
+    PlayerDecision,
+    Receipt,
+    TestQuestion as QuestionModel,
+)
 
 
 def test_sandbox_paths_cannot_escape_workspace() -> None:
@@ -37,3 +43,29 @@ def test_question_rejects_unknown_competency() -> None:
             correct_index=0,
             competency="raw tell string",
         )
+
+
+@pytest.mark.parametrize("source", ["javascript:alert(1)", "data:text/html,payload"])
+def test_evidence_and_receipts_reject_unsafe_source_schemes(source: str) -> None:
+    with pytest.raises(ValidationError):
+        Evidence(
+            id="unsafe-source",
+            source=source,
+            retrieved_at="2026-07-15",
+            claim="This claim has a sufficiently descriptive body.",
+            excerpt="A supporting artifact excerpt.",
+        )
+    with pytest.raises(ValidationError):
+        Receipt(claim="Unsafe source", evidence="Artifact", source=source)
+
+
+def test_evidence_and_receipts_accept_https_sources() -> None:
+    source = "https://example.com/security/advisory"
+    assert Evidence(
+        id="safe-source",
+        source=source,
+        retrieved_at="2026-07-15",
+        claim="This claim has a sufficiently descriptive body.",
+        excerpt="A supporting artifact excerpt.",
+    ).source == source
+    assert Receipt(claim="Safe source", evidence="Artifact", source=source).source == source

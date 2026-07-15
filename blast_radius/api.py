@@ -1,5 +1,5 @@
 import time
-from collections import defaultdict, deque
+from collections import deque
 from typing import Annotated
 from uuid import uuid4
 
@@ -35,13 +35,20 @@ class SlidingWindowLimiter:
     def __init__(self, limit: int = 45, window_seconds: int = 60):
         self.limit = limit
         self.window_seconds = window_seconds
-        self.hits: dict[str, deque[float]] = defaultdict(deque)
+        self.hits: dict[str, deque[float]] = {}
 
     def check(self, key: str) -> None:
         now = time.monotonic()
-        bucket = self.hits[key]
+        bucket = self.hits.get(key)
+        if bucket is None:
+            bucket = deque()
+            self.hits[key] = bucket
         while bucket and now - bucket[0] > self.window_seconds:
             bucket.popleft()
+        if not bucket:
+            self.hits.pop(key, None)
+            bucket = deque()
+            self.hits[key] = bucket
         if len(bucket) >= self.limit:
             raise HTTPException(status_code=429, detail="Too many requests; pause and try again.")
         bucket.append(now)
@@ -71,10 +78,10 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
         round_session_limiter.check(f"round-session:{session_id}")
 
     def load_session(session_id: str, request: Request) -> SessionState:
-        limiter.check(f"{request.client.host if request.client else 'unknown'}:{session_id}")
         state = store.get(session_id)
         if state is None:
             raise HTTPException(status_code=404, detail="Session not found or expired.")
+        limiter.check(f"{client_host(request)}:{session_id}")
         return state
 
     SessionDep = Annotated[SessionState, Depends(load_session)]
@@ -128,7 +135,8 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
         state.scenario_order[start:] = remaining
 
     @router.get("/demo/gate-catch")
-    def demo_gate_catch() -> dict:
+    def demo_gate_catch(request: Request) -> dict:
+        limiter.check(f"gate-catch:{client_host(request)}")
         planted = engine.bank.get("dep-typo-1").model_copy(deep=True)
         planted.id = "demo-planted-hallucination"
         planted.template_ref = "invented-cve-2099-fake-package"

@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -69,6 +70,14 @@ class Evidence(BaseModel):
     retrieved_at: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
     claim: str = Field(min_length=10, max_length=500)
     excerpt: str = Field(min_length=3, max_length=1000)
+
+    @field_validator("source")
+    @classmethod
+    def validate_source(cls, value: str) -> str:
+        parsed = urlsplit(value)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("evidence source must be an http(s) URL")
+        return value
 
 
 class BlastRadiusConfig(BaseModel):
@@ -177,9 +186,19 @@ class GateResult(BaseModel):
 
 
 class Receipt(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     claim: str
     evidence: str
     source: str
+
+    @field_validator("source")
+    @classmethod
+    def validate_source(cls, value: str) -> str:
+        parsed = urlsplit(value)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("receipt source must be an http(s) URL")
+        return value
 
 
 class GradeResult(BaseModel):

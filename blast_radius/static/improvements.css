@@ -67,6 +67,21 @@
   font: 9px var(--mono);
 }
 
+progress.mastery-track {
+  width: 100%;
+  border: 0;
+  appearance: none;
+}
+
+progress.mastery-track::-webkit-progress-bar {
+  background: #252820;
+}
+
+progress.mastery-track::-webkit-progress-value,
+progress.mastery-track::-moz-progress-bar {
+  background: var(--acid);
+}
+
 @media (max-width: 620px) {
   .integrity-check {
     grid-template-columns: 1fr;

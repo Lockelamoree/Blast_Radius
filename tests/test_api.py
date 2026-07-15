@@ -3,6 +3,7 @@ from dataclasses import replace
 from fastapi.testclient import TestClient
 
 from blast_radius.engine import TrustEngine
+from blast_radius.api import SlidingWindowLimiter
 from blast_radius.main import create_app
 from blast_radius.models import Competency
 
@@ -28,6 +29,17 @@ def test_health_and_home(client) -> None:
     assert "api_key" not in str(health.json()).lower()
 
 
+def test_api_documentation_is_off_by_default_and_explicitly_enabled(
+    client, test_settings
+) -> None:
+    assert client.get("/api/docs").status_code == 404
+    assert client.get("/api/openapi.json").status_code == 404
+
+    with TestClient(create_app(replace(test_settings, enable_docs=True))) as docs_client:
+        assert docs_client.get("/api/docs").status_code == 200
+        assert docs_client.get("/api/openapi.json").status_code == 200
+
+
 def test_round_response_hides_ground_truth(client) -> None:
     session_id = create_started_session(client)
     response = client.post(f"/api/sessions/{session_id}/rounds/next")
@@ -42,6 +54,31 @@ def test_gate_catch_rejects_planted_hallucination_without_leaking_it(client) -> 
     assert response.status_code == 200
     assert response.json() == {"passed": False, "reasons": ["unknown template_ref"]}
     assert "ground_truth" not in response.text
+
+
+def test_gate_catch_is_rate_limited(client) -> None:
+    for _ in range(45):
+        assert client.get("/api/demo/gate-catch").status_code == 200
+    assert client.get("/api/demo/gate-catch").status_code == 429
+
+
+def test_unknown_session_ids_do_not_allocate_rate_limit_buckets(
+    test_settings, monkeypatch
+) -> None:
+    checked: list[str] = []
+    original_check = SlidingWindowLimiter.check
+
+    def record_check(limiter, key: str) -> None:
+        checked.append(key)
+        original_check(limiter, key)
+
+    monkeypatch.setattr(SlidingWindowLimiter, "check", record_check)
+    with TestClient(create_app(test_settings)) as unknown_client:
+        for index in range(20):
+            response = unknown_client.get(f"/api/sessions/missing-{index}/results")
+            assert response.status_code == 404
+
+    assert checked == []
 
 
 def test_duplicate_decision_is_rejected(client) -> None:

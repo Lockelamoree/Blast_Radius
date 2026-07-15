@@ -18,6 +18,7 @@ def test_deploy_env_preserves_unset_key_and_updates_managed_values(tmp_path) -> 
     assert values["CUSTOM_SETTING"] == "keep"
     assert values["BLAST_RADIUS_DAILY_LLM_BUDGET"] == "500"
     assert values["BLAST_RADIUS_CRITIC_TIMEOUT_SECONDS"] == "8"
+    assert values["BLAST_RADIUS_ENABLE_DOCS"] == "false"
 
 
 def test_deploy_env_replaces_or_clears_explicit_key(tmp_path) -> None:

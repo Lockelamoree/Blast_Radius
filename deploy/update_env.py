@@ -11,6 +11,7 @@ def update_environment(path: Path, app_dir: Path, environ: dict[str, str]) -> No
     managed = {
         "BLAST_RADIUS_DATABASE": str(app_dir / "blast_radius.db"),
         "BLAST_RADIUS_LIVE_GENERATION": "false",
+        "BLAST_RADIUS_ENABLE_DOCS": "false",
         "BLAST_RADIUS_SESSION_TTL_MINUTES": "180",
         "BLAST_RADIUS_DAILY_LLM_BUDGET": environ.get(
             "BLAST_RADIUS_DAILY_LLM_BUDGET", "500"

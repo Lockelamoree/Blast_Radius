@@ -21,3 +21,17 @@ def test_results_render_measured_values_without_hardcoded_zero_scores() -> None:
     assert "value.post_score" in app
     assert "grade.critic_used" in app
     assert "GPT-5.6 CRITIQUE" in app
+    assert 'onclick=' not in template
+    assert "document.createElement('progress')" in app
+    assert ".style.width" not in app
+    assert "^https?:\\/\\/" in app
+
+
+def test_caddy_security_policy_does_not_require_inline_code() -> None:
+    root = Path(__file__).parents[1]
+    caddy = (root / "deploy" / "Caddyfile").read_text(encoding="utf-8")
+
+    assert "Strict-Transport-Security" in caddy
+    assert "Content-Security-Policy" in caddy
+    assert "script-src 'self'" in caddy
+    assert "'unsafe-inline'" not in caddy

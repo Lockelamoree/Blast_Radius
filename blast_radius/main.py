@@ -13,6 +13,7 @@ from blast_radius.config import Settings, settings
 from blast_radius.engine import TrustEngine
 from blast_radius.storage import SessionStore
 
+
 def create_app(config: Settings = settings) -> FastAPI:
     store = SessionStore(config.database_path, config.session_ttl_minutes)
     engine = TrustEngine(
@@ -36,7 +37,8 @@ def create_app(config: Settings = settings) -> FastAPI:
         title="Blast Radius",
         version="0.1.0",
         description="A verification game for safely operating AI coding agents.",
-        docs_url="/api/docs",
+        docs_url="/api/docs" if config.enable_docs else None,
+        openapi_url="/api/openapi.json" if config.enable_docs else None,
         redoc_url=None,
         lifespan=lifespan,
     )
