@@ -133,3 +133,4 @@ def test_exhausted_budget_skips_provider_and_uses_deterministic_grade(test_setti
     assert grade.graded_by == "deterministic"
     assert not grade.critic_used
     assert grade.reasoning_score == 0
+    assert grade.grading_degraded_reason == "budget_exhausted"

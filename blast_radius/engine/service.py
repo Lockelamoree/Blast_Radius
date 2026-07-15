@@ -81,6 +81,10 @@ class TrustEngine:
             logger.warning("OpenAI reasoning critique failed (%s)", type(exc).__name__)
             return grade
         if review is None:
+            if getattr(self.openai, "budget_exhausted", False):
+                return grade.model_copy(
+                    update={"grading_degraded_reason": "budget_exhausted"}
+                )
             return grade
         allowed = set(scenario.ground_truth.tells)
         critic_matched_tells = list(

@@ -9,13 +9,16 @@ document.querySelector('#gate-catch').addEventListener('click', async (event) =>
     if (review.passed) {
       result.className = 'gate-failed-open';
       result.textContent = 'Unexpected pass. Do not use this scenario.';
+      window.announceStatus(result.textContent);
       return;
     }
     result.className = 'gate-blocked';
     result.textContent = `BLOCKED · ${review.reasons.join(' · ')}`;
+    window.announceStatus(result.textContent);
   } catch (error) {
     result.className = 'gate-failed-open';
     result.textContent = error.message;
+    window.announceStatus(`Integrity check failed: ${result.textContent}`);
   } finally {
     button.disabled = false;
   }

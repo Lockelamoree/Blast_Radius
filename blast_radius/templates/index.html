@@ -4,11 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Blast Radius teaches developers to safely approve, sandbox, or reject AI coding-agent actions.">
+  <meta property="og:title" content="Blast Radius — Size the risk before you approve">
+  <meta property="og:description" content="Train your AI coding-agent approval reflex with verified scenarios and evidence receipts.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Blast Radius — Size the risk before you approve">
+  <meta name="twitter:description" content="Verified security training for AI coding-agent decisions.">
   <title>Blast Radius — Size the risk before you approve</title>
-  <link rel="stylesheet" href="/static/styles.css">
-  <link rel="stylesheet" href="/static/improvements.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%23090a09'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-family='monospace' font-size='26' font-weight='700' fill='%23c8ff3d'%3EBR%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/styles.css?v=20260715-4">
+  <link rel="stylesheet" href="/static/improvements.css?v=20260715-4">
 </head>
 <body>
+  <p id="app-status" class="sr-only" aria-live="polite" aria-atomic="true"></p>
   <div class="noise" aria-hidden="true"></div>
   <header class="site-header">
     <a class="brand" href="/" aria-label="Blast Radius home">
@@ -25,7 +33,7 @@
         <p class="lede">Your coding agent wants to act. Inspect the evidence, constrain the blast radius, and explain the tell. Every verdict comes with receipts.</p>
         <div class="hero-actions">
           <button class="button primary" data-start="demo">Start verified run <span>→</span></button>
-          <button class="button ghost" data-start="live">Try live variation</button>
+          <button class="button ghost" data-start="live" disabled>Try live variation</button>
         </div>
         <p id="live-note" class="microcopy">Live mode falls back to verified scenarios if generation is unavailable.</p>
         <div class="integrity-check">
@@ -34,7 +42,7 @@
             <p>Watch the deterministic gate block a planted hallucination before it can become a round.</p>
           </div>
           <button id="gate-catch" class="button ghost" type="button">Run self-catch</button>
-          <output id="gate-catch-result" aria-live="polite">Ready to verify.</output>
+          <output id="gate-catch-result">Ready to verify.</output>
         </div>
       </div>
       <aside class="hero-terminal" aria-label="Example agent approval">
@@ -56,10 +64,10 @@
       </div>
     </section>
 
-    <section id="screen-test" class="screen test-screen" aria-live="polite">
+    <section id="screen-test" class="screen test-screen">
       <div class="section-heading">
         <div><p class="kicker" id="test-kicker">BASELINE</p><h2 id="test-title">Calibrate your instincts.</h2></div>
-        <div class="step-chip"><span id="test-step">01</span> / <span id="test-total">â€”</span></div>
+        <div class="step-chip"><span id="test-step">01</span> / <span id="test-total">—</span></div>
       </div>
       <form id="test-form" class="test-card">
         <p id="test-prompt" class="question"></p>
@@ -68,11 +76,12 @@
       </form>
     </section>
 
-    <section id="screen-round" class="screen round-screen" aria-live="polite" aria-busy="false">
+    <section id="screen-round" class="screen round-screen" aria-busy="false">
       <div class="round-topline">
         <div><span id="round-number">ROUND 01</span><span class="slash">/</span><span id="round-family">DANGEROUS COMMAND</span></div>
         <div class="timer" id="timer"><span id="timer-value">60</span><small>SEC</small></div>
       </div>
+      <p id="timer-status" class="microcopy timer-status hidden"></p>
       <div class="round-grid">
         <article class="request-panel">
           <p class="kicker" id="scenario-eyebrow"></p>
@@ -95,13 +104,13 @@
           </div>
           <label class="reason-label" for="reasoning">NAME THE TELL <span>one clear sentence</span></label>
           <textarea id="reasoning" maxlength="500" placeholder="I chose this because…"></textarea>
-          <p id="grading-status" class="microcopy hidden" aria-live="polite"></p>
-          <div class="decision-footer"><span id="reason-count">0 / 500</span><button id="submit-decision" class="button primary" disabled>Commit decision</button></div>
+          <p id="grading-status" class="microcopy hidden"></p>
+          <div class="decision-footer"><span id="reason-count">0 / 500</span><div><button id="reset-decision" class="button ghost hidden" type="button">Reset</button><button id="submit-decision" class="button primary" disabled>Commit decision</button></div></div>
         </aside>
       </div>
     </section>
 
-    <section id="screen-verdict" class="screen verdict-screen" aria-live="polite">
+    <section id="screen-verdict" class="screen verdict-screen">
       <div class="verdict-hero">
         <p class="kicker" id="verdict-kicker">DETERMINISTIC CHECK</p>
         <div id="verdict-seal" class="verdict-seal">CORRECT</div>
@@ -117,7 +126,7 @@
       </div>
     </section>
 
-    <section id="screen-results" class="screen results-screen" aria-live="polite">
+    <section id="screen-results" class="screen results-screen">
       <div class="result-card">
         <p class="kicker">SESSION COMPLETE / OPERATOR PROFILE</p>
         <h2>Your approval reflex<br>now has receipts.</h2>
@@ -134,13 +143,13 @@
       <div class="mastery-panel"><div class="panel-label">COMPETENCY MAP</div><div id="mastery-map"></div></div>
     </section>
 
-    <section id="screen-error" class="screen error-screen" aria-live="assertive">
+    <section id="screen-error" class="screen error-screen">
       <p class="kicker">SYSTEM NOTICE</p><h2>That request lost containment.</h2><p id="error-message" class="lede"></p>
       <button id="return-to-safety" class="button primary">Return to safety</button>
     </section>
   </main>
   <footer><span>BLAST RADIUS / BUILD WEEK 2026</span><span>Nothing shown here is executed.</span></footer>
-  <script src="/static/app.js" defer></script>
-  <script src="/static/integrity-check.js" defer></script>
+  <script src="/static/app.js?v=20260715-4" defer></script>
+  <script src="/static/integrity-check.js?v=20260715-4" defer></script>
 </body>
 </html>

@@ -82,6 +82,34 @@ progress.mastery-track::-moz-progress-bar {
   background: var(--acid);
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+:is(.action, .button, .option, input, textarea, a):focus-visible,
+.option:has(input:focus-visible) {
+  outline: 3px solid var(--acid);
+  outline-offset: 3px;
+}
+
+.timer-status {
+  margin: 0 0 12px;
+  color: var(--orange);
+}
+
+.decision-footer > div {
+  display: flex;
+  gap: 8px;
+}
+
 @media (max-width: 620px) {
   .integrity-check {
     grid-template-columns: 1fr;

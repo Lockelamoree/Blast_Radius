@@ -5,6 +5,7 @@ import copy
 import json
 import logging
 from collections.abc import Callable
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
@@ -140,6 +141,9 @@ class OpenAIAdapter:
         self.reasoning_grading_state = (
             "key_present_unverified" if self.grading_enabled else "off"
         )
+        self._budget_exhausted: ContextVar[bool] = ContextVar(
+            "blast_radius_budget_exhausted", default=False
+        )
         self._probe_complete = False
         self._client: Any = None
         if self.grading_enabled or self.generation_enabled:
@@ -160,6 +164,7 @@ class OpenAIAdapter:
         name: str,
         effort: str,
     ) -> StructuredCallResult[OutputT] | None:
+        self._budget_exhausted.set(False)
         if self._client is None:
             return None
         reservation: str | None = None
@@ -168,6 +173,7 @@ class OpenAIAdapter:
         if self._reserve_llm_call is not None:
             reservation = self._reserve_llm_call()
             if reservation is None:
+                self._budget_exhausted.set(True)
                 logger.info("OpenAI call skipped because the daily budget is exhausted")
                 return None
             reserved = True
@@ -206,6 +212,10 @@ class OpenAIAdapter:
         finally:
             if reserved and not succeeded and reservation and self._refund_llm_call is not None:
                 self._refund_llm_call(reservation)
+
+    @property
+    def budget_exhausted(self) -> bool:
+        return self._budget_exhausted.get()
 
     async def probe_reasoning_grading(self) -> None:
         """Verify the configured critic once without delaying application startup."""

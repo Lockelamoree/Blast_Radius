@@ -38,3 +38,42 @@ def test_caddy_security_policy_does_not_require_inline_code() -> None:
     assert "Content-Security-Policy" in caddy
     assert "script-src 'self'" in caddy
     assert "'unsafe-inline'" not in caddy
+
+
+def test_accessibility_and_honest_live_mode_are_wired_without_overlays() -> None:
+    root = Path(__file__).parents[1]
+    template = (root / "blast_radius" / "templates" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    app = (root / "blast_radius" / "static" / "app.js").read_text(encoding="utf-8")
+    css = (root / "blast_radius" / "static" / "improvements.css").read_text(
+        encoding="utf-8"
+    )
+
+    assert template.count('aria-live="polite"') == 1
+    assert 'id="app-status"' in template
+    assert 'data-start="live" disabled' in template
+    assert 'id="reset-decision"' in template
+    assert "Time expired" in app
+    assert "button.disabled=true" in app
+    assert "target.focus" in app
+    assert "health.live_generation" in app
+    assert "liveGenerationAvailable" in app
+    assert "MODEL BUDGET EXHAUSTED" in app
+    assert "grade.graded_by===grade.critic_model" in app
+    assert ":focus-visible" in css
+    assert ".sr-only" in css
+
+
+def test_social_metadata_and_static_assets_are_cache_busted() -> None:
+    template = (
+        Path(__file__).parents[1] / "blast_radius" / "templates" / "index.html"
+    ).read_text(encoding="utf-8")
+
+    assert 'rel="icon" href="data:image/svg+xml' in template
+    assert 'property="og:title"' in template
+    assert 'name="twitter:card"' in template
+    assert "/static/styles.css?v=" in template
+    assert "/static/improvements.css?v=" in template
+    assert "/static/app.js?v=" in template
+    assert "/static/integrity-check.js?v=" in template
