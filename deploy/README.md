@@ -7,13 +7,14 @@ sudo OPENAI_API_KEY='spend-capped-key' bash deploy/deploy.sh blast-radius.exampl
 ```
 
 The script installs Python, Caddy, and the app; creates the restricted service user;
-enables both services; obtains HTTPS through Caddy; and verifies `/healthz`. It preserves an
-existing `/etc/blast-radius.env`, so key rotation and budget changes remain operator-owned.
+enables both services; obtains HTTPS through Caddy; and verifies `/healthz`. On re-runs it
+preserves the existing key unless `OPENAI_API_KEY` is explicitly supplied, in which case the
+key is updated. The health check prints and warns on an unverified grading state.
 
 The public profile keeps `BLAST_RADIUS_LIVE_GENERATION=false`: a server-side key enables
 GPT-5.6 reasoning grading, while scenario generation stays deterministic. Set
 `BLAST_RADIUS_DAILY_LLM_BUDGET` to cap model calls per UTC day; once exhausted, the app
-continues with deterministic grading.
+continues with deterministic grading. The default budget is 500 successful structured calls.
 
 ## Manual deployment
 
@@ -33,7 +34,8 @@ continues with deterministic grading.
    BLAST_RADIUS_DATABASE=/opt/blast-radius/blast_radius.db
    BLAST_RADIUS_LIVE_GENERATION=false
    BLAST_RADIUS_SESSION_TTL_MINUTES=180
-   BLAST_RADIUS_DAILY_LLM_BUDGET=100
+   BLAST_RADIUS_DAILY_LLM_BUDGET=500
+   BLAST_RADIUS_CRITIC_TIMEOUT_SECONDS=8
    OPENAI_API_KEY=spend-capped-server-side-key
    ```
 

@@ -45,14 +45,19 @@ runuser -u blast-radius -- "$APP_DIR/.venv/bin/python" -m pip install -e "$APP_D
 
 if [[ ! -f "$ENV_FILE" ]]; then
   install -m 600 -o root -g root /dev/null "$ENV_FILE"
-  {
-    printf 'OPENAI_API_KEY=%s\n' "${OPENAI_API_KEY:-}"
-    printf 'BLAST_RADIUS_DATABASE=%s\n' "$APP_DIR/blast_radius.db"
-    printf 'BLAST_RADIUS_LIVE_GENERATION=false\n'
-    printf 'BLAST_RADIUS_SESSION_TTL_MINUTES=180\n'
-    printf 'BLAST_RADIUS_DAILY_LLM_BUDGET=%s\n' "${BLAST_RADIUS_DAILY_LLM_BUDGET:-100}"
-  } >> "$ENV_FILE"
 fi
+
+if [[ -v OPENAI_API_KEY ]]; then
+  export BLAST_RADIUS_UPDATE_OPENAI_KEY=1
+else
+  export BLAST_RADIUS_UPDATE_OPENAI_KEY=0
+fi
+export BLAST_RADIUS_ENV_FILE="$ENV_FILE"
+export BLAST_RADIUS_MANAGED_DATABASE="$APP_DIR/blast_radius.db"
+export BLAST_RADIUS_MANAGED_BUDGET="${BLAST_RADIUS_DAILY_LLM_BUDGET:-500}"
+python3 "$APP_DIR/deploy/update_env.py" "$ENV_FILE" "$APP_DIR"
+chmod 600 "$ENV_FILE"
+chown root:root "$ENV_FILE"
 
 install -m 644 "$APP_DIR/deploy/blast-radius.service" /etc/systemd/system/blast-radius.service
 sed "s/blast-radius\.example\.com/$DOMAIN/g" "$APP_DIR/deploy/Caddyfile" > /etc/caddy/Caddyfile
@@ -62,5 +67,19 @@ systemctl enable --now blast-radius.service
 systemctl enable --now caddy.service
 systemctl reload caddy.service
 
-curl --retry 12 --retry-delay 2 --retry-all-errors -fsS "https://$DOMAIN/healthz"
-printf '\nBlast Radius is healthy at https://%s\n' "$DOMAIN"
+HEALTH_JSON=""
+GRADING_STATE="key_present_unverified"
+for _ in $(seq 1 15); do
+  HEALTH_JSON="$(curl --retry 3 --retry-delay 2 --retry-all-errors -fsS "https://$DOMAIN/healthz")"
+  GRADING_STATE="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["reasoning_grading"])' <<< "$HEALTH_JSON")"
+  if [[ "$GRADING_STATE" != "key_present_unverified" ]]; then
+    break
+  fi
+  sleep 2
+done
+printf '%s\n' "$HEALTH_JSON"
+printf 'Reasoning grading state: %s\n' "$GRADING_STATE"
+if [[ "$GRADING_STATE" != "live" ]]; then
+  printf 'WARNING: GPT reasoning grading is not verified; deterministic grading remains active.\n' >&2
+fi
+printf 'Blast Radius is healthy at https://%s\n' "$DOMAIN"

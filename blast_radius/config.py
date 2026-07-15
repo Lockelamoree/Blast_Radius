@@ -22,7 +22,10 @@ class Settings:
     openai_api_key: str | None = os.getenv("OPENAI_API_KEY")
     live_generation: bool = _as_bool(os.getenv("BLAST_RADIUS_LIVE_GENERATION"))
     session_ttl_minutes: int = int(os.getenv("BLAST_RADIUS_SESSION_TTL_MINUTES", "180"))
-    daily_llm_budget: int = int(os.getenv("BLAST_RADIUS_DAILY_LLM_BUDGET", "100"))
+    daily_llm_budget: int = int(os.getenv("BLAST_RADIUS_DAILY_LLM_BUDGET", "500"))
+    critic_timeout_seconds: float = float(
+        os.getenv("BLAST_RADIUS_CRITIC_TIMEOUT_SECONDS", "8")
+    )
     session_create_limit_per_hour: int = int(
         os.getenv("BLAST_RADIUS_SESSION_CREATE_LIMIT_PER_HOUR", "12")
     )

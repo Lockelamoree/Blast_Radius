@@ -58,10 +58,10 @@ class SessionStore:
         with self._lock, self._connect() as connection:
             connection.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
 
-    def try_consume_llm_call(self, daily_limit: int, now: datetime | None = None) -> bool:
-        """Atomically reserve one model call from the UTC daily budget."""
+    def reserve_llm_call(self, daily_limit: int, now: datetime | None = None) -> str | None:
+        """Atomically reserve one call and return its UTC usage day."""
         if daily_limit <= 0:
-            return False
+            return None
         usage_day = (now or datetime.now(UTC)).date().isoformat()
         with self._lock, self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -70,10 +70,36 @@ class SessionStore:
             ).fetchone()
             calls = int(row[0]) if row else 0
             if calls >= daily_limit:
-                return False
+                return None
             connection.execute(
                 "INSERT INTO llm_daily_usage(usage_day, calls) VALUES (?, 1) "
                 "ON CONFLICT(usage_day) DO UPDATE SET calls=calls + 1",
                 (usage_day,),
             )
-        return True
+        return usage_day
+
+    def refund_llm_call(self, usage_day: str) -> None:
+        """Release a failed structured call without allowing the count below zero."""
+        with self._lock, self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute(
+                "UPDATE llm_daily_usage SET calls = calls - 1 "
+                "WHERE usage_day = ? AND calls > 0",
+                (usage_day,),
+            )
+            connection.execute(
+                "DELETE FROM llm_daily_usage WHERE usage_day = ? AND calls <= 0",
+                (usage_day,),
+            )
+
+    def llm_usage(self, now: datetime | None = None) -> int:
+        usage_day = (now or datetime.now(UTC)).date().isoformat()
+        with self._lock, self._connect() as connection:
+            row = connection.execute(
+                "SELECT calls FROM llm_daily_usage WHERE usage_day = ?", (usage_day,)
+            ).fetchone()
+        return int(row[0]) if row else 0
+
+    def try_consume_llm_call(self, daily_limit: int, now: datetime | None = None) -> bool:
+        """Backward-compatible reservation helper."""
+        return self.reserve_llm_call(daily_limit, now) is not None

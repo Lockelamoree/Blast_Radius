@@ -21,6 +21,8 @@ def test_health_and_home(client) -> None:
     health = client.get("/healthz")
     assert health.status_code == 200
     assert health.json()["bank_scenarios"] >= 18
+    assert health.json()["reasoning_grading"] == "off"
+    assert health.json()["critic_model"] == "gpt-5.6-sol"
     assert "api_key" not in str(health.json()).lower()
 
 

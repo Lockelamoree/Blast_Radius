@@ -64,7 +64,7 @@ Fresh scenario generation is a separate opt-in:
 ```dotenv
 OPENAI_API_KEY=your_server_side_key
 BLAST_RADIUS_LIVE_GENERATION=true
-BLAST_RADIUS_DAILY_LLM_BUDGET=100
+BLAST_RADIUS_DAILY_LLM_BUDGET=500
 ```
 
 The key stays server-side and is never included in browser responses or model-payload logs.
@@ -123,7 +123,7 @@ All model IDs live in `blast_radius/config.py`:
 
 - `gpt-5.6-luna`: bounded scenario generation at medium effort.
 - `gpt-5.6-terra`: adaptive blind-spot targeting at low effort.
-- `gpt-5.6-sol`: semantic reasoning critique at high effort and generated-scenario critique
+- `gpt-5.6-sol`: semantic reasoning critique at medium effort and generated-scenario critique
   at max effort.
 
 The build uses the Responses API with Structured Outputs. Sol may add only recognized tells

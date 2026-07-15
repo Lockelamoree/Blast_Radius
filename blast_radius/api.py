@@ -110,6 +110,7 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
             "rounds_total": len(state.scenario_order),
             "pretest": [question.public_view() for question in engine.bank.questions],
             "live_generation_available": engine.openai.generation_enabled,
+            "reasoning_grading": engine.openai.reasoning_grading_state,
         }
 
     @router.post("/sessions/{session_id}/pretest")

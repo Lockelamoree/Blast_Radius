@@ -14,11 +14,20 @@ logger = logging.getLogger(__name__)
 
 
 class TrustEngine:
-    def __init__(self, settings: Settings, allow_llm_call: Callable[[], bool] | None = None):
+    def __init__(
+        self,
+        settings: Settings,
+        reserve_llm_call: Callable[[], str | None] | None = None,
+        refund_llm_call: Callable[[str], None] | None = None,
+    ):
         self.settings = settings
         self.bank = ScenarioBank(settings.data_dir)
         self.gate = CorrectnessGate(self.bank)
-        self.openai = OpenAIAdapter(settings, allow_llm_call=allow_llm_call)
+        self.openai = OpenAIAdapter(
+            settings,
+            reserve_llm_call=reserve_llm_call,
+            refund_llm_call=refund_llm_call,
+        )
 
     async def next_scenario(
         self,
@@ -42,7 +51,8 @@ class TrustEngine:
                 if generated:
                     result = self.gate.verify(generated)
                     if result.passed:
-                        critic = await self.openai.critic_gate(generated, template)
+                        critic_result = await self.openai.critic_gate(generated, template)
+                        critic = critic_result.value if critic_result else None
                         if critic and critic.passed:
                             return generated, None
                         failure_reason = (
@@ -71,6 +81,18 @@ class TrustEngine:
             return grade
         if review is None:
             return grade
-        grade = merge_reasoning(grade, scenario, review.matched_tells, review.followup)
+        grade = merge_reasoning(
+            grade,
+            scenario,
+            review.value.matched_tells,
+            review.value.followup,
+        )
         grade.graded_by = self.settings.critic_model
+        logger.info(
+            "Reasoning critic completed model=%s scenario_id=%s matched_count=%s response_id=%s",
+            self.settings.critic_model,
+            scenario.id,
+            len(grade.matched_tells),
+            review.response_id,
+        )
         return grade

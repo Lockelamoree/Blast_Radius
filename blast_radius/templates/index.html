@@ -68,7 +68,7 @@
       </form>
     </section>
 
-    <section id="screen-round" class="screen round-screen" aria-live="polite">
+    <section id="screen-round" class="screen round-screen" aria-live="polite" aria-busy="false">
       <div class="round-topline">
         <div><span id="round-number">ROUND 01</span><span class="slash">/</span><span id="round-family">DANGEROUS COMMAND</span></div>
         <div class="timer" id="timer"><span id="timer-value">60</span><small>SEC</small></div>
@@ -95,6 +95,7 @@
           </div>
           <label class="reason-label" for="reasoning">NAME THE TELL <span>one clear sentence</span></label>
           <textarea id="reasoning" maxlength="500" placeholder="I chose this because…"></textarea>
+          <p id="grading-status" class="microcopy hidden" aria-live="polite"></p>
           <div class="decision-footer"><span id="reason-count">0 / 500</span><button id="submit-decision" class="button primary" disabled>Commit decision</button></div>
         </aside>
       </div>
