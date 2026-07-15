@@ -33,3 +33,32 @@ def test_budget_reservations_are_concurrent_and_refundable(tmp_path) -> None:
     assert store.llm_usage() == 2
     assert store.reserve_llm_call(3) is not None
     assert store.llm_usage() == 3
+
+
+def test_store_closes_each_operation_connection(tmp_path, monkeypatch) -> None:
+    store = SessionStore(tmp_path / "connections.db", ttl_minutes=180)
+    real_connect = store._connect
+    closed: list[bool] = []
+
+    class TrackingConnection:
+        def __init__(self):
+            self.connection = real_connect()
+
+        def __enter__(self):
+            return self.connection.__enter__()
+
+        def __exit__(self, *args):
+            return self.connection.__exit__(*args)
+
+        def __getattr__(self, name):
+            return getattr(self.connection, name)
+
+        def close(self) -> None:
+            self.connection.close()
+            closed.append(True)
+
+    monkeypatch.setattr(store, "_connect", TrackingConnection)
+
+    for _ in range(40):
+        assert store.llm_usage() == 0
+    assert closed == [True] * 40

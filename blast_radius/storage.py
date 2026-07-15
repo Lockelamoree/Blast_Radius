@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import sqlite3
 import threading
+from contextlib import closing, contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Iterator
 
 from blast_radius.models import SessionState
 
@@ -20,8 +22,13 @@ class SessionStore:
         connection.execute("PRAGMA journal_mode=WAL")
         return connection
 
+    @contextmanager
+    def _connection(self) -> Iterator[sqlite3.Connection]:
+        with closing(self._connect()) as connection, connection:
+            yield connection
+
     def _initialize(self) -> None:
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS sessions ("
                 "id TEXT PRIMARY KEY, state_json TEXT NOT NULL, updated_at TEXT NOT NULL)"
@@ -33,7 +40,7 @@ class SessionStore:
 
     def save(self, state: SessionState) -> None:
         state.updated_at = datetime.now(UTC)
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             connection.execute(
                 "INSERT INTO sessions(id, state_json, updated_at) VALUES (?, ?, ?) "
                 "ON CONFLICT(id) DO UPDATE SET state_json=excluded.state_json, "
@@ -42,7 +49,7 @@ class SessionStore:
             )
 
     def get(self, session_id: str) -> SessionState | None:
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             row = connection.execute(
                 "SELECT state_json, updated_at FROM sessions WHERE id = ?", (session_id,)
             ).fetchone()
@@ -55,7 +62,7 @@ class SessionStore:
         return SessionState.model_validate_json(row[0])
 
     def delete(self, session_id: str) -> None:
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             connection.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
 
     def reserve_llm_call(self, daily_limit: int, now: datetime | None = None) -> str | None:
@@ -63,7 +70,7 @@ class SessionStore:
         if daily_limit <= 0:
             return None
         usage_day = (now or datetime.now(UTC)).date().isoformat()
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
                 "SELECT calls FROM llm_daily_usage WHERE usage_day = ?", (usage_day,)
@@ -80,7 +87,7 @@ class SessionStore:
 
     def refund_llm_call(self, usage_day: str) -> None:
         """Release a failed structured call without allowing the count below zero."""
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             connection.execute(
                 "UPDATE llm_daily_usage SET calls = calls - 1 "
@@ -94,7 +101,7 @@ class SessionStore:
 
     def llm_usage(self, now: datetime | None = None) -> int:
         usage_day = (now or datetime.now(UTC)).date().isoformat()
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             row = connection.execute(
                 "SELECT calls FROM llm_daily_usage WHERE usage_day = ?", (usage_day,)
             ).fetchone()

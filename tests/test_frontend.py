@@ -25,6 +25,9 @@ def test_results_render_measured_values_without_hardcoded_zero_scores() -> None:
     assert "document.createElement('progress')" in app
     assert ".style.width" not in app
     assert "^https?:\\/\\/" in app
+    assert "state.questions.length" in app
+    assert 'id="test-total"' in template
+    assert "SAME 5 SIGNALS" not in app
 
 
 def test_caddy_security_policy_does_not_require_inline_code() -> None:

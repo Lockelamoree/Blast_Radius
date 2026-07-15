@@ -1,3 +1,4 @@
+import logging
 import time
 from collections import deque
 from typing import Annotated
@@ -28,7 +29,10 @@ class CreateSessionRequest(BaseModel):
 
 class TestAnswersRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    answers: list[int] = Field(min_length=5, max_length=5)
+    answers: list[int] = Field(min_length=1, max_length=100)
+
+
+logger = logging.getLogger(__name__)
 
 
 class SlidingWindowLimiter:
@@ -92,7 +96,10 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
 
     def score_test(answers: list[int]) -> tuple[int, dict[str, dict[str, int]]]:
         if len(answers) != len(engine.bank.questions):
-            raise HTTPException(status_code=422, detail="Exactly five answers are required.")
+            raise HTTPException(
+                status_code=422,
+                detail=f"Exactly {len(engine.bank.questions)} answers are required.",
+            )
         competency_scores = {
             competency.value: {"score": 0, "total": 0} for competency in Competency
         }
@@ -177,7 +184,6 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
 
     @router.post("/sessions/{session_id}/rounds/next")
     async def next_round(session_id: str, request: Request, state: SessionDep) -> dict:
-        limit_round_request(request, session_id)
         if state.pretest_score is None:
             raise HTTPException(status_code=409, detail="Complete the pre-test first.")
         if state.posttest_score is not None:
@@ -187,13 +193,50 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
                 "complete": True,
                 "posttest": [question.public_view() for question in engine.bank.questions],
             }
+        limit_round_request(request, session_id)
         if state.active_scenario_json:
             scenario = Scenario.model_validate_json(state.active_scenario_json)
         elif state.mode == "demo":
             scenario = engine.bank.get(state.scenario_order[state.current_index])
             gate = engine.gate.verify(scenario)
             if not gate.passed:
-                raise HTTPException(status_code=503, detail="Curated scenario failed verification.")
+                rejected_id = scenario.id
+                rejected_family = scenario.family
+                rejection_reasons = list(gate.reasons)
+                excluded = set(state.answered_scenario_ids) | {rejected_id}
+                scenario = None
+                for attempt in range(len(engine.bank.scenarios)):
+                    try:
+                        candidate = engine.bank.fallback(
+                            family=rejected_family,
+                            exclude=excluded,
+                            seed=f"{state.id}:{state.current_index}:{attempt}",
+                        )
+                    except LookupError:
+                        break
+                    if candidate.family != rejected_family:
+                        break
+                    candidate_gate = engine.gate.verify(candidate)
+                    if candidate_gate.passed:
+                        scenario = candidate
+                        break
+                    excluded.add(candidate.id)
+                if scenario is None:
+                    logger.error(
+                        "No verified demo fallback for scenario=%s reasons=%s",
+                        rejected_id,
+                        rejection_reasons,
+                    )
+                    raise HTTPException(
+                        status_code=503, detail="No verified scenario is currently available."
+                    )
+                state.last_gate_fallback_reason = "; ".join(rejection_reasons)
+                logger.warning(
+                    "Replaced gate-failing demo scenario=%s with fallback=%s reasons=%s",
+                    rejected_id,
+                    scenario.id,
+                    rejection_reasons,
+                )
         else:
             target = engine.bank.get(state.scenario_order[state.current_index])
             weakest = min(Competency, key=lambda item: competency_accuracy(state, item)).value

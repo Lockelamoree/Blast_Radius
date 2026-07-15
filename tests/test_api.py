@@ -2,10 +2,11 @@ from dataclasses import replace
 
 from fastapi.testclient import TestClient
 
-from blast_radius.engine import TrustEngine
 from blast_radius.api import SlidingWindowLimiter
+from blast_radius.engine import TrustEngine
+from blast_radius.engine.bank import ScenarioBank
 from blast_radius.main import create_app
-from blast_radius.models import Competency
+from blast_radius.models import Competency, GateResult
 
 
 def create_started_session(client):
@@ -216,3 +217,97 @@ def test_round_requests_have_a_per_session_cap(test_settings) -> None:
         assert limited_client.post(f"/api/sessions/{session_id}/rounds/next").status_code == 200
         blocked = limited_client.post(f"/api/sessions/{session_id}/rounds/next")
     assert blocked.status_code == 429
+
+
+def test_terminal_round_payload_bypasses_exhausted_round_bucket(test_settings) -> None:
+    settings = replace(test_settings, session_round_request_cap=12)
+    with TestClient(create_app(settings)) as limited_client:
+        session_id = create_started_session(limited_client)
+        for _ in range(6):
+            round_data = limited_client.post(
+                f"/api/sessions/{session_id}/rounds/next"
+            ).json()
+            scenario_id = round_data["scenario"]["id"]
+            payload = {
+                "scenario_id": scenario_id,
+                "action": "reject",
+                "reasoning_text": "The displayed artifact exceeds the stated trust boundary.",
+            }
+            if scenario_id == "cmd-cleanup-2":
+                payload["action"] = "sandbox"
+                payload["blast_radius_config"] = {
+                    "readable_paths": ["/workspace/htmlcov"],
+                    "writable_paths": ["/workspace/htmlcov"],
+                    "network_enabled": False,
+                    "network_allowlist": [],
+                    "capabilities": ["delete-generated-files"],
+                }
+            assert limited_client.post(
+                f"/api/sessions/{session_id}/decisions", json=payload
+            ).status_code == 200
+
+        terminal = limited_client.post(f"/api/sessions/{session_id}/rounds/next")
+
+    assert terminal.status_code == 200
+    assert terminal.json()["complete"] is True
+
+
+def test_gate_failing_demo_scenario_is_replaced(test_settings, monkeypatch) -> None:
+    from blast_radius.engine.gate import CorrectnessGate
+
+    real_verify = CorrectnessGate.verify
+
+    def reject_one(self, scenario):
+        if scenario.id == "cmd-cleanup-2":
+            return GateResult(
+                passed=False,
+                reasons=["planted runtime contradiction"],
+                scenario_id=scenario.id,
+            )
+        return real_verify(self, scenario)
+
+    monkeypatch.setattr(CorrectnessGate, "verify", reject_one)
+    with TestClient(create_app(test_settings)) as recovery_client:
+        session_id = create_started_session(recovery_client)
+        first = recovery_client.post(f"/api/sessions/{session_id}/rounds/next")
+        repeated = recovery_client.post(f"/api/sessions/{session_id}/rounds/next")
+
+    assert first.status_code == 200
+    assert first.json()["scenario"]["id"] != "cmd-cleanup-2"
+    assert first.json()["scenario"]["family"] == "dangerous_command"
+    assert repeated.json()["scenario"]["id"] == first.json()["scenario"]["id"]
+
+
+def test_test_answer_count_reaches_dynamic_bank_validation(client) -> None:
+    created = client.post("/api/sessions", json={"mode": "demo"}).json()
+    response = client.post(
+        f"/api/sessions/{created['session_id']}/pretest",
+        json={"answers": [1, 1, 1, 1, 1, 1]},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Exactly 5 answers are required."
+
+
+def test_sixth_bank_question_is_accepted_without_request_model_changes(
+    test_settings, monkeypatch
+) -> None:
+    real_init = ScenarioBank.__init__
+
+    def initialize_with_six_questions(bank, data_dir) -> None:
+        real_init(bank, data_dir)
+        bank.questions.append(
+            bank.questions[0].model_copy(update={"id": "q-command-followup"})
+        )
+
+    monkeypatch.setattr(ScenarioBank, "__init__", initialize_with_six_questions)
+    with TestClient(create_app(test_settings)) as six_question_client:
+        created = six_question_client.post("/api/sessions", json={"mode": "demo"}).json()
+        assert len(created["pretest"]) == 6
+        response = six_question_client.post(
+            f"/api/sessions/{created['session_id']}/pretest",
+            json={"answers": [1, 1, 1, 1, 1, 1]},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["total"] == 6
