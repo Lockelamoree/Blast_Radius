@@ -39,9 +39,9 @@ def test_deploy_env_replaces_or_clears_explicit_key(tmp_path) -> None:
     assert read_values(path)["OPENAI_API_KEY"] == ""
 
 
-def test_deploy_warns_without_aborting_for_unverified_grading() -> None:
+def test_deploy_fails_unverified_grading_without_explicit_override() -> None:
     script = (Path(__file__).parents[1] / "deploy" / "deploy.sh").read_text()
     assert 'if [[ "$GRADING_STATE" != "live" ]]' in script
-    assert "WARNING: GPT reasoning grading is not verified" in script
-    warning_block = script.split('if [[ "$GRADING_STATE" != "live" ]]', 1)[1].split("fi", 1)[0]
-    assert "exit 1" not in warning_block
+    assert "journalctl -u blast-radius.service" in script
+    assert "BLAST_RADIUS_ALLOW_DEGRADED_DEPLOY" in script
+    assert "exit 1" in script

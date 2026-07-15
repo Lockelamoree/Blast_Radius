@@ -9,7 +9,9 @@ sudo OPENAI_API_KEY='spend-capped-key' bash deploy/deploy.sh blast-radius.exampl
 The script installs Python, Caddy, and the app; creates the restricted service user;
 enables both services; obtains HTTPS through Caddy; and verifies `/healthz`. On re-runs it
 preserves the existing key unless `OPENAI_API_KEY` is explicitly supplied, in which case the
-key is updated. The health check prints and warns on an unverified grading state.
+key is updated. A deployment with a configured but unverified critic fails after printing
+the recent service logs. Use `BLAST_RADIUS_ALLOW_DEGRADED_DEPLOY=1` only for an intentional
+deterministic-only deployment.
 
 The public profile keeps `BLAST_RADIUS_LIVE_GENERATION=false`: a server-side key enables
 GPT-5.6 reasoning grading, while scenario generation stays deterministic. Set
@@ -47,3 +49,9 @@ continues with deterministic grading. The default budget is 500 successful struc
 
 Do not enable live generation until the deterministic demo has passed its rehearsal and a
 spend-capped server-side API key is configured.
+
+After `/healthz` reports `reasoning_grading: "live"`, capture one real reasoning grade:
+
+```bash
+python scripts/capture_live_grade.py https://your-host
+```

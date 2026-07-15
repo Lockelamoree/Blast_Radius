@@ -11,6 +11,7 @@ def test_results_render_measured_values_without_hardcoded_zero_scores() -> None:
     assert 'id="result-summary-line">—</' in template
     assert 'id="result-tests">—</' in template
     assert "results-summary.js" not in template
+    assert "verdict-label.js" not in template
     assert "Pre 0/5" not in template
     assert "data.pretest_score" in app
     assert "data.posttest_score" in app
@@ -18,3 +19,5 @@ def test_results_render_measured_values_without_hardcoded_zero_scores() -> None:
     assert "value.label" in app
     assert "value.pre_score" in app
     assert "value.post_score" in app
+    assert "grade.critic_used" in app
+    assert "GPT-5.6 CRITIQUE" in app

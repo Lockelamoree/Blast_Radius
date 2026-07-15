@@ -146,6 +146,16 @@ sudo OPENAI_API_KEY='spend-capped-key' bash deploy/deploy.sh your-domain.example
 ```
 
 The script installs the Python service and Caddy, enables HTTPS, and checks `/healthz`.
+It fails if the configured critic cannot be verified and prints recent service logs with the
+provider status/message. Once health reports `reasoning_grading: "live"`, capture the real
+review artifact with:
+
+```bash
+python scripts/capture_live_grade.py https://your-domain.example
+```
+
+The script refuses deterministic fallback responses and writes only a real response ID to
+`evidence/live_grade_<response_id>.json`.
 
 ## Built with Codex
 

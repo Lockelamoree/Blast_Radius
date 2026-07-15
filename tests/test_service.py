@@ -70,6 +70,11 @@ def test_model_review_widens_validated_tells_and_identifies_grader(
     assert "invented tell" not in grade.matched_tells
     assert grade.reasoning_score == 50
     assert grade.graded_by == "gpt-5.6-sol"
+    assert grade.critic_used
+    assert grade.critic_model == "gpt-5.6-sol"
+    assert grade.critic_response_id == "resp_stub"
+    assert grade.deterministic_matched_tells == []
+    assert grade.critic_matched_tells == ["near-miss package name"]
     assert grade.action_correct
     assert grade.receipts
     assert "scenario_id=dep-typo-1" in caplog.text
@@ -86,6 +91,8 @@ def test_model_review_failure_falls_back_to_deterministic(test_settings) -> None
     assert grade.matched_tells == []
     assert grade.reasoning_score == 0
     assert grade.graded_by == "deterministic"
+    assert not grade.critic_used
+    assert grade.critic_response_id is None
     assert grade.verdict == "partial"
 
 
@@ -109,6 +116,8 @@ def test_key_enables_one_sol_grade_call_without_live_generation(test_settings) -
     assert responses.calls[0]["model"] == "gpt-5.6-sol"
     assert responses.calls[0]["reasoning"] == {"effort": "medium"}
     assert grade.graded_by == "gpt-5.6-sol"
+    assert grade.critic_used
+    assert grade.critic_response_id == "resp_test"
 
 
 def test_exhausted_budget_skips_provider_and_uses_deterministic_grade(test_settings) -> None:
@@ -122,4 +131,5 @@ def test_exhausted_budget_skips_provider_and_uses_deterministic_grade(test_setti
 
     assert responses.calls == []
     assert grade.graded_by == "deterministic"
+    assert not grade.critic_used
     assert grade.reasoning_score == 0

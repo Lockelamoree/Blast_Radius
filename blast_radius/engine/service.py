@@ -72,6 +72,7 @@ class TrustEngine:
 
     async def grade(self, scenario: Scenario, decision: PlayerDecision) -> GradeResult:
         grade = grade_decision(scenario, decision)
+        deterministic_matched_tells = list(grade.matched_tells)
         if not self.openai.grading_enabled:
             return grade
         try:
@@ -81,13 +82,26 @@ class TrustEngine:
             return grade
         if review is None:
             return grade
+        allowed = set(scenario.ground_truth.tells)
+        critic_matched_tells = list(
+            dict.fromkeys(tell for tell in review.value.matched_tells if tell in allowed)
+        )
         grade = merge_reasoning(
             grade,
             scenario,
             review.value.matched_tells,
             review.value.followup,
         )
-        grade.graded_by = self.settings.critic_model
+        grade = grade.model_copy(
+            update={
+                "graded_by": self.settings.critic_model,
+                "critic_used": True,
+                "critic_model": self.settings.critic_model,
+                "critic_response_id": review.response_id,
+                "deterministic_matched_tells": deterministic_matched_tells,
+                "critic_matched_tells": critic_matched_tells,
+            }
+        )
         logger.info(
             "Reasoning critic completed model=%s scenario_id=%s matched_count=%s response_id=%s",
             self.settings.critic_model,

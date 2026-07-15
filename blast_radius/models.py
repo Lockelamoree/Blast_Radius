@@ -194,6 +194,11 @@ class GradeResult(BaseModel):
     explanation: str
     socratic_followup: str
     graded_by: str = "deterministic"
+    critic_used: bool = False
+    critic_model: str | None = None
+    critic_response_id: str | None = None
+    deterministic_matched_tells: list[str] = Field(default_factory=list)
+    critic_matched_tells: list[str] = Field(default_factory=list)
 
 
 class TestQuestion(BaseModel):

@@ -69,9 +69,11 @@ systemctl reload caddy.service
 
 HEALTH_JSON=""
 GRADING_STATE="key_present_unverified"
+GENERATION_STATE="true"
 for _ in $(seq 1 15); do
   HEALTH_JSON="$(curl --retry 3 --retry-delay 2 --retry-all-errors -fsS "https://$DOMAIN/healthz")"
   GRADING_STATE="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["reasoning_grading"])' <<< "$HEALTH_JSON")"
+  GENERATION_STATE="$(python3 -c 'import json,sys; print(str(json.load(sys.stdin)["live_generation"]).lower())' <<< "$HEALTH_JSON")"
   if [[ "$GRADING_STATE" != "key_present_unverified" ]]; then
     break
   fi
@@ -79,7 +81,17 @@ for _ in $(seq 1 15); do
 done
 printf '%s\n' "$HEALTH_JSON"
 printf 'Reasoning grading state: %s\n' "$GRADING_STATE"
+if [[ "$GENERATION_STATE" != "false" ]]; then
+  printf 'ERROR: deterministic judging requires BLAST_RADIUS_LIVE_GENERATION=false.\n' >&2
+  exit 1
+fi
 if [[ "$GRADING_STATE" != "live" ]]; then
-  printf 'WARNING: GPT reasoning grading is not verified; deterministic grading remains active.\n' >&2
+  printf 'ERROR: GPT reasoning grading is not verified; recent service logs follow.\n' >&2
+  journalctl -u blast-radius.service -n 80 --no-pager >&2 || true
+  if [[ "${BLAST_RADIUS_ALLOW_DEGRADED_DEPLOY:-0}" != "1" ]]; then
+    printf 'Set BLAST_RADIUS_ALLOW_DEGRADED_DEPLOY=1 only for an intentional fallback-only deploy.\n' >&2
+    exit 1
+  fi
+  printf 'WARNING: continuing with deterministic grading by explicit override.\n' >&2
 fi
 printf 'Blast Radius is healthy at https://%s\n' "$DOMAIN"
