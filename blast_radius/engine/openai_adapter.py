@@ -286,17 +286,15 @@ class OpenAIAdapter:
             {"probe": True},
         )
         try:
-            result = await asyncio.wait_for(
-                self._structured(
+            async with asyncio.timeout(self.settings.critic_timeout_seconds):
+                result = await self._structured(
                     model=self.settings.critic_model,
                     prompt=prompt,
                     output_type=ModelReasoningReview,
                     name="blast_radius_reasoning_probe",
                     effort="medium",
                     max_output_tokens=self.settings.reasoning_max_output_tokens,
-                ),
-                timeout=self.settings.critic_timeout_seconds,
-            )
+                )
         except TimeoutError:
             logger.warning("OpenAI reasoning probe timed out")
             return
@@ -446,8 +444,8 @@ class OpenAIAdapter:
             },
         )
         try:
-            return await asyncio.wait_for(
-                self._structured(
+            async with asyncio.timeout(self.settings.critic_timeout_seconds):
+                return await self._structured(
                     model=self.settings.critic_model,
                     prompt=prompt,
                     output_type=ModelReasoningReview,
@@ -455,9 +453,7 @@ class OpenAIAdapter:
                     effort="medium",
                     max_output_tokens=self.settings.reasoning_max_output_tokens,
                     safety_identifier=safety_identifier,
-                ),
-                timeout=self.settings.critic_timeout_seconds,
-            )
+                )
         except TimeoutError:
             logger.warning("OpenAI reasoning critique timed out")
             return None
