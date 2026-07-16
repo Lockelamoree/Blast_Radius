@@ -17,8 +17,11 @@ supplied `OPENAI_API_KEY` clears it. A deployment with an unverified critic fail
 printing sanitized recent service logs. Use `BLAST_RADIUS_ALLOW_DEGRADED_DEPLOY=1` only for
 an intentional deterministic-only deployment.
 
-The public profile keeps `BLAST_RADIUS_LIVE_GENERATION=false`: a server-side key enables
-GPT-5.6 Sol tell matching, while scenario selection stays deterministic. Set
+The default proof profile keeps `BLAST_RADIUS_LIVE_GENERATION=false`: a server-side key enables
+GPT-5.6 Sol tell matching, while scenario selection stays deterministic. After the genuine
+Sol receipt is captured, set `BLAST_RADIUS_LIVE_GENERATION=true` explicitly to enable
+verified-anchored Luna presentation reskinning. Generated rounds remain deterministically
+graded and fall back to the unchanged anchor on any gate or provider failure. Set
 `BLAST_RADIUS_DAILY_LLM_BUDGET` to cap model calls per UTC day; once exhausted, the app
 continues with deterministic grading. The default budget is 500 provider-dispatched attempts;
 timeouts and provider errors still count because they can incur usage.
@@ -44,8 +47,10 @@ timeouts and provider errors still count because they can incur usage.
    BLAST_RADIUS_SESSION_TTL_MINUTES=180
    BLAST_RADIUS_DAILY_LLM_BUDGET=500
    BLAST_RADIUS_CRITIC_TIMEOUT_SECONDS=8
+   BLAST_RADIUS_GENERATION_TIMEOUT_SECONDS=8
+   BLAST_RADIUS_SESSION_LLM_CALL_CAP=12
+   BLAST_RADIUS_GENERATED_ROUNDS_PER_SESSION=5
    BLAST_RADIUS_GENERATOR_MAX_OUTPUT_TOKENS=4096
-   BLAST_RADIUS_ADAPTATION_MAX_OUTPUT_TOKENS=512
    BLAST_RADIUS_GATE_MAX_OUTPUT_TOKENS=4096
    BLAST_RADIUS_REASONING_MAX_OUTPUT_TOKENS=2048
    BLAST_RADIUS_REVISION=the-deployed-git-commit
@@ -59,8 +64,9 @@ timeouts and provider errors still count because they can incur usage.
    the configuration to `/etc/caddy/Caddyfile`, and reload Caddy.
 6. Verify `https://your-host/healthz` and complete a full run in a logged-out browser.
 
-Do not enable the optional immutable-artifact ordering path for public judging. It adds no
-new evidence and is not needed by the deterministic demo.
+Do not enable live variation until the deterministic deployment has produced and cross-checked
+a genuine Sol reasoning-grade receipt. Enabling it does not enable model-authored truth or
+new evidence; it only activates the gated, verified-anchor presentation path.
 
 After `/healthz` reports `reasoning_grading: "live"`, capture one real reasoning grade:
 

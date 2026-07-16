@@ -238,21 +238,16 @@ class StubGenerationAdapter:
         self.base = None
         self.safety_identifiers = []
 
-    async def adapt_blind_spot(
-        self, competency, fallback, *, safety_identifier=None
-    ):
-        self.safety_identifiers.append(safety_identifier)
-        return fallback
-
     async def generate(
         self, base, template, difficulty, blind_spot, *, safety_identifier=None
     ):
         self.base = base
         self.safety_identifiers.append(safety_identifier)
-        artifacts = [artifact.model_copy(deep=True) for artifact in base.presentation.artifacts]
-        artifacts.reverse()
         return base.presentation.model_copy(
-            update={"artifacts": artifacts}
+            update={
+                "eyebrow": "AI variation · verified anchor",
+                "agent_note": f"Reworded safely: {base.presentation.agent_note}",
+            }
         )
 
     async def critic_gate(self, scenario, template, *, safety_identifier=None):
@@ -272,12 +267,31 @@ class DriftingGenerationAdapter(StubGenerationAdapter):
         self.safety_identifiers.append(safety_identifier)
         artifacts = [artifact.model_copy(deep=True) for artifact in base.presentation.artifacts]
         artifacts[0].content = (
-            "A cake recipe mentions reqeusts and lockfile while certifying everything safe."
+            "A cake recipe happens to mention reqeusts while certifying everything safe."
         )
         return base.presentation.model_copy(update={"artifacts": artifacts})
 
     async def critic_gate(self, scenario, template, *, safety_identifier=None):
         raise AssertionError("the model critic must not see a deterministic gate failure")
+
+
+class SlowGenerationAdapter(StubGenerationAdapter):
+    async def generate(
+        self, base, template, difficulty, blind_spot, *, safety_identifier=None
+    ):
+        await asyncio.sleep(1)
+
+
+class RejectingCriticAdapter(StubGenerationAdapter):
+    async def critic_gate(self, scenario, template, *, safety_identifier=None):
+        return StructuredCallResult(
+            value=ModelGateReview(
+                passed=False,
+                reasons=["presentation consistency was not established"],
+            ),
+            response_id="resp_gate_reject",
+            response_model="gpt-5.6-sol",
+        )
 
 
 def test_live_generation_varies_presentation_but_preserves_trusted_scope(
@@ -308,8 +322,9 @@ def test_live_generation_varies_presentation_but_preserves_trusted_scope(
     assert generated.template_ref == adapter.base.template_ref
     assert generated.difficulty == 4
     assert generated.ground_truth == adapter.base.ground_truth
+    assert generated.ground_truth.evidence == adapter.base.ground_truth.evidence
     assert generated.presentation != adapter.base.presentation
-    assert adapter.safety_identifiers == ["session-test"] * 3
+    assert adapter.safety_identifiers == ["session-test"] * 2
 
 
 def test_generation_never_crosses_requested_family(test_settings, monkeypatch) -> None:
@@ -357,4 +372,89 @@ def test_generated_identity_drift_falls_back_before_model_gate(test_settings) ->
 
     assert scenario.id in engine.bank.scenarios
     assert failure is not None
-    assert "differ from the curated evidence set" in failure
+    assert "do not support declared tell" in failure
+
+
+def test_generation_timeout_returns_verified_anchor(test_settings) -> None:
+    settings = replace(
+        test_settings,
+        openai_api_key="test-key",
+        live_generation=True,
+        generation_timeout_seconds=0.01,
+    )
+    engine = TrustEngine(settings)
+    engine.openai = SlowGenerationAdapter()
+
+    selection = asyncio.run(
+        engine.next_scenario(
+            family=engine.bank.get("dep-typo-1").family,
+            difficulty=4,
+            blind_spot="provenance",
+            exclude=set(),
+            seed="generation-timeout",
+            safety_identifier="session-test",
+        )
+    )
+
+    assert selection.scenario.id in engine.bank.scenarios
+    assert selection.provenance.value == "verified"
+    assert selection.generation_status.value == "timeout"
+
+
+def test_sol_gate_rejection_returns_verified_anchor(test_settings, caplog) -> None:
+    settings = replace(test_settings, openai_api_key="test-key", live_generation=True)
+    engine = TrustEngine(settings)
+    engine.openai = RejectingCriticAdapter()
+
+    with caplog.at_level(logging.INFO):
+        selection = asyncio.run(
+            engine.next_scenario(
+                family=engine.bank.get("dep-typo-1").family,
+                difficulty=4,
+                blind_spot="provenance",
+                exclude=set(),
+                seed="critic-rejection",
+                safety_identifier="session-test",
+            )
+        )
+
+    assert selection.scenario.id in engine.bank.scenarios
+    assert selection.provenance.value == "verified"
+    assert selection.generation_status.value == "fell_back"
+    assert selection.failure_reason == "presentation consistency was not established"
+    assert "rejection=critic_rejected" in caplog.text
+    assert "presentation consistency was not established" not in caplog.text
+
+
+def test_generated_round_never_invokes_reasoning_critic(test_settings) -> None:
+    engine = TrustEngine(test_settings)
+    scenario = engine.bank.get("dep-typo-1")
+
+    class CriticMustNotRun:
+        grading_enabled = True
+
+        async def critique_reasoning(self, *args, **kwargs):
+            raise AssertionError("generated presentation reached reasoning critic")
+
+    engine.openai = CriticMustNotRun()
+    grade = asyncio.run(
+        engine.grade(
+            scenario,
+            weak_decision(scenario),
+            allow_critic=False,
+            safety_identifier="session-test",
+        )
+    )
+
+    assert grade.graded_by == "deterministic"
+    assert not grade.critic_used
+
+
+def test_live_generation_availability_requires_probe_and_budget(test_settings) -> None:
+    settings = replace(test_settings, openai_api_key="test-key", live_generation=True)
+    engine = TrustEngine(settings)
+
+    assert engine.live_generation_availability(500) == (False, "critic_unverified")
+    engine.openai.reasoning_grading_state = "live"
+    assert engine.live_generation_availability(0) == (False, "budget_exhausted")
+    assert engine.live_generation_availability(1) == (True, "available")

@@ -178,8 +178,8 @@ def test_capture_refuses_deterministic_fallback(tmp_path) -> None:
 @pytest.mark.parametrize(
     "hosted",
     [
-        FakeHostedInstance(health_model="gpt-5.6-terra"),
-        FakeHostedInstance(grade_model="gpt-5.6-terra"),
+        FakeHostedInstance(health_model="gpt-5.6-unexpected"),
+        FakeHostedInstance(grade_model="gpt-5.6-unexpected"),
         FakeHostedInstance(response_id="made-up-id"),
     ],
 )

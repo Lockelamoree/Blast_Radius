@@ -54,10 +54,14 @@ def create_app(config: Settings = settings) -> FastAPI:
 
     @application.get("/healthz")
     def health() -> dict:
+        generation_available, generation_reason = engine.live_generation_availability(
+            store.budget_remaining(config.daily_llm_budget)
+        )
         return {
             "status": "ok",
             "bank_scenarios": len(engine.bank.scenarios),
-            "live_generation": engine.openai.generation_enabled,
+            "live_generation": generation_available,
+            "live_generation_reason": generation_reason,
             "reasoning_grading": engine.openai.reasoning_grading_state,
             "critic_model": config.critic_model,
             "revision": config.revision,

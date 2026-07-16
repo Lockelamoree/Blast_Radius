@@ -11,15 +11,19 @@ from pathlib import Path
 def update_environment(path: Path, state_dir: Path, environ: dict[str, str]) -> None:
     managed = {
         "BLAST_RADIUS_DATABASE": f"{state_dir.as_posix().rstrip('/')}/blast_radius.db",
-        "BLAST_RADIUS_LIVE_GENERATION": "false",
+        "BLAST_RADIUS_LIVE_GENERATION": environ.get(
+            "BLAST_RADIUS_LIVE_GENERATION", "false"
+        ),
         "BLAST_RADIUS_ENABLE_DOCS": "false",
         "BLAST_RADIUS_SESSION_TTL_MINUTES": "180",
         "BLAST_RADIUS_DAILY_LLM_BUDGET": environ.get(
             "BLAST_RADIUS_DAILY_LLM_BUDGET", "500"
         ),
         "BLAST_RADIUS_CRITIC_TIMEOUT_SECONDS": "8",
+        "BLAST_RADIUS_GENERATION_TIMEOUT_SECONDS": "8",
+        "BLAST_RADIUS_SESSION_LLM_CALL_CAP": "12",
+        "BLAST_RADIUS_GENERATED_ROUNDS_PER_SESSION": "5",
         "BLAST_RADIUS_GENERATOR_MAX_OUTPUT_TOKENS": "4096",
-        "BLAST_RADIUS_ADAPTATION_MAX_OUTPUT_TOKENS": "512",
         "BLAST_RADIUS_GATE_MAX_OUTPUT_TOKENS": "4096",
         "BLAST_RADIUS_REASONING_MAX_OUTPUT_TOKENS": "2048",
         "BLAST_RADIUS_REVISION": environ.get("BLAST_RADIUS_REVISION", "unknown"),

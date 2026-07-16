@@ -107,6 +107,10 @@ class SessionStore:
             ).fetchone()
         return int(row[0]) if row else 0
 
+    def budget_remaining(self, daily_limit: int, now: datetime | None = None) -> int:
+        """Return remaining UTC-day capacity without reserving a call."""
+        return max(0, daily_limit - self.llm_usage(now))
+
     def try_consume_llm_call(self, daily_limit: int, now: datetime | None = None) -> bool:
         """Backward-compatible reservation helper."""
         return self.reserve_llm_call(daily_limit, now) is not None

@@ -20,8 +20,11 @@ def test_deploy_env_preserves_unset_key_and_updates_managed_values(tmp_path) -> 
     assert values["CUSTOM_SETTING"] == "keep"
     assert values["BLAST_RADIUS_DAILY_LLM_BUDGET"] == "500"
     assert values["BLAST_RADIUS_CRITIC_TIMEOUT_SECONDS"] == "8"
+    assert values["BLAST_RADIUS_GENERATION_TIMEOUT_SECONDS"] == "8"
+    assert values["BLAST_RADIUS_SESSION_LLM_CALL_CAP"] == "12"
+    assert values["BLAST_RADIUS_GENERATED_ROUNDS_PER_SESSION"] == "5"
+    assert values["BLAST_RADIUS_LIVE_GENERATION"] == "false"
     assert values["BLAST_RADIUS_GENERATOR_MAX_OUTPUT_TOKENS"] == "4096"
-    assert values["BLAST_RADIUS_ADAPTATION_MAX_OUTPUT_TOKENS"] == "512"
     assert values["BLAST_RADIUS_GATE_MAX_OUTPUT_TOKENS"] == "4096"
     assert values["BLAST_RADIUS_REASONING_MAX_OUTPUT_TOKENS"] == "2048"
     assert values["BLAST_RADIUS_ENABLE_DOCS"] == "false"
@@ -42,6 +45,18 @@ def test_deploy_env_records_exact_revision(tmp_path) -> None:
     )
 
     assert read_values(path)["BLAST_RADIUS_REVISION"] == "abc123def456"
+
+
+def test_deploy_env_can_explicitly_enable_live_generation(tmp_path) -> None:
+    path = tmp_path / "blast-radius.env"
+
+    update_environment(
+        path,
+        Path("/var/lib/blast-radius"),
+        {"BLAST_RADIUS_LIVE_GENERATION": "true"},
+    )
+
+    assert read_values(path)["BLAST_RADIUS_LIVE_GENERATION"] == "true"
 
 
 def test_deploy_env_replaces_or_clears_explicit_key(tmp_path) -> None:
@@ -77,6 +92,8 @@ def test_deploy_fails_unverified_grading_without_explicit_override() -> None:
     assert 'if [[ "$HEALTH_CRITIC_MODEL" != "gpt-5.6-sol" ]]' in script
     assert 'unset OPENAI_API_KEY' in script
     assert "BLAST_RADIUS_PROMPT_FOR_OPENAI_KEY" in script
+    assert "LIVE_GENERATION_VALUE" in script
+    assert "BLAST_RADIUS_LIVE_GENERATION must be true or false" in script
     assert "blast-radius-deploy.lock" in script
     assert 'git clone --branch "$BRANCH" --single-branch' in script
     assert 'git -C "$INCOMING_DIR" status --porcelain' in script

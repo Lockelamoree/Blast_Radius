@@ -1,16 +1,25 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
 from collections.abc import Callable
+from dataclasses import dataclass
 from uuid import uuid4
 
 from blast_radius.config import Settings
 from blast_radius.engine.bank import ScenarioBank
 from blast_radius.engine.gate import CorrectnessGate
 from blast_radius.engine.grader import grade_decision, merge_reasoning
-from blast_radius.engine.openai_adapter import OpenAIAdapter
-from blast_radius.models import GradeResult, PlayerDecision, Scenario, ScenarioFamily
+from blast_radius.engine.openai_adapter import OpenAIAdapter, SessionLLMBudget
+from blast_radius.models import (
+    GenerationStatus,
+    GradeResult,
+    PlayerDecision,
+    Scenario,
+    ScenarioFamily,
+    ScenarioProvenance,
+)
 
 logger = logging.getLogger(__name__)
 audit_logger = logging.getLogger("uvicorn.error")
@@ -20,6 +29,20 @@ def audit_session_hash(session_id: str | None) -> str:
     if not session_id:
         return "none"
     return hashlib.sha256(f"blast-radius-audit:v1:{session_id}".encode()).hexdigest()
+
+
+@dataclass(frozen=True)
+class ScenarioSelection:
+    scenario: Scenario
+    anchor_id: str
+    provenance: ScenarioProvenance
+    generation_status: GenerationStatus
+    failure_reason: str | None = None
+
+    def __iter__(self):
+        """Keep the historical scenario/failure tuple unpacking available internally."""
+        yield self.scenario
+        yield self.failure_reason
 
 
 class TrustEngine:
@@ -38,22 +61,143 @@ class TrustEngine:
             refund_llm_call=refund_llm_call,
         )
 
+    def live_generation_availability(self, daily_budget_remaining: int) -> tuple[bool, str]:
+        if not self.settings.live_generation or not self.settings.openai_api_key:
+            return False, "off"
+        if self.openai.reasoning_grading_state != "live":
+            return False, "critic_unverified"
+        if daily_budget_remaining <= 0:
+            return False, "budget_exhausted"
+        return True, "available"
+
+    @staticmethod
+    def _generation_status_from_failure(failure: str | None) -> GenerationStatus:
+        return (
+            GenerationStatus.BUDGET_EXHAUSTED
+            if failure == "budget_exhausted"
+            else GenerationStatus.FELL_BACK
+        )
+
+    @staticmethod
+    def _rejection_category(
+        failure_reason: str | None, status: GenerationStatus
+    ) -> str:
+        """Reduce failure detail to an audit-safe category before logging."""
+        if failure_reason is None:
+            return "none"
+        if status == GenerationStatus.TIMEOUT:
+            return "timeout"
+        if status == GenerationStatus.BUDGET_EXHAUSTED:
+            return "budget_exhausted"
+        if failure_reason in {
+            "off",
+            "critic_unverified",
+            "round_cap",
+            "provider_error",
+            "malformed_response",
+            "invalid_request",
+            "invalid_schema",
+            "unavailable",
+        }:
+            return failure_reason
+        if "generated" in failure_reason or "presented artifacts" in failure_reason:
+            return "deterministic_gate"
+        if failure_reason.startswith("no compatible curated base"):
+            return "anchor_unavailable"
+        if failure_reason.startswith("curated base references"):
+            return "template_unavailable"
+        if failure_reason == "critic correctness gate unavailable":
+            return "critic_unavailable"
+        if failure_reason == "live generation unavailable":
+            return "generator_unavailable"
+        return "critic_rejected"
+
+    def _selection(
+        self,
+        *,
+        scenario: Scenario,
+        anchor_id: str,
+        status: GenerationStatus,
+        failure_reason: str | None,
+        safety_identifier: str | None,
+        calls_before: int,
+        session_budget: SessionLLMBudget | None,
+        log_attempt: bool,
+    ) -> ScenarioSelection:
+        provenance = (
+            ScenarioProvenance.GENERATED
+            if status == GenerationStatus.GENERATED
+            else ScenarioProvenance.VERIFIED
+        )
+        if log_attempt:
+            calls_after = session_budget.used if session_budget is not None else calls_before
+            logger.info(
+                "Live variation session_sha256=%s anchor_id=%s status=%s calls=%s "
+                "generated_id=%s rejection=%s",
+                audit_session_hash(safety_identifier),
+                anchor_id,
+                status.value,
+                max(0, calls_after - calls_before),
+                scenario.id if provenance == ScenarioProvenance.GENERATED else "none",
+                self._rejection_category(failure_reason, status),
+            )
+        return ScenarioSelection(
+            scenario=scenario,
+            anchor_id=anchor_id,
+            provenance=provenance,
+            generation_status=status,
+            failure_reason=failure_reason,
+        )
+
     async def next_scenario(
         self,
         *,
         family: ScenarioFamily | None,
         difficulty: int,
         blind_spot: str,
-        competency: dict[str, dict[str, int]],
         exclude: set[str],
         seed: str,
+        competency: dict[str, dict[str, int]] | None = None,
         safety_identifier: str | None = None,
-    ) -> tuple[Scenario, str | None]:
+        generation_requested: bool = True,
+        generation_available: bool | None = None,
+        generation_unavailable_reason: str = "off",
+        session_budget: SessionLLMBudget | None = None,
+    ) -> ScenarioSelection:
+        _ = competency  # Backward-compatible input; targeting is now the clamped blind_spot label.
         failure_reason: str | None = None
         fallback = self.bank.fallback(family=family, exclude=exclude, seed=seed)
         fallback_result = self.gate.verify(fallback)
         if not fallback_result.passed:
             raise RuntimeError(f"verified fallback failed gate: {fallback_result.reasons}")
+
+        calls_before = session_budget.used if session_budget is not None else 0
+        if not generation_requested:
+            return self._selection(
+                scenario=fallback,
+                anchor_id=fallback.id,
+                status=GenerationStatus.NOT_REQUESTED,
+                failure_reason=None,
+                safety_identifier=safety_identifier,
+                calls_before=calls_before,
+                session_budget=session_budget,
+                log_attempt=False,
+            )
+
+        if generation_available is None:
+            generation_available = self.openai.generation_enabled
+        if not generation_available:
+            failure_reason = generation_unavailable_reason
+            return self._selection(
+                scenario=fallback,
+                anchor_id=fallback.id,
+                status=self._generation_status_from_failure(failure_reason),
+                failure_reason=failure_reason,
+                safety_identifier=safety_identifier,
+                calls_before=calls_before,
+                session_budget=session_budget,
+                log_attempt=True,
+            )
 
         if self.openai.generation_enabled and family is not None:
             if fallback.family != family:
@@ -61,19 +205,44 @@ class TrustEngine:
             else:
                 template = self.bank.templates.get(fallback.template_ref)
                 if template is None:
-                    return fallback, "curated base references an unknown template"
-                blind_spot = await self.openai.adapt_blind_spot(
-                    competency,
-                    blind_spot,
-                    safety_identifier=safety_identifier,
-                )
-                presentation = await self.openai.generate(
-                    fallback,
-                    template,
-                    difficulty,
-                    blind_spot,
-                    safety_identifier=safety_identifier,
-                )
+                    failure_reason = "curated base references an unknown template"
+                    return self._selection(
+                        scenario=fallback,
+                        anchor_id=fallback.id,
+                        status=GenerationStatus.FELL_BACK,
+                        failure_reason=failure_reason,
+                        safety_identifier=safety_identifier,
+                        calls_before=calls_before,
+                        session_budget=session_budget,
+                        log_attempt=True,
+                    )
+                try:
+                    async with asyncio.timeout(self.settings.generation_timeout_seconds):
+                        generation_budget = (
+                            {"session_budget": session_budget}
+                            if session_budget is not None
+                            else {}
+                        )
+                        presentation = await self.openai.generate(
+                            fallback,
+                            template,
+                            difficulty,
+                            blind_spot,
+                            safety_identifier=safety_identifier,
+                            **generation_budget,
+                        )
+                except TimeoutError:
+                    failure_reason = "generation timeout"
+                    return self._selection(
+                        scenario=fallback,
+                        anchor_id=fallback.id,
+                        status=GenerationStatus.TIMEOUT,
+                        failure_reason=failure_reason,
+                        safety_identifier=safety_identifier,
+                        calls_before=calls_before,
+                        session_budget=session_budget,
+                        log_attempt=True,
+                    )
                 if presentation:
                     generated_id = f"live-{uuid4().hex}"
                     while generated_id in self.bank.scenarios or generated_id in exclude:
@@ -88,24 +257,63 @@ class TrustEngine:
                     )
                     result = self.gate.verify(generated, trusted_base=fallback)
                     if result.passed:
-                        critic_result = await self.openai.critic_gate(
-                            generated,
-                            template,
-                            safety_identifier=safety_identifier,
-                        )
+                        try:
+                            async with asyncio.timeout(self.settings.generation_timeout_seconds):
+                                critic_budget = (
+                                    {"session_budget": session_budget}
+                                    if session_budget is not None
+                                    else {}
+                                )
+                                critic_result = await self.openai.critic_gate(
+                                    generated,
+                                    template,
+                                    safety_identifier=safety_identifier,
+                                    **critic_budget,
+                                )
+                        except TimeoutError:
+                            failure_reason = "critic gate timeout"
+                            return self._selection(
+                                scenario=fallback,
+                                anchor_id=fallback.id,
+                                status=GenerationStatus.TIMEOUT,
+                                failure_reason=failure_reason,
+                                safety_identifier=safety_identifier,
+                                calls_before=calls_before,
+                                session_budget=session_budget,
+                                log_attempt=True,
+                            )
                         critic = critic_result.value if critic_result else None
                         if critic and critic.passed:
-                            return generated, None
+                            return self._selection(
+                                scenario=generated,
+                                anchor_id=fallback.id,
+                                status=GenerationStatus.GENERATED,
+                                failure_reason=None,
+                                safety_identifier=safety_identifier,
+                                calls_before=calls_before,
+                                session_budget=session_budget,
+                                log_attempt=True,
+                            )
                         failure_reason = (
                             "; ".join(critic.reasons)
                             if critic
-                            else "critic correctness gate unavailable"
+                            else self.openai.last_failure
+                            or "critic correctness gate unavailable"
                         )
                     else:
                         failure_reason = "; ".join(result.reasons)
                 else:
-                    failure_reason = "live generation unavailable"
-        return fallback, failure_reason
+                    failure_reason = self.openai.last_failure or "live generation unavailable"
+        return self._selection(
+            scenario=fallback,
+            anchor_id=fallback.id,
+            status=self._generation_status_from_failure(failure_reason),
+            failure_reason=failure_reason,
+            safety_identifier=safety_identifier,
+            calls_before=calls_before,
+            session_budget=session_budget,
+            log_attempt=True,
+        )
 
     async def grade(
         self,
@@ -113,16 +321,24 @@ class TrustEngine:
         decision: PlayerDecision,
         *,
         safety_identifier: str | None = None,
+        allow_critic: bool = True,
+        session_budget: SessionLLMBudget | None = None,
     ) -> GradeResult:
         grade = grade_decision(scenario, decision)
         deterministic_matched_tells = list(grade.matched_tells)
-        if not self.openai.grading_enabled:
+        if not allow_critic or not self.openai.grading_enabled:
             return grade
         try:
+            critique_budget = (
+                {"session_budget": session_budget}
+                if session_budget is not None
+                else {}
+            )
             review = await self.openai.critique_reasoning(
                 scenario,
                 decision,
                 safety_identifier=safety_identifier,
+                **critique_budget,
             )
         except Exception as exc:
             logger.warning("OpenAI reasoning critique failed (%s)", type(exc).__name__)

@@ -15,6 +15,7 @@ from blast_radius.engine.openai_adapter import (
     ModelGeneratedPresentation,
     ModelReasoningReview,
     OpenAIAdapter,
+    SessionLLMBudget,
     model_input,
     to_strict_schema,
 )
@@ -36,36 +37,41 @@ def assert_strict_objects(node) -> None:
             assert_strict_objects(value)
 
 
-def full_artifact_selections(scenario) -> dict:
-    return {"artifact_order": list(range(len(scenario.presentation.artifacts)))}
+def generated_presentation(scenario) -> dict:
+    payload = scenario.presentation.model_dump(mode="json")
+    payload["eyebrow"] = "Live variation · verified anchor"
+    payload["agent_note"] = f"Reworded safely: {scenario.presentation.agent_note}"
+    return payload
 
 
 def test_grading_and_generation_schemas_are_strict(test_settings) -> None:
     engine = TrustEngine(test_settings)
     scenario = engine.bank.get("dep-typo-1")
     generated = ModelGeneratedPresentation.model_validate(
-        full_artifact_selections(scenario)
+        generated_presentation(scenario)
     )
 
     for model in (ModelGateReview, ModelReasoningReview, ModelGeneratedPresentation):
         assert_strict_objects(to_strict_schema(model.model_json_schema()))
 
-    assert generated.model_dump(mode="json") == full_artifact_selections(scenario)
+    assert generated.model_dump(mode="json") == generated_presentation(scenario)
 
 
 def test_generated_schema_rejects_model_authored_identity_or_truth(test_settings) -> None:
     scenario = TrustEngine(test_settings).bank.get("dep-typo-1")
-    payload = full_artifact_selections(scenario)
+    payload = generated_presentation(scenario)
     payload["family"] = scenario.family.value
     with pytest.raises(ValidationError):
         ModelGeneratedPresentation.model_validate(payload)
 
-    payload = full_artifact_selections(scenario)
+    payload = generated_presentation(scenario)
     payload["ground_truth"] = scenario.ground_truth.model_dump(mode="json")
     with pytest.raises(ValidationError):
         ModelGeneratedPresentation.model_validate(payload)
+    payload = generated_presentation(scenario)
+    payload["artifacts"] = []
     with pytest.raises(ValidationError):
-        ModelGeneratedPresentation(artifact_order=[-1])
+        ModelGeneratedPresentation.model_validate(payload)
 
 
 class FakeResponses:
@@ -215,7 +221,7 @@ def test_generator_requests_presentation_only_with_its_role_bound(test_settings)
     scenario = TrustEngine(test_settings).bank.get("dep-typo-1")
     fake = FakeResponses(
         output_text=ModelGeneratedPresentation.model_validate(
-            full_artifact_selections(scenario)
+            generated_presentation(scenario)
         ).model_dump_json()
     )
     adapter._client = FakeClient(fake)
@@ -236,23 +242,19 @@ def test_generator_requests_presentation_only_with_its_role_bound(test_settings)
     assert request["store"] is False
     assert request["safety_identifier"] == "session-test"
     properties = request["text"]["format"]["schema"]["properties"]
-    assert set(properties) == {"artifact_order"}
+    assert set(properties) == {"eyebrow", "ask_text", "agent_note", "artifacts"}
     assert "ground_truth" not in properties
-    assert result.eyebrow == scenario.presentation.eyebrow
+    assert result.eyebrow == "Live variation · verified anchor"
     assert result.ask_text == scenario.presentation.ask_text
-    assert result.agent_note == scenario.presentation.agent_note
+    assert result.agent_note.startswith("Reworded safely:")
 
 
-def test_generator_rejects_invalid_curated_line_selection(test_settings) -> None:
+def test_generator_rejects_malformed_presentation(test_settings) -> None:
     settings = replace(test_settings, openai_api_key="test-key", live_generation=True)
     adapter = OpenAIAdapter(settings)
     engine = TrustEngine(test_settings)
     scenario = engine.bank.get("dep-typo-1")
-    fake = FakeResponses(
-        output_text=ModelGeneratedPresentation(
-            artifact_order=[0, 0]
-        ).model_dump_json()
-    )
+    fake = FakeResponses(output_text='{"eyebrow":"missing everything else"}')
     adapter._client = FakeClient(fake)
 
     result = asyncio.run(
@@ -303,7 +305,7 @@ def test_missing_response_id_never_marks_probe_live(test_settings) -> None:
     assert adapter.reasoning_grading_state == "key_present_unverified"
 
 
-@pytest.mark.parametrize("response_model", [None, "gpt-5.6-terra"])
+@pytest.mark.parametrize("response_model", [None, "gpt-5.6-unexpected"])
 def test_missing_or_mismatched_response_model_never_marks_probe_live(
     test_settings, response_model
 ) -> None:
@@ -401,6 +403,73 @@ def test_pre_dispatch_failure_refunds_budget(test_settings, tmp_path) -> None:
 
     assert result is None
     assert store.llm_usage() == 0
+
+
+def test_pre_dispatch_failure_refunds_session_budget(test_settings) -> None:
+    class LocallyFailingResponses:
+        def create(self, **kwargs):
+            raise RuntimeError("local request construction failed")
+
+    settings = replace(test_settings, openai_api_key="test-key")
+    adapter = OpenAIAdapter(settings)
+    adapter._client = FakeClient(LocallyFailingResponses())
+    session_budget = SessionLLMBudget(limit=1)
+
+    result = asyncio.run(
+        adapter._structured(
+            model=settings.critic_model,
+            prompt="probe",
+            output_type=ModelReasoningReview,
+            name="test_review",
+            effort="medium",
+            max_output_tokens=512,
+            session_budget=session_budget,
+        )
+    )
+
+    assert result is None
+    assert session_budget.used == 0
+
+
+def test_concurrent_dispatches_cannot_exceed_session_budget(test_settings) -> None:
+    class SlowResponses(FakeResponses):
+        async def create(self, **kwargs):
+            self.calls.append(kwargs)
+            await asyncio.sleep(0.02)
+            return SimpleNamespace(
+                output_text=ModelReasoningReview(
+                    matched_tells=[],
+                    followup="Review completed successfully.",
+                ).model_dump_json(),
+                id="resp_session_cap",
+                model=kwargs["model"],
+            )
+
+    settings = replace(test_settings, openai_api_key="test-key")
+    adapter = OpenAIAdapter(settings)
+    fake = SlowResponses()
+    adapter._client = FakeClient(fake)
+    session_budget = SessionLLMBudget(limit=1)
+
+    async def call_once():
+        return await adapter._structured(
+            model=settings.critic_model,
+            prompt="probe",
+            output_type=ModelReasoningReview,
+            name="test_review",
+            effort="medium",
+            max_output_tokens=512,
+            session_budget=session_budget,
+        )
+
+    async def run_both():
+        return await asyncio.gather(call_once(), call_once())
+
+    results = asyncio.run(run_both())
+
+    assert sum(result is not None for result in results) == 1
+    assert len(fake.calls) == 1
+    assert session_budget.used == 1
 
 
 def test_invalid_safety_identifier_never_dispatches_or_reserves(

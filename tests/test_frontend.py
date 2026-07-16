@@ -71,6 +71,7 @@ def test_accessibility_and_honest_live_mode_are_wired_without_overlays() -> None
     assert "state.testSubmitting=true;submitButton.disabled=true" in app
     assert "state.testSubmitting=false;submitButton.disabled=false" in app
     assert "health.live_generation" in app
+    assert "health.live_generation_reason" in app
     assert "liveGenerationAvailable" in app
     assert "MODEL BUDGET EXHAUSTED" in app
     assert "grade.graded_by===grade.critic_model" in app
@@ -78,6 +79,10 @@ def test_accessibility_and_honest_live_mode_are_wired_without_overlays() -> None
     assert ".split('-').pop()" not in app
     assert ":focus-visible" in css
     assert ".sr-only" in css
+    assert 'id="round-provenance"' in template
+    assert "AI-GENERATED VARIATION" in app
+    assert "never sent to the reasoning critic" in app
+    assert 'id="result-generated"' in template
 
 
 def test_decision_controls_serialize_capabilities_and_expose_selected_state() -> None:
@@ -121,8 +126,10 @@ def test_assessment_and_score_labels_are_accessible_and_honest() -> None:
     assert "tell coverage.`" in app
     assert "tell coverage`)" in app
     assert "BLOCKED BEFORE DISPLAY" in integrity
-    assert "PLANTED DEFECT" in integrity
+    assert "PLANTED HALLUCINATION" in integrity
     assert "FAILED INVARIANT" in integrity
+    assert "case=${selectedCase}" in integrity
+    assert "review.planted_claim" in integrity
 
 
 def test_social_metadata_and_static_assets_are_cache_busted() -> None:

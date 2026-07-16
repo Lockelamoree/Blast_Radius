@@ -15,15 +15,18 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from blast_radius.config import Settings
 from blast_radius.engine import TrustEngine
+from blast_radius.engine.openai_adapter import SessionLLMBudget
 from blast_radius.models import (
     COMPETENCY_LABELS,
     AssessmentForm,
     Competency,
     CompetencyProgress,
+    GenerationStatus,
     LearnerProgress,
     PlayerDecision,
     Scenario,
     SessionState,
+    ScenarioProvenance,
     competency_for_family,
 )
 from blast_radius.storage import SessionStore
@@ -239,14 +242,42 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
         )
         state.scenario_order[start:] = remaining
 
+    def live_generation_availability(state: SessionState | None = None) -> tuple[bool, str]:
+        available, reason = engine.live_generation_availability(
+            store.budget_remaining(settings.daily_llm_budget)
+        )
+        if state is not None and state.llm_calls_used >= settings.session_llm_call_cap:
+            return False, "budget_exhausted"
+        if state is not None and state.rounds_generated >= settings.generated_rounds_per_session:
+            return False, "round_cap"
+        return available, reason
+
     @router.get("/demo/gate-catch")
-    def demo_gate_catch(request: Request) -> dict:
+    def demo_gate_catch(request: Request, case: str = "tell") -> dict:
         limiter.check(f"gate-catch:{client_host(request)}")
+        if case not in {"tell", "citation"}:
+            raise HTTPException(status_code=422, detail="case must be tell or citation")
         planted = engine.bank.get("dep-typo-1").model_copy(deep=True)
         planted.id = "demo-planted-hallucination"
-        planted.template_ref = "invented-cve-2099-fake-package"
+        if case == "tell":
+            planted_claim = "hidden remote code execution backdoor"
+            planted.ground_truth.tells.append(planted_claim)
+            planted.ground_truth.tell_keywords[planted_claim] = [
+                "remote code execution",
+                "backdoor",
+            ]
+        else:
+            planted_claim = "off-catalog security receipt"
+            planted.ground_truth.evidence[0].source = (
+                "https://example.com/fabricated-security-guidance"
+            )
         result = engine.gate.verify(planted)
-        return {"passed": result.passed, "reasons": result.reasons}
+        return {
+            "case": case,
+            "planted_claim": planted_claim,
+            "passed": result.passed,
+            "reasons": result.reasons,
+        }
 
     @router.post("/sessions", status_code=status.HTTP_201_CREATED)
     def create_session(payload: CreateSessionRequest, request: Request) -> dict:
@@ -258,12 +289,13 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
             scenario_order=engine.bank.demo_order(),
         )
         store.save(state)
+        generation_available, _ = live_generation_availability()
         return {
             "session_id": state.id,
             "mode": state.mode,
             "rounds_total": len(state.scenario_order),
             "pretest": assessment_view(state.id, AssessmentForm.PRE),
-            "live_generation_available": engine.openai.generation_enabled,
+            "live_generation_available": generation_available,
             "reasoning_grading": engine.openai.reasoning_grading_state,
         }
 
@@ -306,10 +338,19 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
                 "posttest": assessment_view(state.id, AssessmentForm.POST),
             }
         limit_round_request(request, session_id)
+        is_new_active = not bool(state.active_scenario_json)
         if state.active_scenario_json:
             scenario = Scenario.model_validate_json(state.active_scenario_json)
+            anchor_id = state.active_anchor_id or scenario.id
+            provenance = state.active_provenance or ScenarioProvenance.VERIFIED
+            generation_status = (
+                state.active_generation_status or GenerationStatus.NOT_REQUESTED
+            )
         elif state.mode == "demo":
             scenario = engine.bank.get(state.scenario_order[state.current_index])
+            anchor_id = scenario.id
+            provenance = ScenarioProvenance.VERIFIED
+            generation_status = GenerationStatus.NOT_REQUESTED
             gate = engine.gate.verify(scenario)
             if not gate.passed:
                 rejected_id = scenario.id
@@ -349,28 +390,54 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
                     scenario.id,
                     rejection_reasons,
                 )
+                anchor_id = scenario.id
+                generation_status = GenerationStatus.FELL_BACK
         else:
             target = engine.bank.get(state.scenario_order[state.current_index])
             weakest = min(Competency, key=lambda item: competency_accuracy(state, item)).value
             difficulty = min(5, 1 + state.current_index)
-            scenario, fallback_reason = await engine.next_scenario(
+            generation_available, unavailable_reason = live_generation_availability(state)
+            session_budget = SessionLLMBudget(
+                limit=settings.session_llm_call_cap,
+                used=state.llm_calls_used,
+            )
+            selection = await engine.next_scenario(
                 family=target.family,
                 difficulty=difficulty,
                 blind_spot=weakest,
-                competency=state.competency,
-                exclude=set(state.answered_scenario_ids),
+                exclude=set(state.shown_scenario_ids),
                 seed=f"{state.id}:{state.current_index}",
                 safety_identifier=state.id,
+                generation_requested=True,
+                generation_available=generation_available,
+                generation_unavailable_reason=unavailable_reason,
+                session_budget=session_budget,
             )
-            state.last_gate_fallback_reason = fallback_reason
-        state.active_scenario_id = scenario.id
-        state.active_scenario_json = scenario.model_dump_json()
-        store.save(state)
+            state.llm_calls_used = session_budget.used
+            scenario = selection.scenario
+            anchor_id = selection.anchor_id
+            provenance = selection.provenance
+            generation_status = selection.generation_status
+            state.last_gate_fallback_reason = selection.failure_reason
+        if is_new_active:
+            state.active_scenario_id = scenario.id
+            state.active_scenario_json = scenario.model_dump_json()
+            state.active_anchor_id = anchor_id
+            state.active_provenance = provenance
+            state.active_generation_status = generation_status
+            for shown_id in (anchor_id, scenario.id):
+                if shown_id not in state.shown_scenario_ids:
+                    state.shown_scenario_ids.append(shown_id)
+            if provenance == ScenarioProvenance.GENERATED:
+                state.rounds_generated += 1
+            store.save(state)
         return {
             "complete": False,
             "round_number": state.current_index + 1,
             "rounds_total": len(state.scenario_order),
             "seconds": max(35, 70 - state.current_index * 5),
+            "provenance": provenance,
+            "generation_status": generation_status,
             "scenario": scenario.public_view(),
         }
 
@@ -398,11 +465,18 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
         if decision.scenario_id in state.answered_scenario_ids:
             raise HTTPException(status_code=409, detail="This round was already answered.")
         scenario = Scenario.model_validate_json(state.active_scenario_json)
+        session_budget = SessionLLMBudget(
+            limit=settings.session_llm_call_cap,
+            used=state.llm_calls_used,
+        )
         grade = await engine.grade(
             scenario,
             decision,
             safety_identifier=state.id,
+            allow_critic=state.active_provenance != ScenarioProvenance.GENERATED,
+            session_budget=session_budget,
         )
+        state.llm_calls_used = session_budget.used
         competency = competency_for_family(scenario.family).value
         record = state.competency.setdefault(competency, {"hits": 0, "misses": 0})
         for tell in scenario.ground_truth.tells:
@@ -412,6 +486,9 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
         state.current_index += 1
         state.active_scenario_id = None
         state.active_scenario_json = None
+        state.active_anchor_id = None
+        state.active_provenance = None
+        state.active_generation_status = None
         reorder_demo_suffix(state, state.current_index)
         store.save(state)
         return {
@@ -504,12 +581,13 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
             test_total=test_total,
             delta=delta,
             rounds_played=len(state.grades),
+            rounds_generated=state.rounds_generated,
             competency_map=competency_map,
             average_reasoning_score=average,
             share_text=(
                 f"I completed Blast Radius: pre {state.pretest_score}/{test_total} → "
                 f"post {state.posttest_score}/{test_total}, {len(state.grades)} agent decisions, "
-                f"and {average}% average tell coverage."
+                f"{state.rounds_generated} generated variations, and {average}% average tell coverage."
             ),
         )
 

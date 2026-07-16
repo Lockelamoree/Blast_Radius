@@ -35,6 +35,15 @@ class Settings:
     critic_timeout_seconds: float = float(
         os.getenv("BLAST_RADIUS_CRITIC_TIMEOUT_SECONDS", "8")
     )
+    generation_timeout_seconds: float = float(
+        os.getenv("BLAST_RADIUS_GENERATION_TIMEOUT_SECONDS", "8")
+    )
+    session_llm_call_cap: int = int(
+        os.getenv("BLAST_RADIUS_SESSION_LLM_CALL_CAP", "12")
+    )
+    generated_rounds_per_session: int = int(
+        os.getenv("BLAST_RADIUS_GENERATED_ROUNDS_PER_SESSION", "5")
+    )
     revision: str = _as_revision(os.getenv("BLAST_RADIUS_REVISION", "unknown"))
     session_create_limit_per_hour: int = int(
         os.getenv("BLAST_RADIUS_SESSION_CREATE_LIMIT_PER_HOUR", "12")
@@ -46,13 +55,9 @@ class Settings:
         os.getenv("BLAST_RADIUS_SESSION_ROUND_REQUEST_CAP", "30")
     )
     generator_model: str = "gpt-5.6-luna"
-    adaptation_model: str = "gpt-5.6-terra"
     critic_model: str = "gpt-5.6-sol"
     generator_max_output_tokens: int = int(
         os.getenv("BLAST_RADIUS_GENERATOR_MAX_OUTPUT_TOKENS", "4096")
-    )
-    adaptation_max_output_tokens: int = int(
-        os.getenv("BLAST_RADIUS_ADAPTATION_MAX_OUTPUT_TOKENS", "512")
     )
     gate_max_output_tokens: int = int(
         os.getenv("BLAST_RADIUS_GATE_MAX_OUTPUT_TOKENS", "4096")

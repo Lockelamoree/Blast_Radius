@@ -1,4 +1,5 @@
 import asyncio
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from threading import Barrier
@@ -13,6 +14,12 @@ from blast_radius.api import (
 )
 from blast_radius.engine import TrustEngine
 from blast_radius.engine.bank import ScenarioBank
+from blast_radius.engine.openai_adapter import (
+    ModelGateReview,
+    ModelReasoningReview,
+    OpenAIAdapter,
+    StructuredCallResult,
+)
 from blast_radius.main import create_app
 from blast_radius.models import AssessmentForm, Competency, GateResult
 
@@ -104,6 +111,8 @@ def test_health_and_home(client) -> None:
     assert health.status_code == 200
     assert health.json()["bank_scenarios"] >= 18
     assert health.json()["reasoning_grading"] == "off"
+    assert health.json()["live_generation"] is False
+    assert health.json()["live_generation_reason"] == "off"
     assert health.json()["critic_model"] == "gpt-5.6-sol"
     assert "api_key" not in str(health.json()).lower()
 
@@ -126,13 +135,26 @@ def test_round_response_hides_ground_truth(client) -> None:
     body = response.json()
     assert "ground_truth" not in str(body)
     assert "correct_action" not in str(body)
+    assert body["provenance"] == "verified"
+    assert body["generation_status"] == "not_requested"
 
 
 def test_gate_catch_rejects_planted_hallucination_without_leaking_it(client) -> None:
-    response = client.get("/api/demo/gate-catch")
-    assert response.status_code == 200
-    assert response.json() == {"passed": False, "reasons": ["unknown template_ref"]}
-    assert "ground_truth" not in response.text
+    tell = client.get("/api/demo/gate-catch?case=tell")
+    assert tell.status_code == 200
+    assert tell.json()["case"] == "tell"
+    assert tell.json()["planted_claim"] == "hidden remote code execution backdoor"
+    assert tell.json()["reasons"] == [
+        "presented artifacts do not support declared tell: hidden remote code execution backdoor"
+    ]
+    citation = client.get("/api/demo/gate-catch?case=citation")
+    assert citation.status_code == 200
+    assert citation.json()["case"] == "citation"
+    assert citation.json()["planted_claim"] == "off-catalog security receipt"
+    assert citation.json()["reasons"] == [
+        "evidence source is not approved for this template"
+    ]
+    assert "ground_truth" not in tell.text + citation.text
 
 
 def test_gate_catch_is_rate_limited(client) -> None:
@@ -232,10 +254,19 @@ def test_concurrent_duplicate_decisions_grade_exactly_once(
         player_decision,
         *,
         safety_identifier=None,
+        allow_critic=True,
+        session_budget=None,
     ):
         identifiers.append(safety_identifier)
         await asyncio.sleep(0.05)
-        return await real_grade(engine, scenario, player_decision)
+        return await real_grade(
+            engine,
+            scenario,
+            player_decision,
+            safety_identifier=safety_identifier,
+            allow_critic=allow_critic,
+            session_budget=session_budget,
+        )
 
     monkeypatch.setattr(TrustEngine, "grade", slow_grade)
 
@@ -370,6 +401,135 @@ def test_demo_reorders_only_the_verified_deck_by_weakest_competency(
     assert played[:2] == ["tool-scope-1", "market-egress-1"]
     assert set(played) == expected_ids
     assert len(played) == len(set(played)) == 6
+
+
+def test_live_rounds_persist_generation_provenance_and_respect_caps(
+    test_settings, monkeypatch
+) -> None:
+    calls: dict[str, list[str]] = {"generate": [], "gate": [], "reasoning": []}
+
+    async def probe(self) -> None:
+        self.reasoning_grading_state = "live"
+
+    async def generate(
+        self,
+        base,
+        template,
+        difficulty,
+        blind_spot,
+        *,
+        safety_identifier=None,
+        session_budget=None,
+    ):
+        assert session_budget is not None and session_budget.reserve()
+        calls["generate"].append(base.id)
+        return base.presentation.model_copy(
+            update={
+                "eyebrow": f"Verified-anchor variation {len(calls['generate'])}",
+                "agent_note": f"Reskinned safely: {base.presentation.agent_note}",
+            }
+        )
+
+    async def critic_gate(
+        self,
+        scenario,
+        template,
+        *,
+        safety_identifier=None,
+        session_budget=None,
+    ):
+        assert session_budget is not None and session_budget.reserve()
+        calls["gate"].append(scenario.id)
+        return StructuredCallResult(
+            value=ModelGateReview(passed=True, reasons=[]),
+            response_id=f"resp_gate_{len(calls['gate'])}",
+            response_model="gpt-5.6-sol",
+        )
+
+    async def critique(
+        self,
+        scenario,
+        decision,
+        *,
+        safety_identifier=None,
+        session_budget=None,
+    ):
+        assert session_budget is not None and session_budget.reserve()
+        calls["reasoning"].append(scenario.id)
+        return StructuredCallResult(
+            value=ModelReasoningReview(
+                matched_tells=[],
+                followup="Which artifact supports your decision?",
+            ),
+            response_id="resp_reasoning_fallback",
+            response_model="gpt-5.6-sol",
+        )
+
+    monkeypatch.setattr(OpenAIAdapter, "probe_reasoning_grading", probe)
+    monkeypatch.setattr(OpenAIAdapter, "generate", generate)
+    monkeypatch.setattr(OpenAIAdapter, "critic_gate", critic_gate)
+    monkeypatch.setattr(OpenAIAdapter, "critique_reasoning", critique)
+    settings = replace(
+        test_settings,
+        openai_api_key="test-key",
+        live_generation=True,
+        generated_rounds_per_session=5,
+        session_llm_call_cap=12,
+    )
+
+    with TestClient(create_app(settings)) as live_client:
+        for _ in range(20):
+            health = live_client.get("/healthz").json()
+            if health["live_generation"]:
+                break
+            time.sleep(0.01)
+        assert health["live_generation_reason"] == "available"
+
+        bank = ScenarioBank(settings.data_dir)
+        created = live_client.post("/api/sessions", json={"mode": "live"}).json()
+        session_id = created["session_id"]
+        pre_answers = assessment_answers(bank, created["pretest"])
+        assert live_client.post(
+            f"/api/sessions/{session_id}/pretest",
+            json={"answers": pre_answers},
+        ).status_code == 200
+
+        shown_ids: list[str] = []
+        for index in range(6):
+            first = live_client.post(f"/api/sessions/{session_id}/rounds/next")
+            repeated = live_client.post(f"/api/sessions/{session_id}/rounds/next")
+            assert first.status_code == repeated.status_code == 200
+            assert first.json() == repeated.json()
+            round_data = first.json()
+            shown_ids.append(round_data["scenario"]["id"])
+            if index < 5:
+                assert round_data["provenance"] == "generated"
+                assert round_data["generation_status"] == "generated"
+            else:
+                assert round_data["provenance"] == "verified"
+                assert round_data["generation_status"] == "fell_back"
+            assert live_client.post(
+                f"/api/sessions/{session_id}/decisions",
+                json={
+                    "scenario_id": round_data["scenario"]["id"],
+                    "action": "reject",
+                    "reasoning_text": "The displayed scope and provenance are not sufficiently trusted.",
+                },
+            ).status_code == 200
+
+        terminal = live_client.post(f"/api/sessions/{session_id}/rounds/next").json()
+        post_answers = assessment_answers(bank, terminal["posttest"])
+        assert live_client.post(
+            f"/api/sessions/{session_id}/posttest",
+            json={"answers": post_answers},
+        ).status_code == 200
+        results = live_client.get(f"/api/sessions/{session_id}/results").json()
+
+    assert results["rounds_generated"] == 5
+    assert len(calls["generate"]) == len(calls["gate"]) == 5
+    assert len(calls["reasoning"]) == 1
+    assert len(calls["generate"]) == len(set(calls["generate"]))
+    assert len(shown_ids) == len(set(shown_ids))
 
 
 def test_session_creation_has_a_per_ip_limit(test_settings) -> None:

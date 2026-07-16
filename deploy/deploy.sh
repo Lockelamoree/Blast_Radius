@@ -4,6 +4,7 @@ set -euo pipefail
 DOMAIN="${1:-${DOMAIN:-}}"
 REPOSITORY="${2:-${REPOSITORY:-https://github.com/Lockelamoree/Blast_Radius.git}}"
 BRANCH="${BLAST_RADIUS_BRANCH:-main}"
+LIVE_GENERATION_VALUE="${BLAST_RADIUS_LIVE_GENERATION:-false}"
 APP_DIR="/opt/blast-radius"
 RELEASES_DIR="/opt/blast-radius-releases"
 STATE_DIR="/var/lib/blast-radius"
@@ -41,6 +42,10 @@ if [[ ! "$DOMAIN" =~ ^[A-Za-z0-9.-]+$ ]] || [[ "$DOMAIN" != *.* ]]; then
 fi
 if [[ ! "$BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]]; then
   echo "BLAST_RADIUS_BRANCH contains unsupported characters." >&2
+  exit 1
+fi
+if [[ "$LIVE_GENERATION_VALUE" != "true" && "$LIVE_GENERATION_VALUE" != "false" ]]; then
+  echo "BLAST_RADIUS_LIVE_GENERATION must be true or false." >&2
   exit 1
 fi
 
@@ -265,11 +270,13 @@ if [[ "$OPENAI_KEY_SUPPLIED" == "1" ]]; then
   BLAST_RADIUS_UPDATE_OPENAI_KEY=1 \
   OPENAI_API_KEY="$OPENAI_KEY_VALUE" \
   BLAST_RADIUS_DAILY_LLM_BUDGET="$ENV_BUDGET" \
+  BLAST_RADIUS_LIVE_GENERATION="$LIVE_GENERATION_VALUE" \
   BLAST_RADIUS_REVISION="$DEPLOY_REVISION" \
     python3 "$RELEASE_DIR/deploy/update_env.py" "$ENV_CANDIDATE" "$STATE_DIR"
 else
   BLAST_RADIUS_UPDATE_OPENAI_KEY=0 \
   BLAST_RADIUS_DAILY_LLM_BUDGET="$ENV_BUDGET" \
+  BLAST_RADIUS_LIVE_GENERATION="$LIVE_GENERATION_VALUE" \
   BLAST_RADIUS_REVISION="$DEPLOY_REVISION" \
     python3 "$RELEASE_DIR/deploy/update_env.py" "$ENV_CANDIDATE" "$STATE_DIR"
 fi
@@ -354,8 +361,8 @@ for _ in $(seq 1 20); do
     sleep 1
     continue
   fi
-  if python3 -c 'import json,sys; h=json.load(sys.stdin); ok=(h.get("status") == "ok" and h.get("revision") == sys.argv[1] and h.get("bank_scenarios") == 18 and h.get("live_generation") is False and h.get("critic_model") == "gpt-5.6-sol"); raise SystemExit(0 if ok else 1)' \
-       "$DEPLOY_REVISION" <<< "$LOCAL_HEALTH_JSON"; then
+  if python3 -c 'import json,sys; h=json.load(sys.stdin); expected=(sys.argv[2] == "true"); ok=(h.get("status") == "ok" and h.get("revision") == sys.argv[1] and h.get("bank_scenarios") == 18 and h.get("live_generation") is expected and h.get("critic_model") == "gpt-5.6-sol"); raise SystemExit(0 if ok else 1)' \
+       "$DEPLOY_REVISION" "$LIVE_GENERATION_VALUE" <<< "$LOCAL_HEALTH_JSON"; then
     LOCAL_HEALTH_VALID=1
     break
   fi
@@ -416,8 +423,8 @@ if [[ "$BANK_SCENARIOS" != "18" ]]; then
   printf 'ERROR: expected 18 verified scenarios, health reports %s.\n' "$BANK_SCENARIOS" >&2
   exit 1
 fi
-if [[ "$GENERATION_STATE" != "false" ]]; then
-  printf 'ERROR: deterministic judging requires BLAST_RADIUS_LIVE_GENERATION=false.\n' >&2
+if [[ "$GENERATION_STATE" != "$LIVE_GENERATION_VALUE" ]]; then
+  printf 'ERROR: health reports live_generation=%s, expected %s.\n' "$GENERATION_STATE" "$LIVE_GENERATION_VALUE" >&2
   exit 1
 fi
 if [[ "$GRADING_STATE" != "live" ]]; then

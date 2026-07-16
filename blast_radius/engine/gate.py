@@ -1,10 +1,37 @@
 from __future__ import annotations
 
 import re
-from collections import Counter
-
 from blast_radius.engine.bank import ScenarioBank
 from blast_radius.models import Action, GateResult, Scenario
+
+
+_URL_PATTERN = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
+_GENERATED_PRESENTATION_BLOCKLIST = (
+    re.compile(r"\bsystem\s+note\b", re.IGNORECASE),
+    re.compile(
+        r"\b(?:ignore|disregard|override)\s+(?:all\s+)?"
+        r"(?:previous|prior|developer|system)\s+instructions?\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:return|reveal|list|output)\s+(?:all|every|the)\s+"
+        r"(?:allowed\s+)?tells?\b",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\bmatched_tells\b", re.IGNORECASE),
+    re.compile(r"\byou\s+are\s+(?:the|a)\s+(?:grader|reviewer)\b", re.IGNORECASE),
+    re.compile(r"<\s*(?:system|developer|assistant)\s*>", re.IGNORECASE),
+)
+_ANSWER_LEAK_PATTERNS = (
+    re.compile(r"\bcorrect\s+action\b", re.IGNORECASE),
+    re.compile(r"\b(?:the\s+)?answer\s+is\b", re.IGNORECASE),
+    re.compile(r"\b(?:you\s+should|you\s+must)\s+(?:approve|reject|sandbox)\b", re.IGNORECASE),
+    re.compile(r"\b(?:choose|select|pick|use)\s+(?:the\s+)?(?:approve|reject|sandbox)\b", re.IGNORECASE),
+    re.compile(
+        r"\b(?:approve|reject|sandbox)\s+(?:this|that|the|it|request|command|package|tool|skill)\b",
+        re.IGNORECASE,
+    ),
+)
 
 
 class CorrectnessGate:
@@ -32,6 +59,21 @@ class CorrectnessGate:
         return reasons
 
     @staticmethod
+    def _normalized_presentation_value(value):
+        if isinstance(value, str):
+            return " ".join(value.split()).casefold()
+        if isinstance(value, dict):
+            return {
+                key: CorrectnessGate._normalized_presentation_value(item)
+                for key, item in value.items()
+            }
+        if isinstance(value, list):
+            return [
+                CorrectnessGate._normalized_presentation_value(item) for item in value
+            ]
+        return value
+
+    @staticmethod
     def _compare_generated_presentation(
         scenario: Scenario,
         trusted_base: Scenario,
@@ -39,23 +81,72 @@ class CorrectnessGate:
         reasons: list[str] = []
         candidate = scenario.presentation
         trusted = trusted_base.presentation
-        if (
-            candidate.eyebrow != trusted.eyebrow
-            or candidate.ask_text != trusted.ask_text
-            or candidate.agent_note != trusted.agent_note
+        if CorrectnessGate._normalized_presentation_value(
+            candidate.model_dump(mode="json")
+        ) == CorrectnessGate._normalized_presentation_value(
+            trusted.model_dump(mode="json")
         ):
-            reasons.append("generated presentation identity differs from trusted base")
+            reasons.append("generated presentation did not vary from trusted base")
         if len(candidate.artifacts) != len(trusted.artifacts):
             reasons.append("generated artifact count differs from trusted base")
             return reasons
-        candidate_artifacts = Counter(
-            artifact.model_dump_json() for artifact in candidate.artifacts
+        for index, (candidate_artifact, trusted_artifact) in enumerate(
+            zip(candidate.artifacts, trusted.artifacts, strict=True)
+        ):
+            if (
+                candidate_artifact.kind != trusted_artifact.kind
+                or candidate_artifact.language != trusted_artifact.language
+            ):
+                reasons.append(f"generated artifact {index} changed kind or language")
+
+        presentation_text = "\n".join(
+            [candidate.eyebrow, candidate.ask_text, candidate.agent_note]
+            + [artifact.title for artifact in candidate.artifacts]
+            + [artifact.content for artifact in candidate.artifacts]
         )
-        trusted_artifacts = Counter(
-            artifact.model_dump_json() for artifact in trusted.artifacts
+        if any(pattern.search(presentation_text) for pattern in _GENERATED_PRESENTATION_BLOCKLIST):
+            reasons.append("generated presentation contains grader-directed instructions")
+        if any(pattern.search(presentation_text) for pattern in _ANSWER_LEAK_PATTERNS):
+            reasons.append("generated presentation reveals the expected action")
+
+        trusted_text = "\n".join(
+            [trusted.eyebrow, trusted.ask_text, trusted.agent_note]
+            + [artifact.title for artifact in trusted.artifacts]
+            + [artifact.content for artifact in trusted.artifacts]
         )
-        if candidate_artifacts != trusted_artifacts:
-            reasons.append("generated artifacts differ from the curated evidence set")
+        allowed_urls = {
+            value.rstrip(".,);]") for value in _URL_PATTERN.findall(trusted_text)
+        } | {evidence.source for evidence in trusted_base.ground_truth.evidence}
+        generated_urls = {
+            value.rstrip(".,);]") for value in _URL_PATTERN.findall(presentation_text)
+        }
+        if generated_urls - allowed_urls:
+            reasons.append("generated presentation introduced an unverified URL")
+        artifact_text = "\n".join(
+            "\n".join(
+                [artifact.kind, artifact.title, artifact.content, artifact.language]
+            )
+            for artifact in candidate.artifacts
+        ).lower()
+        trusted_artifact_text = "\n".join(
+            "\n".join(
+                [artifact.kind, artifact.title, artifact.content, artifact.language]
+            )
+            for artifact in trusted.artifacts
+        ).lower()
+        for tell, keywords in trusted_base.ground_truth.tell_keywords.items():
+            supported = sum(
+                CorrectnessGate._contains_keyword(artifact_text, keyword)
+                for keyword in keywords
+            )
+            trusted_supported = sum(
+                CorrectnessGate._contains_keyword(trusted_artifact_text, keyword)
+                for keyword in keywords
+            )
+            if supported < max(1, trusted_supported):
+                reasons.append(
+                    f"generated presentation under-supports immutable tell: {tell}"
+                )
         return reasons
 
     @staticmethod
@@ -99,6 +190,18 @@ class CorrectnessGate:
             reasons.append("unknown template_ref")
         elif template["family"] != scenario.family.value:
             reasons.append("template family mismatch")
+
+        approved_sources = {
+            evidence.source
+            for curated in self.bank.scenarios.values()
+            if curated.template_ref == scenario.template_ref
+            for evidence in curated.ground_truth.evidence
+        }
+        if approved_sources and any(
+            evidence.source not in approved_sources
+            for evidence in scenario.ground_truth.evidence
+        ):
+            reasons.append("evidence source is not approved for this template")
 
         truth = scenario.ground_truth
         if set(truth.tells) != set(truth.tell_keywords):

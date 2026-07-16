@@ -39,6 +39,19 @@ class AssessmentForm(StrEnum):
     POST = "post"
 
 
+class ScenarioProvenance(StrEnum):
+    GENERATED = "generated"
+    VERIFIED = "verified"
+
+
+class GenerationStatus(StrEnum):
+    GENERATED = "generated"
+    FELL_BACK = "fell_back"
+    TIMEOUT = "timeout"
+    BUDGET_EXHAUSTED = "budget_exhausted"
+    NOT_REQUESTED = "not_requested"
+
+
 COMPETENCY_LABELS: dict[Competency, str] = {
     Competency.SCOPE: "Scope discipline",
     Competency.PROVENANCE: "Dependency provenance",
@@ -340,8 +353,14 @@ class SessionState(BaseModel):
     current_index: int = 0
     active_scenario_id: str | None = None
     active_scenario_json: str | None = None
+    active_anchor_id: str | None = None
+    active_provenance: ScenarioProvenance | None = None
+    active_generation_status: GenerationStatus | None = None
     last_gate_fallback_reason: str | None = None
     answered_scenario_ids: list[str] = Field(default_factory=list)
+    shown_scenario_ids: list[str] = Field(default_factory=list)
+    llm_calls_used: int = Field(default=0, ge=0)
+    rounds_generated: int = Field(default=0, ge=0)
     grades: list[GradeResult] = Field(default_factory=list)
     competency: dict[str, dict[str, int]] = Field(default_factory=dict)
 
@@ -365,6 +384,7 @@ class LearnerProgress(BaseModel):
     test_total: int
     delta: int
     rounds_played: int
+    rounds_generated: int
     competency_map: dict[Competency, CompetencyProgress]
     average_reasoning_score: int
     share_text: str

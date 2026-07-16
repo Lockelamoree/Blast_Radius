@@ -22,14 +22,17 @@ are inert strings and are never executed.
 - A deterministic fallback for every model timeout, malformed response, provider failure, or
   exhausted application budget.
 
-The public judging profile keeps `BLAST_RADIUS_LIVE_GENERATION=false`. An optional self-hosted
-experiment can use Luna and Terra to reorder whole, immutable curated artifact cards; the
-model cannot add, rewrite, or omit evidence. Every proposed ordering still passes the
-deterministic gate before the separate Sol gate is called.
+`BLAST_RADIUS_LIVE_GENERATION=false` remains the safe deployment default. An explicitly
+enabled live session selects a verified anchor first, then Luna may reskin only its
+presentation fields. The anchor's family, template, action, tells, evidence, explanation,
+sandbox policy, and receipts remain deep-copied and immutable. The deterministic gate and a
+separate Sol consistency gate must both pass or the unchanged verified anchor is returned.
+Generated presentations use deterministic tell-coverage grading; only verified and fallback
+rounds may use the Sol reasoning critic.
 
 ```text
-curated scenario -> deterministic gate -> adaptive verified deck -> player decision
-                 -> immutable truth -> tell matching -> cited receipts
+curated anchor -> optional Luna presentation reskin -> deterministic gate -> Sol gate
+               -> player decision -> immutable truth -> tell coverage -> cited receipts
 ```
 
 ## Try it
@@ -100,8 +103,8 @@ Useful endpoints:
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /healthz` | Non-sensitive health, critic state, bank size, and deployed revision |
-| `GET /api/demo/gate-catch` | Show the gate rejecting a planted defect |
+| `GET /healthz` | Non-sensitive health, critic/generation state, bank size, and revision |
+| `GET /api/demo/gate-catch?case=tell\|citation` | Show the gate rejecting a planted hallucination |
 | `POST /api/sessions` | Start a `demo` or `live` session |
 | `POST /api/sessions/{id}/pretest` | Submit the shuffled baseline form |
 | `POST /api/sessions/{id}/rounds/next` | Retrieve a presentation-only scenario |
@@ -127,8 +130,9 @@ critic at most once under the documented single-worker deployment.
 Browser
   -> FastAPI validation + keyed session lock
       -> curated bank + deterministic correctness gate
+      -> optional Luna presentation-only reskin + deterministic/Sol gates
       -> deterministic grade and receipts
-      -> optional GPT-5.6 Sol tell matcher
+      -> optional GPT-5.6 Sol tell matcher for verified rounds only
       -> SQLite session + atomic attempt budget
 ```
 
@@ -141,15 +145,16 @@ when it exactly matches the immutable safe policy—extra scope is not treated a
 The model IDs in `blast_radius/config.py` match the official
 [OpenAI model catalog](https://developers.openai.com/api/docs/models):
 
-- `gpt-5.6-sol`: medium-effort tell matching and max-effort secondary presentation review.
-- `gpt-5.6-terra`: low-effort blind-spot label selection in the opt-in presentation path.
-- `gpt-5.6-luna`: medium-effort ordering of immutable curated artifact cards in that same
-  opt-in path.
+- `gpt-5.6-sol`: medium-effort allowlisted tell matching for verified rounds and max-effort
+  secondary review of generated presentations.
+- `gpt-5.6-luna`: medium-effort presentation-only reskinning of a server-selected verified
+  anchor.
 
 All calls use the Responses API and strict Structured Outputs. Trusted developer instructions
 and inert user/scenario data are separate messages. Immutable ground truth and deterministic
-action/sandbox results remain authoritative; Sol can only widen allowlisted tell coverage and
-write the follow-up critique.
+action/sandbox results remain authoritative. On verified rounds, Sol can only widen
+allowlisted tell coverage and write the follow-up critique. Generated presentations never
+enter that reasoning-critic prompt.
 
 ## Production deployment and proof capture
 
@@ -163,10 +168,11 @@ sudo BLAST_RADIUS_PROMPT_FOR_OPENAI_KEY=1 bash deploy/deploy.sh your-domain.exam
 ```
 
 The script builds a clean, non-editable, root-owned release; gives the runtime user write
-access only to `/var/lib/blast-radius`; keeps public generation off; records the deployed Git
-revision; validates Caddy; and restarts the service. It first verifies the new local Uvicorn
-process, then the public HTTPS endpoint, and fails unless health reports `ok`, the expected
-revision, 18 scenarios, generation off, and live Sol grading. Once that succeeds:
+access only to `/var/lib/blast-radius`; records the deployed Git revision; validates Caddy;
+and restarts the service. It first verifies the new local Uvicorn process, then the public
+HTTPS endpoint, and fails unless health reports `ok`, the expected revision, 18 scenarios,
+the configured generation state, and live Sol grading. Keep generation off for the first
+proof deployment. Once that succeeds:
 
 ```bash
 python scripts/capture_live_grade.py https://your-domain.example
@@ -181,6 +187,18 @@ decision, raw application grade, deterministic and critic matches, UTC timestamp
 and `ground_truth`. Before treating the receipt as external proof, cross-check the response ID
 in `journalctl -u blast-radius.service` and the OpenAI account usage/response record.
 
+Only after that proof is captured, explicitly enable anchored live variation and rerun the
+logged-out browser acceptance check:
+
+```bash
+sudo BLAST_RADIUS_LIVE_GENERATION=true BLAST_RADIUS_PROMPT_FOR_OPENAI_KEY=1 \
+  bash deploy/deploy.sh your-domain.example
+```
+
+Each session permits at most 12 provider-dispatched attempts and five generated rounds by
+default. `/healthz.live_generation` becomes true only when the feature flag and key are
+present, the Sol probe is live, and daily application budget remains.
+
 ## Claim-to-proof map
 
 | Claim | Inspectable proof | Status |
@@ -190,7 +208,7 @@ in `journalctl -u blast-radius.service` and the OpenAI account usage/response re
 | Assessments are paired and option-shuffled | `questions.json`, API and bank tests | Verified locally |
 | Model output cannot author truth or evidence | strict DTOs, trusted-base gate tests | Verified locally |
 | Sol grades a real hosted answer | application receipt, matching service log, and provider-account cross-check | Pending VPS/key run |
-| Public generation is off | deployment environment plus `/healthz` | Pending VPS run |
+| Anchored live variation cannot rewrite truth | presentation DTO, trusted-base gates, provenance/cap tests | Verified locally |
 | Build used Codex | repository guidance and dated commit history | Inspectable |
 | Learning improvement | one consented named pre/post run | Not yet measured |
 
@@ -226,7 +244,7 @@ poisoned context, and the fictional skill marketplace.
 ## Submission checklist
 
 - [ ] Hosted URL passes a logged-out browser run with no console errors
-- [ ] `/healthz` reports revision, 18 scenarios, generation off, and live Sol grading
+- [ ] `/healthz` reports revision, 18 scenarios, the intended generation state, and live Sol grading
 - [ ] Genuine live-grade artifact is cross-checked against the service log and secret-scanned
 - [ ] One consented named pre/post run replaces the truthful TODO
 - [ ] Genuine `/feedback` Session ID replaces the truthful TODO
