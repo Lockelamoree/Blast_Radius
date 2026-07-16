@@ -48,7 +48,13 @@ def create_app(config: Settings = settings) -> FastAPI:
     )
     templates = Jinja2Templates(directory=config.base_dir / "templates")
 
-    @application.get("/", response_class=HTMLResponse, include_in_schema=False)
+    # methods includes HEAD so uptime monitors that probe HEAD / see 200, not 405.
+    @application.api_route(
+        "/",
+        methods=["GET", "HEAD"],
+        response_class=HTMLResponse,
+        include_in_schema=False,
+    )
     def index(request: Request) -> HTMLResponse:
         return templates.TemplateResponse(request=request, name="index.html")
 

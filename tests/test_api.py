@@ -107,6 +107,8 @@ def test_sliding_window_limiter_is_atomic_across_threads() -> None:
 
 def test_health_and_home(client) -> None:
     assert client.get("/").status_code == 200
+    # Uptime monitors default to HEAD; it must not 405.
+    assert client.head("/").status_code == 200
     health = client.get("/healthz")
     assert health.status_code == 200
     assert health.json()["bank_scenarios"] >= 18

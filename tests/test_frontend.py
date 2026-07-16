@@ -178,6 +178,13 @@ def test_judge_path_hotfixes_lock_grading_and_render_honest_states() -> None:
     versions = set(re.findall(r"\?v=([\w-]+)", template))
     assert len(versions) == 1, f"static cache-bust versions diverged: {versions}"
     assert len(re.findall(r"\?v=", template)) == 4
+    # The first assessment question is announced (screen active before render).
+    assert app.count("show('test');renderQuestion();") == 2
+    assert "renderQuestion();show('test');" not in app
+    # Explicit smooth scroll respects the reduced-motion preference.
+    assert "matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'" in app
+    # The share button reverts so a second copy gives feedback.
+    assert "setTimeout(()=>{event.target.textContent='Copy result';},2000)" in app
 
 
 def test_verdict_receipt_renders_provenance_tells_and_divergence() -> None:
@@ -220,6 +227,8 @@ def test_social_metadata_and_static_assets_are_cache_busted() -> None:
     assert 'rel="icon" href="data:image/svg+xml' in template
     assert 'property="og:title"' in template
     assert 'name="twitter:card"' in template
+    assert 'property="og:image"' in template
+    assert '<meta name="theme-color" content="#090a09">' in template
     assert "/static/styles.css?v=" in template
     assert "/static/improvements.css?v=" in template
     assert "/static/app.js?v=" in template
