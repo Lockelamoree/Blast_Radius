@@ -83,6 +83,15 @@ The suite covers model validation, every curated scenario, the correctness gate,
 grading, model failure and budget fallback, sandbox scoping, adversarial player text, API
 leakage, rate limits, duplicate decisions, and the complete six-round demo session.
 
+Before submission, verify that every verdict receipt points directly to a healthy source:
+
+```powershell
+python scripts/check_evidence_links.py
+```
+
+This is an intentionally standalone network check, not part of pytest or CI. It fails on
+dead sources and on redirects so judges do not land on stale receipt URLs.
+
 Useful endpoints:
 
 | Endpoint | Purpose |
