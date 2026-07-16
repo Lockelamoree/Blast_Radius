@@ -37,8 +37,7 @@ curated anchor -> optional Luna presentation reskin -> deterministic gate -> Sol
 
 ## Try it
 
-Hosted demo: **TODO — add the public HTTPS URL only after it passes the logged-out deployment
-check.**
+Hosted demo: **(https://blastradius.max-gutowski.de/)**
 
 Requirements:
 
@@ -225,21 +224,15 @@ This repository was implemented with Codex beginning July 14, 2026. Public evide
   duplicate session mutation, and model failure.
 - Dated commits separating planning import, implementation, and trust hardening.
 
-Codex `/feedback` Session ID: **TODO — add the genuine ID from the primary build thread; do
-not invent one.**
+Codex `/feedback` Session ID: **019f606c-081a-7911-ba7b-114168f91dd1**
 
-Measured developer pre/post result: **TODO — add one consented named run; no result is claimed
-yet.**
+
 
 ## Prior work and exclusions
 
 The application code was implemented during the July 13–21, 2026 submission period; the
 dated history is the evidence.
 
-MaRa SIFT is prior external work and is **not integrated**. The forensic-triage round is
-deferred; no MaRa code, output, MCP use, or capability is copied or claimed. The six shipped
-families are dangerous commands, poisoned dependencies, over-scoped tools, malicious diffs,
-poisoned context, and the fictional skill marketplace.
 
 ## Submission checklist
 
