@@ -337,8 +337,12 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
                 "complete": True,
                 "posttest": assessment_view(state.id, AssessmentForm.POST),
             }
-        limit_round_request(request, session_id)
         is_new_active = not bool(state.active_scenario_json)
+        # Idempotent replays of the active round are free; only a fresh round
+        # consumes the per-IP and per-session caps, so client retries can never
+        # rate-limit a session out of its own game.
+        if is_new_active:
+            limit_round_request(request, session_id)
         if state.active_scenario_json:
             scenario = Scenario.model_validate_json(state.active_scenario_json)
             anchor_id = state.active_anchor_id or scenario.id
@@ -458,12 +462,14 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
         state: SessionState,
     ) -> dict:
         limit_round_request(request, session_id)
+        # Duplicate check runs first: after a processed decision the active slot is
+        # cleared, so a client retry must hear the truth, not "request a round".
+        if decision.scenario_id in state.answered_scenario_ids:
+            raise HTTPException(status_code=409, detail="This round was already answered.")
         if not state.active_scenario_json or not state.active_scenario_id:
             raise HTTPException(status_code=409, detail="Request a round before answering.")
         if decision.scenario_id != state.active_scenario_id:
             raise HTTPException(status_code=409, detail="Decision does not match the active round.")
-        if decision.scenario_id in state.answered_scenario_ids:
-            raise HTTPException(status_code=409, detail="This round was already answered.")
         scenario = Scenario.model_validate_json(state.active_scenario_json)
         session_budget = SessionLLMBudget(
             limit=settings.session_llm_call_cap,

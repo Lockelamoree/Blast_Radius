@@ -203,6 +203,27 @@ def test_duplicate_decision_is_rejected(client) -> None:
     assert client.post(f"/api/sessions/{session_id}/decisions", json=decision).status_code == 200
     duplicate = client.post(f"/api/sessions/{session_id}/decisions", json=decision)
     assert duplicate.status_code == 409
+    # The retrying client must hear the truth so it can advance instead of erroring.
+    assert duplicate.json()["detail"] == "This round was already answered."
+
+
+def test_idempotent_round_replays_do_not_consume_the_session_cap(client) -> None:
+    session_id = create_started_session(client)
+    first = client.post(f"/api/sessions/{session_id}/rounds/next").json()
+    # 40 replays exceed the 30-per-session cap; replays of the active round are free.
+    for _ in range(40):
+        replay = client.post(f"/api/sessions/{session_id}/rounds/next")
+        assert replay.status_code == 200
+        assert replay.json()["scenario"]["id"] == first["scenario"]["id"]
+    decision = {
+        "scenario_id": first["scenario"]["id"],
+        "action": "reject",
+        "reasoning_text": "Replays must never lock a session out of its own game.",
+    }
+    assert (
+        client.post(f"/api/sessions/{session_id}/decisions", json=decision).status_code
+        == 200
+    )
 
 
 def test_session_mutation_locks_release_idle_keys() -> None:
@@ -543,10 +564,28 @@ def test_session_creation_has_a_per_ip_limit(test_settings) -> None:
 
 
 def test_round_requests_have_a_per_session_cap(test_settings) -> None:
-    settings = replace(test_settings, session_round_request_cap=1)
+    # Cap of 2 = one fresh round fetch + its decision; the next fresh round must block.
+    settings = replace(test_settings, session_round_request_cap=2)
     with TestClient(create_app(settings)) as limited_client:
         session_id = create_started_session(limited_client)
-        assert limited_client.post(f"/api/sessions/{session_id}/rounds/next").status_code == 200
+        first = limited_client.post(f"/api/sessions/{session_id}/rounds/next")
+        assert first.status_code == 200
+        # Replaying the active round is idempotent and free even at the cap.
+        replay = limited_client.post(f"/api/sessions/{session_id}/rounds/next")
+        assert replay.status_code == 200
+        assert replay.json()["scenario"]["id"] == first.json()["scenario"]["id"]
+        decision = {
+            "scenario_id": first.json()["scenario"]["id"],
+            "action": "reject",
+            "reasoning_text": "Only fresh rounds may consume the per-session cap.",
+        }
+        assert (
+            limited_client.post(
+                f"/api/sessions/{session_id}/decisions", json=decision
+            ).status_code
+            == 200
+        )
+        # The next FRESH round is the third capped request and must be blocked.
         blocked = limited_client.post(f"/api/sessions/{session_id}/rounds/next")
     assert blocked.status_code == 429
 

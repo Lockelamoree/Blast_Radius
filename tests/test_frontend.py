@@ -156,6 +156,12 @@ def test_judge_path_hotfixes_lock_grading_and_render_honest_states() -> None:
     assert "event.ctrlKey||event.metaKey||event.altKey" in app
     # A hung request must reject instead of freezing the run.
     assert "AbortSignal.timeout(" in app
+    # Transient failures retry with backoff; 409s resync instead of erroring.
+    assert "async function apiRetry" in app
+    assert "error.status=response.status" in app
+    assert app.count("apiRetry(`/api/sessions/") == 4
+    assert app.count("error.status===409") >= 2
+    assert "already recorded — continuing" in app
     # Structured 422 details must never render as [object Object].
     assert "typeof body.detail==='string'" in app
     # Failure states carry the .bad modifier instead of success-green.
