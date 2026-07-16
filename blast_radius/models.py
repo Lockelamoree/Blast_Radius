@@ -304,6 +304,8 @@ class GradeResult(BaseModel):
     critic_used: bool = False
     critic_model: str | None = None
     critic_response_id: str | None = None
+    critic_effort: str | None = None
+    critic_latency_ms: int | None = Field(default=None, ge=0)
     grading_degraded_reason: str | None = None
     deterministic_matched_tells: list[str] = Field(default_factory=list)
     critic_matched_tells: list[str] = Field(default_factory=list)

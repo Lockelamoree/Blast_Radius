@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from uuid import uuid4
@@ -11,7 +12,11 @@ from blast_radius.config import Settings
 from blast_radius.engine.bank import ScenarioBank
 from blast_radius.engine.gate import CorrectnessGate
 from blast_radius.engine.grader import grade_decision, merge_reasoning
-from blast_radius.engine.openai_adapter import OpenAIAdapter, SessionLLMBudget
+from blast_radius.engine.openai_adapter import (
+    CRITIC_REASONING_EFFORT,
+    OpenAIAdapter,
+    SessionLLMBudget,
+)
 from blast_radius.models import (
     GenerationStatus,
     GradeResult,
@@ -325,9 +330,9 @@ class TrustEngine:
         session_budget: SessionLLMBudget | None = None,
     ) -> GradeResult:
         grade = grade_decision(scenario, decision)
-        deterministic_matched_tells = list(grade.matched_tells)
         if not allow_critic or not self.openai.grading_enabled:
             return grade
+        critique_started = time.perf_counter()
         try:
             critique_budget = (
                 {"session_budget": session_budget}
@@ -342,13 +347,21 @@ class TrustEngine:
             )
         except Exception as exc:
             logger.warning("OpenAI reasoning critique failed (%s)", type(exc).__name__)
-            return grade
+            return grade.model_copy(update={"grading_degraded_reason": "critic_error"})
+        critique_latency_ms = round((time.perf_counter() - critique_started) * 1000)
         if review is None:
             if getattr(self.openai, "budget_exhausted", False):
                 return grade.model_copy(
                     update={"grading_degraded_reason": "budget_exhausted"}
                 )
-            return grade
+            last_failure = getattr(self.openai, "last_failure", None)
+            return grade.model_copy(
+                update={
+                    "grading_degraded_reason": (
+                        "critic_timeout" if last_failure is None else f"critic_{last_failure}"
+                    )
+                }
+            )
         allowed = set(scenario.ground_truth.tells)
         critic_matched_tells = list(
             dict.fromkeys(tell for tell in review.value.matched_tells if tell in allowed)
@@ -365,7 +378,8 @@ class TrustEngine:
                 "critic_used": True,
                 "critic_model": review.response_model,
                 "critic_response_id": review.response_id,
-                "deterministic_matched_tells": deterministic_matched_tells,
+                "critic_effort": CRITIC_REASONING_EFFORT,
+                "critic_latency_ms": critique_latency_ms,
                 "critic_matched_tells": critic_matched_tells,
             }
         )

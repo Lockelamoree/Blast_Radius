@@ -160,9 +160,92 @@ progress.mastery-track::-moz-progress-bar {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #grading-status::before {
+  #grading-status::before,
+  .verdict-provenance .live-dot {
     animation: none;
   }
+}
+
+.verdict-provenance {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 6px 0 0;
+}
+
+.verdict-provenance .live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--acid);
+  animation: grading-pulse 1.2s ease-in-out infinite;
+}
+
+.verdict-provenance code {
+  color: var(--muted);
+  font: 10px/1.5 var(--mono);
+  letter-spacing: .06em;
+  cursor: pointer;
+}
+
+.verdict-debrief {
+  margin: 22px auto 0;
+  max-width: 560px;
+  text-align: left;
+}
+
+.verdict-debrief blockquote {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border-left: 2px solid var(--line);
+  color: var(--muted);
+  font-style: italic;
+  font-size: 13px;
+}
+
+#tell-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tell {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.tell b {
+  font-family: var(--mono);
+}
+
+.tell.matched b {
+  color: var(--acid);
+}
+
+.tell.missed b {
+  color: var(--orange);
+}
+
+.tell.missed span {
+  color: var(--muted);
+}
+
+.tell-chip {
+  margin-left: 6px;
+  padding: 2px 6px;
+  border: 1px solid var(--acid);
+  color: var(--acid);
+  font: 8px/1 var(--mono);
+  font-style: normal;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .button:disabled {

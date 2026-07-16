@@ -116,6 +116,11 @@ class ModelReasoningReview(BaseModel):
     followup: str = Field(min_length=5, max_length=300)
 
 
+# Single source for the critic's effort tier so the verdict provenance strip
+# can never drift from the tier the call actually used.
+CRITIC_REASONING_EFFORT = "medium"
+
+
 class ModelGeneratedPresentation(BaseModel):
     """A presentation-only reskin; it can never carry immutable ground truth."""
 
@@ -461,7 +466,7 @@ class OpenAIAdapter:
                     prompt=prompt,
                     output_type=ModelReasoningReview,
                     name="blast_radius_reasoning_review",
-                    effort="medium",
+                    effort=CRITIC_REASONING_EFFORT,
                     max_output_tokens=self.settings.reasoning_max_output_tokens,
                     safety_identifier=safety_identifier,
                     session_budget=session_budget,

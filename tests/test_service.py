@@ -146,6 +146,45 @@ def test_model_review_failure_falls_back_to_deterministic(test_settings) -> None
     assert not grade.critic_used
     assert grade.critic_response_id is None
     assert grade.verdict == "partial"
+    assert grade.grading_degraded_reason == "critic_error"
+
+
+def test_critic_success_carries_effort_latency_and_uniform_deterministic_tells(
+    test_settings,
+) -> None:
+    engine = TrustEngine(test_settings)
+    scenario = engine.bank.get("dep-typo-1")
+    engine.openai = StubReasoningAdapter()
+
+    grade = asyncio.run(
+        engine.grade(scenario, weak_decision(scenario), safety_identifier="session-test")
+    )
+
+    assert grade.critic_effort == "medium"
+    assert isinstance(grade.critic_latency_ms, int)
+    assert grade.critic_latency_ms >= 0
+    # Serialization stays safe with the new optional fields present.
+    assert '"critic_effort":"medium"' in grade.model_dump_json()
+
+
+def test_deterministic_grade_populates_deterministic_matched_tells(test_settings) -> None:
+    engine = TrustEngine(test_settings)  # keyless: critic never runs
+    scenario = engine.bank.get("dep-typo-1")
+    keyword = scenario.ground_truth.tell_keywords[scenario.ground_truth.tells[0]][0]
+    decision = PlayerDecision(
+        scenario_id=scenario.id,
+        action=scenario.ground_truth.correct_action,
+        reasoning_text=f"I noticed the {keyword} in the artifact.",
+    )
+
+    grade = asyncio.run(engine.grade(scenario, decision))
+
+    assert grade.graded_by == "deterministic"
+    assert grade.matched_tells
+    assert grade.deterministic_matched_tells == grade.matched_tells
+    assert grade.critic_effort is None
+    assert grade.critic_latency_ms is None
+    assert grade.grading_degraded_reason is None
 
 
 def test_key_enables_one_sol_grade_call_without_live_generation(test_settings) -> None:

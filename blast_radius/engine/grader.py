@@ -189,6 +189,7 @@ def grade_decision(scenario: Scenario, decision: PlayerDecision) -> GradeResult:
         receipts=receipts,
         explanation=truth.explanation,
         socratic_followup=followup,
+        deterministic_matched_tells=list(matched),
     )
 
 

@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 
@@ -124,7 +125,7 @@ def test_assessment_and_score_labels_are_accessible_and_honest() -> None:
     assert '<legend id="test-prompt"' in template
     assert template.count("tell coverage") >= 2
     assert "reasoning score" not in template
-    assert "tell coverage.`" in app
+    assert "tell coverage, ${$('#tells-named').textContent} tells.`" in app
     assert "tell coverage`)" in app
     assert "BLOCKED BEFORE DISPLAY" in integrity
     assert "PLANTED HALLUCINATION" in integrity
@@ -174,7 +175,41 @@ def test_judge_path_hotfixes_lock_grading_and_render_honest_states() -> None:
     assert "review.reasons.join(' · ').replace(`: ${review.planted_claim}`, '')" in integrity
     assert "next plant" in integrity
     # Static assets share one current cache-bust version.
-    assert template.count("?v=20260716-10") == 4
+    versions = set(re.findall(r"\?v=([\w-]+)", template))
+    assert len(versions) == 1, f"static cache-bust versions diverged: {versions}"
+    assert len(re.findall(r"\?v=", template)) == 4
+
+
+def test_verdict_receipt_renders_provenance_tells_and_divergence() -> None:
+    root = Path(__file__).parents[1]
+    template = (root / "blast_radius" / "templates" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    app = (root / "blast_radius" / "static" / "app.js").read_text(encoding="utf-8")
+    css = (root / "blast_radius" / "static" / "improvements.css").read_text(
+        encoding="utf-8"
+    )
+
+    # Provenance strip: only for a real critic response id, never the sentinel.
+    assert 'id="verdict-provenance"' in template
+    assert "respId!=='unavailable'" in app
+    assert "grade.critic_effort" in app
+    assert "grade.critic_latency_ms" in app
+    assert "click to copy" in app
+    # Tell checklist with echoed reasoning and honest marks.
+    assert 'id="verdict-debrief"' in template
+    assert 'id="tell-list"' in template
+    assert 'id="tells-named"' in template
+    assert "state.lastReasoning" in app
+    assert "grade.missed_tells.forEach" in app
+    # Divergence chip fires only for critic-only matches.
+    assert "CAUGHT BY GPT-5.6" in app
+    assert "criticSet.has(tell)&&!detSet.has(tell)" in app
+    # Non-budget degraded grades are labeled honestly.
+    assert "CRITIC UNAVAILABLE" in app
+    # Styling exists for the new elements.
+    assert ".verdict-provenance" in css
+    assert ".tell-chip" in css
 
 
 def test_social_metadata_and_static_assets_are_cache_busted() -> None:
