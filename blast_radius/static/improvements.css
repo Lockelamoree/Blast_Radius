@@ -77,7 +77,12 @@ progress.mastery-track::-webkit-progress-bar {
   background: #252820;
 }
 
-progress.mastery-track::-webkit-progress-value,
+/* Kept as separate rules: a grouped list with an unknown vendor pseudo-element
+   is dropped whole by the other engine, leaving the fill browser-default. */
+progress.mastery-track::-webkit-progress-value {
+  background: var(--acid);
+}
+
 progress.mastery-track::-moz-progress-bar {
   background: var(--acid);
 }
@@ -129,6 +134,52 @@ progress.mastery-track::-moz-progress-bar {
 .decision-footer > div {
   display: flex;
   gap: 8px;
+}
+
+#grading-status {
+  margin: 10px 0 0;
+  color: var(--acid);
+  font: 11px/1.5 var(--mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+#grading-status::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--acid);
+  animation: grading-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes grading-pulse {
+  50% { opacity: .25; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #grading-status::before {
+    animation: none;
+  }
+}
+
+.button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.score-row strong.bad,
+.delta-block strong.bad,
+.result-stats strong.bad {
+  color: var(--orange);
+}
+
+#gate-catch-result .invariant {
+  display: block;
+  color: var(--muted);
 }
 
 @media (max-width: 620px) {

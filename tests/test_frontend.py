@@ -56,8 +56,9 @@ def test_accessibility_and_honest_live_mode_are_wired_without_overlays() -> None
         encoding="utf-8"
     )
 
-    assert template.count('aria-live="polite"') == 1
+    assert template.count('aria-live="polite"') == 2
     assert 'id="app-status"' in template
+    assert 'id="grading-status" class="microcopy hidden" aria-live="polite"' in template
     assert 'data-start="live" disabled' in template
     assert 'id="reset-decision"' in template
     assert "Time expired" in app
@@ -130,6 +131,50 @@ def test_assessment_and_score_labels_are_accessible_and_honest() -> None:
     assert "FAILED INVARIANT" in integrity
     assert "case=${selectedCase}" in integrity
     assert "review.planted_claim" in integrity
+
+
+def test_judge_path_hotfixes_lock_grading_and_render_honest_states() -> None:
+    root = Path(__file__).parents[1]
+    template = (root / "blast_radius" / "templates" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    app = (root / "blast_radius" / "static" / "app.js").read_text(encoding="utf-8")
+    css = (root / "blast_radius" / "static" / "improvements.css").read_text(
+        encoding="utf-8"
+    )
+    integrity = (root / "blast_radius" / "static" / "integrity-check.js").read_text(
+        encoding="utf-8"
+    )
+
+    # In-flight grading locks every decision input, not just the submit button.
+    assert "state.grading=true" in app
+    assert "state.grading=false" in app
+    assert app.count("if(state.grading)return;") >= 2
+    assert "state.grading||!(state.selectedAction" in app
+    # Browser/system shortcuts must never flip a decision.
+    assert "event.ctrlKey||event.metaKey||event.altKey" in app
+    # A hung request must reject instead of freezing the run.
+    assert "AbortSignal.timeout(" in app
+    # Structured 422 details must never render as [object Object].
+    assert "typeof body.detail==='string'" in app
+    # Failure states carry the .bad modifier instead of success-green.
+    assert "classList.toggle('bad',!grade.action_correct)" in app
+    assert "classList.toggle('bad',grade.reasoning_score<50)" in app
+    assert "classList.toggle('bad',data.delta<0)" in app
+    assert "strong.bad" in css
+    # The Chromium-dropped grouped progress rule stays split.
+    assert "progress.mastery-track::-webkit-progress-value {" in css
+    assert "progress.mastery-track::-moz-progress-bar {" in css
+    assert "::-webkit-progress-value,\nprogress.mastery-track::-moz-progress-bar" not in css
+    # Grading wait is announced and visually prominent; ghost buttons show disabled.
+    assert 'id="grading-status" class="microcopy hidden" aria-live="polite"' in template
+    assert "#grading-status::before" in css
+    assert ".button:disabled" in css
+    # Self-catch result: claim named once, invariant on its own line, cycle hint.
+    assert "review.reasons.join(' · ').replace(`: ${review.planted_claim}`, '')" in integrity
+    assert "next plant" in integrity
+    # Static assets share one current cache-bust version.
+    assert template.count("?v=20260716-10") == 4
 
 
 def test_social_metadata_and_static_assets_are_cache_busted() -> None:
