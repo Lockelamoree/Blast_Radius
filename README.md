@@ -9,6 +9,8 @@ policy, with receipt links for every scenario.
 The application targets the OpenAI Build Week 2026 Developer Tools track. Scenario commands
 are inert strings and are never executed.
 
+![The decision screen: a proposed agent action, three color-coded calls, and the tell prompt](assets/thumb_decision.png)
+
 ## What is shipped
 
 - 18 curated, receipt-backed scenarios across six threat families.
@@ -125,6 +127,8 @@ answer keys, and the original assessment option order remain server-side. Per-se
 locks serialize mutations, so simultaneous duplicate decisions persist once and invoke the
 critic at most once under the documented single-worker deployment.
 
+![Architecture: the scenario path (bank, optional Luna reskin, deterministic gate, Sol gate) and the grading path (decision, deterministic grade, Sol tell match, verdict with receipts)](assets/architecture.svg)
+
 ```text
 Browser
   -> FastAPI validation + keyed session lock
@@ -134,6 +138,23 @@ Browser
       -> optional GPT-5.6 Sol tell matcher for verified rounds only
       -> SQLite session + atomic attempt budget
 ```
+
+### What the correctness gate rejects
+
+`blast_radius/engine/gate.py` enforces named invariants before any scenario can be shown; the
+planted-defect self-catch on the landing page fires two of them live. Representative reasons:
+
+| Invariant class | Example rejection reason |
+|---|---|
+| Trusted-base immutability | `scenario ground truth differs from trusted base` |
+| Curated integrity | `curated scenario presentation was modified` · `unknown template_ref` |
+| Tell evidence | `presented artifacts do not support declared tell: <tell>` |
+| Citation allowlist | `evidence source is not approved for this template` |
+| Injection defense | `generated presentation contains grader-directed instructions` |
+| Answer-leak defense | `generated presentation reveals the expected action` |
+| URL provenance | `generated presentation introduced an unverified URL` |
+| Reskin discipline | `generated presentation did not vary from trusted base` · `generated artifact <n> changed kind or language` |
+| Policy coherence | `sandbox action has no safe policy` · `non-sandbox action defines a contradictory safe policy` |
 
 Sandbox paths must be `/workspace` or a true descendant. Hosts are bounded bare hostnames,
 capabilities use canonical names, and a sandbox policy receives a fully correct score only

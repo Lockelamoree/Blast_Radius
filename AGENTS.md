@@ -25,6 +25,17 @@ scenario. Never expose `ground_truth` through a public API.
 
 ## Commands
 
+Linux/macOS:
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -e ".[dev]"
+.venv/bin/python -m pytest
+.venv/bin/python -m uvicorn blast_radius.main:app --reload
+```
+
+Windows:
+
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python -m pip install -e ".[dev]"
