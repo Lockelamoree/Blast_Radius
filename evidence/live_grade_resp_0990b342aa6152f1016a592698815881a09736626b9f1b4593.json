@@ -1,0 +1,87 @@
+{
+  "receipt_kind": "application_receipt",
+  "captured_at": "2026-07-16T18:44:44.017050+00:00",
+  "base_url": "https://blastradius.max-gutowski.de",
+  "deployment_revision": "d862a01d5846f5863cefab7a89115530ec13d24b",
+  "session_sha256": "87227d81c5535fb17e7d51b46d45fd653edacac3c98c79e951959d0056ef5cfe",
+  "health": {
+    "status": "ok",
+    "bank_scenarios": 18,
+    "live_generation": false,
+    "live_generation_reason": "off",
+    "reasoning_grading": "live",
+    "critic_model": "gpt-5.6-sol",
+    "revision": "d862a01d5846f5863cefab7a89115530ec13d24b"
+  },
+  "scenario": {
+    "id": "dep-typo-1",
+    "family": "poisoned_dependency",
+    "difficulty": 2,
+    "presentation": {
+      "eyebrow": "Package approval \u00b7 build fix",
+      "ask_text": "The agent proposes a package whose name is one character away from the approved dependency.",
+      "agent_note": "It says this package is a drop-in replacement for requests.",
+      "artifacts": [
+        {
+          "kind": "manifest",
+          "title": "Install proposal",
+          "content": "pip install reqeusts==2.32.0\nApproved lockfile entry: requests==2.32.0\nRegistry policy: reqeusts is not approved",
+          "language": "text"
+        }
+      ]
+    }
+  },
+  "decision": {
+    "scenario_id": "dep-typo-1",
+    "action": "reject",
+    "reasoning_text": "The proposed library name differs by transposed letters from the dependency our project normally uses, and its origin has not been established."
+  },
+  "critic_proof": {
+    "requested_model": "gpt-5.6-sol",
+    "provider_model": "gpt-5.6-sol",
+    "response_id": "resp_0990b342aa6152f1016a592698815881a09736626b9f1b4593",
+    "deterministic_matched_tells": [],
+    "critic_matched_tells": [
+      "near-miss package name"
+    ],
+    "critic_only_tells": [
+      "near-miss package name"
+    ],
+    "followup": "The learner identifies the transposed-letter package-name mismatch. They do not explicitly identify that the package is absent from the approved lockfile."
+  },
+  "raw_decision_response": {
+    "grade": {
+      "scenario_id": "dep-typo-1",
+      "verdict": "partial",
+      "action_correct": true,
+      "reasoning_score": 50,
+      "blast_radius_score": null,
+      "matched_tells": [
+        "near-miss package name"
+      ],
+      "missed_tells": [
+        "not in approved lockfile"
+      ],
+      "receipts": [
+        {
+          "claim": "The proposed name differs from the approved dependency and the supplied policy marks it unapproved.",
+          "evidence": "reqeusts versus requests; registry policy says not approved.",
+          "source": "https://github.blog/security/supply-chain-security/avoiding-npm-substitution-attacks/"
+        }
+      ],
+      "explanation": "A plausible near-miss is a supply-chain warning. Reject it and use the exact locked dependency after verifying provenance.",
+      "socratic_followup": "The learner identifies the transposed-letter package-name mismatch. They do not explicitly identify that the package is absent from the approved lockfile.",
+      "graded_by": "gpt-5.6-sol",
+      "critic_used": true,
+      "critic_model": "gpt-5.6-sol",
+      "critic_response_id": "resp_0990b342aa6152f1016a592698815881a09736626b9f1b4593",
+      "grading_degraded_reason": null,
+      "deterministic_matched_tells": [],
+      "critic_matched_tells": [
+        "near-miss package name"
+      ]
+    },
+    "rounds_remaining": 5
+  },
+  "application_receipt_sha256": "e938395bd094c78c07ad4b3e092ea620d4b177128806cbbfd8d4ee5cabd232fe"
+}

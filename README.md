@@ -206,7 +206,7 @@ present, the Sol probe is live, and daily application budget remains.
 | Judge mode is deterministic and adaptive | API engine and six-round session tests | Verified locally |
 | Assessments are paired and option-shuffled | `questions.json`, API and bank tests | Verified locally |
 | Model output cannot author truth or evidence | strict DTOs, trusted-base gate tests | Verified locally |
-| Sol grades a real hosted answer | application receipt, matching service log, and provider-account cross-check | Pending VPS/key run |
+| Sol grades a real hosted answer | [`evidence/live_grade_resp_0990b342….json`](evidence/live_grade_resp_0990b342aa6152f1016a592698815881a09736626b9f1b4593.json), matching service log, and provider-account cross-check | Captured on the hosted instance, 2026-07-16 |
 | Anchored live variation cannot rewrite truth | presentation DTO, trusted-base gates, provenance/cap tests | Verified locally |
 | Build used Codex | repository guidance and dated commit history | Inspectable |
 | Learning improvement | one consented named pre/post run | Not yet measured |
