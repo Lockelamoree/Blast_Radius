@@ -167,6 +167,39 @@ def test_critic_success_carries_effort_latency_and_uniform_deterministic_tells(
     assert '"critic_effort":"medium"' in grade.model_dump_json()
 
 
+def test_rubric_speak_followup_keeps_the_deterministic_question(test_settings) -> None:
+    engine = TrustEngine(test_settings)
+    scenario = engine.bank.get("dep-typo-1")
+
+    class RubricSpeakAdapter(StubReasoningAdapter):
+        async def critique_reasoning(self, scenario, decision, *, safety_identifier=None):
+            return StructuredCallResult(
+                value=ModelReasoningReview(
+                    matched_tells=[scenario.ground_truth.tells[0]],
+                    followup="The learner explicitly identifies both immutable tells.",
+                ),
+                response_id="resp_stub",
+                response_model="gpt-5.6-sol",
+            )
+
+    engine.openai = RubricSpeakAdapter()
+    grade = asyncio.run(engine.grade(scenario, weak_decision(scenario)))
+
+    assert grade.critic_used
+    assert grade.socratic_followup != "The learner explicitly identifies both immutable tells."
+    assert grade.socratic_followup.endswith("?")
+
+
+def test_question_followup_from_the_critic_is_kept(test_settings) -> None:
+    engine = TrustEngine(test_settings)
+    scenario = engine.bank.get("dep-typo-1")
+    engine.openai = StubReasoningAdapter()
+
+    grade = asyncio.run(engine.grade(scenario, weak_decision(scenario)))
+
+    assert grade.socratic_followup == "Which artifact proves the package name is a near miss?"
+
+
 def test_deterministic_grade_populates_deterministic_matched_tells(test_settings) -> None:
     engine = TrustEngine(test_settings)  # keyless: critic never runs
     scenario = engine.bank.get("dep-typo-1")

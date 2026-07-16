@@ -370,11 +370,16 @@ class TrustEngine:
         critic_matched_tells = list(
             dict.fromkeys(tell for tell in review.value.matched_tells if tell in allowed)
         )
+        followup = review.value.followup.strip()
+        # Only a real second-person question may replace the deterministic
+        # Socratic prompt; grader rubric-speak keeps the curated question.
+        if not followup.endswith("?") or followup.lower().startswith("the learner"):
+            followup = None
         grade = merge_reasoning(
             grade,
             scenario,
             review.value.matched_tells,
-            review.value.followup,
+            followup,
         )
         grade = grade.model_copy(
             update={
