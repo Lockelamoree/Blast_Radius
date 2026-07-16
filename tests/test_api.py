@@ -1,23 +1,101 @@
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
+from threading import Barrier
 
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from blast_radius.api import SlidingWindowLimiter
+from blast_radius.api import (
+    SessionMutationLocks,
+    SlidingWindowLimiter,
+    assessment_option_order,
+)
 from blast_radius.engine import TrustEngine
 from blast_radius.engine.bank import ScenarioBank
 from blast_radius.main import create_app
-from blast_radius.models import Competency, GateResult
+from blast_radius.models import AssessmentForm, Competency, GateResult
+
+PRETEST_CORRECT_OPTIONS = {
+    "q-command": "Path scope and reversibility",
+    "q-package": "Verify registry provenance and package history",
+    "q-manifest": "Its capabilities exceed its stated job",
+    "q-diff": "The behavior is absent from the change description",
+    "q-context": "As untrusted content and rejected",
+}
 
 
 def create_started_session(client):
     created = client.post("/api/sessions", json={"mode": "demo"})
     assert created.status_code == 201
-    session_id = created.json()["session_id"]
+    body = created.json()
+    session_id = body["session_id"]
+    answers = [
+        next(
+            index
+            for index, option in enumerate(question["options"])
+            if option != PRETEST_CORRECT_OPTIONS[question["id"]]
+        )
+        for question in body["pretest"]
+    ]
     pretest = client.post(
-        f"/api/sessions/{session_id}/pretest", json={"answers": [0, 0, 0, 0, 0]}
+        f"/api/sessions/{session_id}/pretest",
+        json={"answers": answers},
     )
     assert pretest.status_code == 200
     return session_id
+
+
+def assessment_answers(bank, public_questions, *, incorrect_ids=frozenset()):
+    lookup = {question.id: question for question in bank.questions}
+    answers = []
+    for public in public_questions:
+        question = lookup[public["id"]]
+        correct_text = question.options[question.correct_index]
+        if question.id in incorrect_ids:
+            answers.append(
+                next(
+                    index
+                    for index, option in enumerate(public["options"])
+                    if option != correct_text
+                )
+            )
+        else:
+            answers.append(public["options"].index(correct_text))
+    return answers
+
+
+def test_assessment_option_order_is_session_stable() -> None:
+    first = assessment_option_order("session-a", AssessmentForm.PRE, "q-command", 4)
+    assert first == assessment_option_order(
+        "session-a", AssessmentForm.PRE, "q-command", 4
+    )
+    assert first != assessment_option_order(
+        "session-b", AssessmentForm.PRE, "q-command", 4
+    )
+    assert sorted(first) == [0, 1, 2, 3]
+
+
+def test_sliding_window_limiter_is_atomic_across_threads() -> None:
+    limit = 8
+    attempts = 24
+    limiter = SlidingWindowLimiter(limit=limit, window_seconds=60)
+    barrier = Barrier(attempts)
+
+    def check_once() -> bool:
+        barrier.wait()
+        try:
+            limiter.check("shared")
+        except HTTPException as exc:
+            assert exc.status_code == 429
+            return False
+        return True
+
+    with ThreadPoolExecutor(max_workers=attempts) as pool:
+        accepted = list(pool.map(lambda _: check_once(), range(attempts)))
+
+    assert sum(accepted) == limit
+    assert len(limiter.hits["shared"]) == limit
 
 
 def test_health_and_home(client) -> None:
@@ -103,8 +181,88 @@ def test_duplicate_decision_is_rejected(client) -> None:
     assert duplicate.status_code == 409
 
 
-def test_full_demo_session(client) -> None:
+def test_session_mutation_locks_release_idle_keys() -> None:
+    locks = SessionMutationLocks()
+
+    async def wait_for_lock() -> None:
+        async with locks.hold("session-1"):
+            raise AssertionError("cancelled waiter unexpectedly acquired the lock")
+
+    async def exercise_lock() -> None:
+        async with locks.hold("session-1"):
+            assert locks.active_key_count == 1
+            waiter = asyncio.create_task(wait_for_lock())
+            await asyncio.sleep(0)
+            waiter.cancel()
+            try:
+                await waiter
+            except asyncio.CancelledError:
+                pass
+
+    asyncio.run(exercise_lock())
+    assert locks.active_key_count == 0
+
+
+def test_concurrent_duplicate_decisions_grade_exactly_once(
+    client, monkeypatch
+) -> None:
     session_id = create_started_session(client)
+    round_data = client.post(f"/api/sessions/{session_id}/rounds/next").json()
+    scenario_id = round_data["scenario"]["id"]
+    decision = {
+        "scenario_id": scenario_id,
+        "action": "sandbox",
+        "reasoning_text": (
+            "The destructive cleanup needs a narrow generated-directory boundary."
+        ),
+        "blast_radius_config": {
+            "readable_paths": ["/workspace/htmlcov"],
+            "writable_paths": ["/workspace/htmlcov"],
+            "network_enabled": False,
+            "network_allowlist": [],
+            "capabilities": ["delete-generated-files"],
+        },
+    }
+    real_grade = TrustEngine.grade
+    identifiers: list[str | None] = []
+
+    async def slow_grade(
+        engine,
+        scenario,
+        player_decision,
+        *,
+        safety_identifier=None,
+    ):
+        identifiers.append(safety_identifier)
+        await asyncio.sleep(0.05)
+        return await real_grade(engine, scenario, player_decision)
+
+    monkeypatch.setattr(TrustEngine, "grade", slow_grade)
+
+    def submit():
+        return client.post(f"/api/sessions/{session_id}/decisions", json=decision)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        responses = list(pool.map(lambda _: submit(), range(2)))
+
+    assert sorted(response.status_code for response in responses) == [200, 409]
+    assert identifiers == [session_id]
+
+
+def test_full_demo_session(client, test_settings) -> None:
+    bank = ScenarioBank(test_settings.data_dir)
+    created = client.post("/api/sessions", json={"mode": "demo"}).json()
+    session_id = created["session_id"]
+    pre_answers = assessment_answers(
+        bank,
+        created["pretest"],
+        incorrect_ids={question["id"] for question in created["pretest"]},
+    )
+    pretest = client.post(
+        f"/api/sessions/{session_id}/pretest",
+        json={"answers": pre_answers},
+    )
+    assert pretest.json() == {"score": 0, "total": 5}
     for _ in range(6):
         round_data = client.post(f"/api/sessions/{session_id}/rounds/next").json()
         scenario_id = round_data["scenario"]["id"]
@@ -132,8 +290,14 @@ def test_full_demo_session(client) -> None:
         assert response.status_code == 200, (family, response.text)
     done = client.post(f"/api/sessions/{session_id}/rounds/next")
     assert done.json()["complete"] is True
+    repeated_done = client.post(f"/api/sessions/{session_id}/rounds/next")
+    assert repeated_done.json()["posttest"] == done.json()["posttest"]
+    assert "correct_index" not in done.text
+    assert '"form"' not in done.text
+    post_answers = assessment_answers(bank, done.json()["posttest"])
     post = client.post(
-        f"/api/sessions/{session_id}/posttest", json={"answers": [1, 1, 1, 1, 1]}
+        f"/api/sessions/{session_id}/posttest",
+        json={"answers": post_answers},
     )
     assert post.status_code == 200
     result = client.get(f"/api/sessions/{session_id}/results")
@@ -170,11 +334,17 @@ def test_demo_reorders_only_the_verified_deck_by_weakest_competency(
     }
 
     with TestClient(create_app(test_settings)) as adaptive_client:
+        bank = ScenarioBank(test_settings.data_dir)
         created = adaptive_client.post("/api/sessions", json={"mode": "demo"}).json()
         session_id = created["session_id"]
+        answers = assessment_answers(
+            bank,
+            created["pretest"],
+            incorrect_ids={"q-manifest"},
+        )
         pretest = adaptive_client.post(
             f"/api/sessions/{session_id}/pretest",
-            json={"answers": [1, 1, 0, 1, 1]},
+            json={"answers": answers},
         )
         assert pretest.status_code == 200
 
@@ -289,25 +459,15 @@ def test_test_answer_count_reaches_dynamic_bank_validation(client) -> None:
     assert response.json()["detail"] == "Exactly 5 answers are required."
 
 
-def test_sixth_bank_question_is_accepted_without_request_model_changes(
-    test_settings, monkeypatch
+def test_session_assessments_preserve_options_but_shuffle_positions(
+    client, test_settings
 ) -> None:
-    real_init = ScenarioBank.__init__
+    bank = ScenarioBank(test_settings.data_dir)
+    created = client.post("/api/sessions", json={"mode": "demo"}).json()
 
-    def initialize_with_six_questions(bank, data_dir) -> None:
-        real_init(bank, data_dir)
-        bank.questions.append(
-            bank.questions[0].model_copy(update={"id": "q-command-followup"})
-        )
-
-    monkeypatch.setattr(ScenarioBank, "__init__", initialize_with_six_questions)
-    with TestClient(create_app(test_settings)) as six_question_client:
-        created = six_question_client.post("/api/sessions", json={"mode": "demo"}).json()
-        assert len(created["pretest"]) == 6
-        response = six_question_client.post(
-            f"/api/sessions/{created['session_id']}/pretest",
-            json={"answers": [1, 1, 1, 1, 1, 1]},
-        )
-
-    assert response.status_code == 200
-    assert response.json()["total"] == 6
+    for public in created["pretest"]:
+        source = next(question for question in bank.questions if question.id == public["id"])
+        assert set(public["options"]) == set(source.options)
+        assert public["options"] != source.options
+        assert "correct_index" not in public
+        assert "form" not in public

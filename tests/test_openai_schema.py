@@ -12,9 +12,10 @@ from pydantic import ValidationError
 
 from blast_radius.engine.openai_adapter import (
     ModelGateReview,
-    ModelGeneratedScenario,
+    ModelGeneratedPresentation,
     ModelReasoningReview,
     OpenAIAdapter,
+    model_input,
     to_strict_schema,
 )
 from blast_radius.engine.service import TrustEngine
@@ -35,54 +36,61 @@ def assert_strict_objects(node) -> None:
             assert_strict_objects(value)
 
 
-def model_generated_payload(scenario) -> dict:
-    payload = scenario.model_dump(mode="json")
-    payload["ground_truth"]["tell_keywords"] = [
-        {"tell": tell, "keywords": keywords}
-        for tell, keywords in scenario.ground_truth.tell_keywords.items()
-    ]
-    return payload
+def full_artifact_selections(scenario) -> dict:
+    return {"artifact_order": list(range(len(scenario.presentation.artifacts)))}
 
 
 def test_grading_and_generation_schemas_are_strict(test_settings) -> None:
     engine = TrustEngine(test_settings)
     scenario = engine.bank.get("dep-typo-1")
-    generated = ModelGeneratedScenario.model_validate(model_generated_payload(scenario))
+    generated = ModelGeneratedPresentation.model_validate(
+        full_artifact_selections(scenario)
+    )
 
-    for model in (ModelGateReview, ModelReasoningReview, ModelGeneratedScenario):
+    for model in (ModelGateReview, ModelReasoningReview, ModelGeneratedPresentation):
         assert_strict_objects(to_strict_schema(model.model_json_schema()))
 
-    converted = generated.to_scenario()
-    assert converted == scenario
-    assert isinstance(converted.ground_truth.tell_keywords, dict)
+    assert generated.model_dump(mode="json") == full_artifact_selections(scenario)
 
 
-def test_generated_schema_rejects_duplicate_or_missing_tell_groups(test_settings) -> None:
+def test_generated_schema_rejects_model_authored_identity_or_truth(test_settings) -> None:
     scenario = TrustEngine(test_settings).bank.get("dep-typo-1")
-    payload = model_generated_payload(scenario)
-    payload["ground_truth"]["tell_keywords"][1]["tell"] = payload["ground_truth"][
-        "tell_keywords"
-    ][0]["tell"]
+    payload = full_artifact_selections(scenario)
+    payload["family"] = scenario.family.value
     with pytest.raises(ValidationError):
-        ModelGeneratedScenario.model_validate(payload)
+        ModelGeneratedPresentation.model_validate(payload)
 
-    payload = model_generated_payload(scenario)
-    payload["ground_truth"]["tell_keywords"].pop()
+    payload = full_artifact_selections(scenario)
+    payload["ground_truth"] = scenario.ground_truth.model_dump(mode="json")
     with pytest.raises(ValidationError):
-        ModelGeneratedScenario.model_validate(payload)
+        ModelGeneratedPresentation.model_validate(payload)
+    with pytest.raises(ValidationError):
+        ModelGeneratedPresentation(artifact_order=[-1])
 
 
 class FakeResponses:
-    def __init__(self, output_text: str | None = None, error: Exception | None = None):
+    def __init__(
+        self,
+        output_text: str | None = None,
+        error: Exception | None = None,
+        response_id: str | None = "resp_schema_test",
+        response_model: str | None = None,
+    ):
         self.output_text = output_text
         self.error = error
+        self.response_id = response_id
+        self.response_model = response_model
         self.calls: list[dict] = []
 
     async def create(self, **kwargs):
         self.calls.append(kwargs)
         if self.error is not None:
             raise self.error
-        return SimpleNamespace(output_text=self.output_text, id="resp_schema_test")
+        return SimpleNamespace(
+            output_text=self.output_text,
+            id=self.response_id,
+            model=self.response_model or kwargs["model"],
+        )
 
 
 class FakeClient:
@@ -90,11 +98,13 @@ class FakeClient:
         self.responses = responses
 
 
-def test_failed_structured_call_refunds_budget_and_logs_status(
+def test_failed_dispatched_call_keeps_budget_unit_and_logs_status(
     test_settings, tmp_path, caplog
 ) -> None:
     store = SessionStore(tmp_path / "budget.db", ttl_minutes=180)
-    settings = replace(test_settings, openai_api_key="test-key")
+    api_key = "sk-" + "proj-supersecret123456"
+    learner_secret = "LEARNER_PRIVATE_VALUE_7391"
+    settings = replace(test_settings, openai_api_key=api_key)
     adapter = OpenAIAdapter(
         settings,
         reserve_llm_call=lambda: store.reserve_llm_call(1),
@@ -104,7 +114,11 @@ def test_failed_structured_call_refunds_budget_and_logs_status(
         400,
         request=httpx.Request("POST", "https://api.openai.com/v1/responses"),
     )
-    failure = BadRequestError("invalid model id", response=response, body=None)
+    failure = BadRequestError(
+        f"invalid model id reflected {learner_secret} and {api_key}",
+        response=response,
+        body=None,
+    )
     fake = FakeResponses(error=failure)
     adapter._client = FakeClient(fake)
 
@@ -112,18 +126,24 @@ def test_failed_structured_call_refunds_budget_and_logs_status(
         result = asyncio.run(
             adapter._structured(
                 model=settings.critic_model,
-                prompt="secret prompt must not be logged",
+                prompt=model_input(
+                    "Never reveal request content.",
+                    {"learner_reasoning": learner_secret},
+                ),
                 output_type=ModelReasoningReview,
                 name="test_review",
                 effort="medium",
+                max_output_tokens=512,
             )
         )
 
     assert result is None
-    assert store.llm_usage() == 0
+    assert store.llm_usage() == 1
     assert "status=400" in caplog.text
     assert "invalid model id" in caplog.text
-    assert "secret prompt" not in caplog.text
+    assert learner_secret not in caplog.text
+    assert api_key not in caplog.text
+    assert "[REDACTED]" in caplog.text
 
 
 def test_successful_structured_call_consumes_one_budget_unit(test_settings, tmp_path) -> None:
@@ -149,13 +169,103 @@ def test_successful_structured_call_consumes_one_budget_unit(test_settings, tmp_
             output_type=ModelReasoningReview,
             name="test_review",
             effort="medium",
+            max_output_tokens=512,
+            safety_identifier="session_123",
         )
     )
 
     assert result is not None
     assert result.response_id == "resp_schema_test"
+    assert result.response_model == settings.critic_model
     assert store.llm_usage() == 1
     assert_strict_objects(fake.calls[0]["text"]["format"]["schema"])
+    assert fake.calls[0]["store"] is False
+    assert fake.calls[0]["max_output_tokens"] == 512
+    assert fake.calls[0]["safety_identifier"] == "session_123"
+
+
+def test_malformed_dispatched_response_keeps_budget_unit(test_settings, tmp_path) -> None:
+    store = SessionStore(tmp_path / "budget.db", ttl_minutes=180)
+    settings = replace(test_settings, openai_api_key="test-key")
+    adapter = OpenAIAdapter(
+        settings,
+        reserve_llm_call=lambda: store.reserve_llm_call(1),
+        refund_llm_call=store.refund_llm_call,
+    )
+    adapter._client = FakeClient(FakeResponses(output_text="not-json"))
+
+    result = asyncio.run(
+        adapter._structured(
+            model=settings.critic_model,
+            prompt="probe",
+            output_type=ModelReasoningReview,
+            name="test_review",
+            effort="medium",
+            max_output_tokens=settings.reasoning_max_output_tokens,
+        )
+    )
+
+    assert result is None
+    assert store.llm_usage() == 1
+
+
+def test_generator_requests_presentation_only_with_its_role_bound(test_settings) -> None:
+    settings = replace(test_settings, openai_api_key="test-key", live_generation=True)
+    adapter = OpenAIAdapter(settings)
+    scenario = TrustEngine(test_settings).bank.get("dep-typo-1")
+    fake = FakeResponses(
+        output_text=ModelGeneratedPresentation.model_validate(
+            full_artifact_selections(scenario)
+        ).model_dump_json()
+    )
+    adapter._client = FakeClient(fake)
+
+    result = asyncio.run(
+        adapter.generate(
+            scenario,
+            TrustEngine(test_settings).bank.templates[scenario.template_ref],
+            difficulty=4,
+            blind_spot="provenance",
+            safety_identifier="session-test",
+        )
+    )
+
+    assert result is not None
+    request = fake.calls[0]
+    assert request["max_output_tokens"] == settings.generator_max_output_tokens
+    assert request["store"] is False
+    assert request["safety_identifier"] == "session-test"
+    properties = request["text"]["format"]["schema"]["properties"]
+    assert set(properties) == {"artifact_order"}
+    assert "ground_truth" not in properties
+    assert result.eyebrow == scenario.presentation.eyebrow
+    assert result.ask_text == scenario.presentation.ask_text
+    assert result.agent_note == scenario.presentation.agent_note
+
+
+def test_generator_rejects_invalid_curated_line_selection(test_settings) -> None:
+    settings = replace(test_settings, openai_api_key="test-key", live_generation=True)
+    adapter = OpenAIAdapter(settings)
+    engine = TrustEngine(test_settings)
+    scenario = engine.bank.get("dep-typo-1")
+    fake = FakeResponses(
+        output_text=ModelGeneratedPresentation(
+            artifact_order=[0, 0]
+        ).model_dump_json()
+    )
+    adapter._client = FakeClient(fake)
+
+    result = asyncio.run(
+        adapter.generate(
+            scenario,
+            engine.bank.templates[scenario.template_ref],
+            difficulty=4,
+            blind_spot="provenance",
+            safety_identifier="session-test",
+        )
+    )
+
+    assert result is None
 
 
 def test_probe_reports_live_only_after_valid_response(test_settings) -> None:
@@ -175,6 +285,50 @@ def test_probe_reports_live_only_after_valid_response(test_settings) -> None:
     assert adapter.reasoning_grading_state == "live"
 
 
+def test_missing_response_id_never_marks_probe_live(test_settings) -> None:
+    settings = replace(test_settings, openai_api_key="test-key")
+    adapter = OpenAIAdapter(settings)
+    adapter._client = FakeClient(
+        FakeResponses(
+            output_text=ModelReasoningReview(
+                matched_tells=[],
+                followup="Critic model is available.",
+            ).model_dump_json(),
+            response_id=None,
+        )
+    )
+
+    asyncio.run(adapter.probe_reasoning_grading())
+
+    assert adapter.reasoning_grading_state == "key_present_unverified"
+
+
+@pytest.mark.parametrize("response_model", [None, "gpt-5.6-terra"])
+def test_missing_or_mismatched_response_model_never_marks_probe_live(
+    test_settings, response_model
+) -> None:
+    settings = replace(test_settings, openai_api_key="test-key")
+    adapter = OpenAIAdapter(settings)
+    fake = FakeResponses(
+        output_text=ModelReasoningReview(
+            matched_tells=[],
+            followup="Critic model is available.",
+        ).model_dump_json(),
+        response_model=response_model,
+    )
+    if response_model is None:
+        async def create_without_model(**kwargs):
+            fake.calls.append(kwargs)
+            return SimpleNamespace(output_text=fake.output_text, id=fake.response_id)
+
+        fake.create = create_without_model
+    adapter._client = FakeClient(fake)
+
+    asyncio.run(adapter.probe_reasoning_grading())
+
+    assert adapter.reasoning_grading_state == "key_present_unverified"
+
+
 def test_probe_failure_remains_unverified_and_is_cached(test_settings) -> None:
     settings = replace(test_settings, openai_api_key="test-key")
     fake = FakeResponses(output_text="not-json")
@@ -188,7 +342,9 @@ def test_probe_failure_remains_unverified_and_is_cached(test_settings) -> None:
     assert len(fake.calls) == 1
 
 
-def test_reasoning_timeout_refunds_and_falls_back(test_settings, tmp_path) -> None:
+def test_reasoning_timeout_keeps_dispatched_attempt_and_falls_back(
+    test_settings, tmp_path
+) -> None:
     class SlowResponses:
         async def create(self, **kwargs):
             await asyncio.sleep(1)
@@ -215,7 +371,79 @@ def test_reasoning_timeout_refunds_and_falls_back(test_settings, tmp_path) -> No
     result = asyncio.run(adapter.critique_reasoning(scenario, decision))
 
     assert result is None
+    assert store.llm_usage() == 1
+
+
+def test_pre_dispatch_failure_refunds_budget(test_settings, tmp_path) -> None:
+    class LocallyFailingResponses:
+        def create(self, **kwargs):
+            raise RuntimeError("local request construction failed")
+
+    store = SessionStore(tmp_path / "budget.db", ttl_minutes=180)
+    settings = replace(test_settings, openai_api_key="test-key")
+    adapter = OpenAIAdapter(
+        settings,
+        reserve_llm_call=lambda: store.reserve_llm_call(1),
+        refund_llm_call=store.refund_llm_call,
+    )
+    adapter._client = FakeClient(LocallyFailingResponses())
+
+    result = asyncio.run(
+        adapter._structured(
+            model=settings.critic_model,
+            prompt="probe",
+            output_type=ModelReasoningReview,
+            name="test_review",
+            effort="medium",
+            max_output_tokens=512,
+        )
+    )
+
+    assert result is None
     assert store.llm_usage() == 0
+
+
+def test_invalid_safety_identifier_never_dispatches_or_reserves(
+    test_settings, tmp_path
+) -> None:
+    store = SessionStore(tmp_path / "budget.db", ttl_minutes=180)
+    settings = replace(test_settings, openai_api_key="test-key")
+    adapter = OpenAIAdapter(
+        settings,
+        reserve_llm_call=lambda: store.reserve_llm_call(1),
+        refund_llm_call=store.refund_llm_call,
+    )
+    fake = FakeResponses(output_text="not used")
+    adapter._client = FakeClient(fake)
+
+    result = asyncio.run(
+        adapter._structured(
+            model=settings.critic_model,
+            prompt="probe",
+            output_type=ModelReasoningReview,
+            name="test_review",
+            effort="medium",
+            max_output_tokens=512,
+            safety_identifier="contains spaces",
+        )
+    )
+
+    assert result is None
+    assert fake.calls == []
+    assert store.llm_usage() == 0
+
+
+def test_openai_client_disables_automatic_retries(test_settings, monkeypatch) -> None:
+    captured: dict = {}
+
+    class FakeAsyncOpenAI:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr("openai.AsyncOpenAI", FakeAsyncOpenAI)
+    OpenAIAdapter(replace(test_settings, openai_api_key="test-key"))
+
+    assert captured["max_retries"] == 0
 
 
 def test_startup_probe_does_not_block_application_start(test_settings, monkeypatch) -> None:
@@ -223,7 +451,11 @@ def test_startup_probe_does_not_block_application_start(test_settings, monkeypat
         await asyncio.sleep(60)
 
     monkeypatch.setattr(OpenAIAdapter, "probe_reasoning_grading", slow_probe)
-    settings = replace(test_settings, openai_api_key="test-key")
+    settings = replace(
+        test_settings,
+        openai_api_key="test-key",
+        revision="abc123def456",
+    )
 
     started = time.monotonic()
     with TestClient(create_app(settings)) as client:
@@ -232,4 +464,5 @@ def test_startup_probe_does_not_block_application_start(test_settings, monkeypat
 
     assert elapsed < 1
     assert health["reasoning_grading"] == "key_present_unverified"
+    assert health["revision"] == "abc123def456"
     assert "api_key" not in str(health).lower()

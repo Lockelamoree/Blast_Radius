@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import ipaddress
+import posixpath
+import re
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
@@ -29,6 +32,11 @@ class Competency(StrEnum):
     CAPABILITIES = "capabilities"
     DIFF_REVIEW = "diff_review"
     PROMPT_INJECTION = "prompt_injection"
+
+
+class AssessmentForm(StrEnum):
+    PRE = "pre"
+    POST = "post"
 
 
 COMPETENCY_LABELS: dict[Competency, str] = {
@@ -92,18 +100,67 @@ class BlastRadiusConfig(BaseModel):
     @field_validator("readable_paths", "writable_paths")
     @classmethod
     def validate_paths(cls, paths: list[str]) -> list[str]:
+        normalized_paths: list[str] = []
         for path in paths:
-            if not path.startswith("/workspace") or ".." in path or "~" in path:
+            if (
+                not path
+                or len(path) > 500
+                or path != path.strip()
+                or not path.isprintable()
+                or "\x00" in path
+                or "\\" in path
+                or "~" in path
+                or any(character in path for character in "*?[")
+            ):
                 raise ValueError("sandbox paths must stay below /workspace")
-        return paths
+            segments = path.split("/")
+            if any(segment in {".", ".."} for segment in segments):
+                raise ValueError("sandbox paths must stay below /workspace")
+            normalized = posixpath.normpath(path)
+            if normalized != "/workspace" and not normalized.startswith("/workspace/"):
+                raise ValueError("sandbox paths must stay below /workspace")
+            normalized_paths.append(normalized)
+        return list(dict.fromkeys(normalized_paths))
 
     @field_validator("network_allowlist")
     @classmethod
     def validate_hosts(cls, hosts: list[str]) -> list[str]:
+        normalized_hosts: list[str] = []
         for host in hosts:
-            if not host or "/" in host or ":" in host or host.startswith("."):
+            if (
+                not host
+                or len(host) > 253
+                or host != host.strip()
+                or host.endswith(".")
+                or not re.fullmatch(
+                    r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+                    r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*",
+                    host,
+                )
+            ):
                 raise ValueError("allowlist entries must be bare hostnames")
-        return hosts
+            try:
+                ipaddress.ip_address(host)
+            except ValueError:
+                if all(label.isdigit() for label in host.split(".")):
+                    raise ValueError("allowlist entries must be bare hostnames") from None
+            else:
+                raise ValueError("allowlist entries must be bare hostnames")
+            normalized_hosts.append(host.lower())
+        return list(dict.fromkeys(normalized_hosts))
+
+    @field_validator("capabilities")
+    @classmethod
+    def validate_capabilities(cls, capabilities: list[str]) -> list[str]:
+        for capability in capabilities:
+            if (
+                len(capability) > 80
+                or not re.fullmatch(
+                    r"[a-z0-9](?:[a-z0-9._-]{0,78}[a-z0-9])?", capability
+                )
+            ):
+                raise ValueError("capabilities must use canonical lowercase names")
+        return list(dict.fromkeys(capabilities))
 
     @model_validator(mode="after")
     def allowlist_requires_network(self) -> "BlastRadiusConfig":
@@ -135,6 +192,21 @@ class GroundTruth(BaseModel):
     def sandbox_requires_policy(self) -> "GroundTruth":
         if self.correct_action == Action.SANDBOX and self.safe_blast_radius is None:
             raise ValueError("sandbox ground truth requires a safe blast radius")
+        if self.correct_action != Action.SANDBOX and self.safe_blast_radius is not None:
+            raise ValueError("only sandbox ground truth may define a safe blast radius")
+        if any(not tell.strip() or len(tell) > 120 for tell in self.tells):
+            raise ValueError("tells must be non-blank and at most 120 characters")
+        if len(self.tells) != len(set(self.tells)):
+            raise ValueError("tells must be unique")
+        for tell, keywords in self.tell_keywords.items():
+            if not tell.strip() or len(tell) > 120:
+                raise ValueError("tell keyword names must be non-blank")
+            if not keywords or len(keywords) > 24:
+                raise ValueError("tell keyword groups must contain 1 to 24 keywords")
+            if any(not keyword.strip() or len(keyword) > 120 for keyword in keywords):
+                raise ValueError("tell keywords must be non-blank and at most 120 characters")
+            if len(keywords) != len(set(keywords)):
+                raise ValueError("tell keywords must be unique within each group")
         return self
 
 
@@ -160,7 +232,7 @@ class Scenario(BaseModel):
 class PlayerDecision(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    scenario_id: str
+    scenario_id: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]{2,80}$")
     action: Action
     reasoning_text: str = Field(min_length=8, max_length=500)
     blast_radius_config: BlastRadiusConfig | None = None
@@ -168,7 +240,10 @@ class PlayerDecision(BaseModel):
     @field_validator("reasoning_text")
     @classmethod
     def normalize_reasoning(cls, value: str) -> str:
-        return " ".join(value.split())
+        normalized = " ".join(value.split())
+        if len(normalized) < 8:
+            raise ValueError("reasoning must contain at least 8 non-padding characters")
+        return normalized
 
     @model_validator(mode="after")
     def sandbox_config_matches_action(self) -> "PlayerDecision":
@@ -222,14 +297,32 @@ class GradeResult(BaseModel):
 
 
 class TestQuestion(BaseModel):
-    id: str
-    prompt: str
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]{2,80}$")
+    prompt: str = Field(min_length=10, max_length=500)
     options: list[str] = Field(min_length=2, max_length=5)
     correct_index: int = Field(ge=0)
     competency: Competency
+    form: AssessmentForm
+
+    @field_validator("options")
+    @classmethod
+    def options_are_distinct_and_nonblank(cls, options: list[str]) -> list[str]:
+        if any(not option.strip() or len(option) > 300 for option in options):
+            raise ValueError("question options must be non-blank and at most 300 characters")
+        if len(options) != len(set(options)):
+            raise ValueError("question options must be unique")
+        return options
+
+    @model_validator(mode="after")
+    def correct_index_is_available(self) -> "TestQuestion":
+        if self.correct_index >= len(self.options):
+            raise ValueError("correct_index must reference an available option")
+        return self
 
     def public_view(self) -> dict[str, Any]:
-        return self.model_dump(exclude={"correct_index"})
+        return self.model_dump(exclude={"correct_index", "form"})
 
 
 class SessionState(BaseModel):

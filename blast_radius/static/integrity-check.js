@@ -13,7 +13,7 @@ document.querySelector('#gate-catch').addEventListener('click', async (event) =>
       return;
     }
     result.className = 'gate-blocked';
-    result.textContent = `BLOCKED · ${review.reasons.join(' · ')}`;
+    result.textContent = `BLOCKED BEFORE DISPLAY · PLANTED DEFECT: INVENTED TEMPLATE · FAILED INVARIANT: ${review.reasons.join(' · ')}`;
     window.announceStatus(result.textContent);
   } catch (error) {
     result.className = 'gate-failed-open';

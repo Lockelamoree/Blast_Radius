@@ -12,39 +12,147 @@ from blast_radius.models import (
 )
 
 
-def _terms(value: str) -> set[str]:
-    return set(re.findall(r"[a-z0-9_.~-]+", value.lower()))
+_LOW_SIGNAL_SINGLE_KEYWORDS = {
+    "a",
+    "an",
+    "and",
+    "approved",
+    "argument",
+    "are",
+    "as",
+    "at",
+    "be",
+    "by",
+    "bounded",
+    "condition",
+    "five",
+    "for",
+    "from",
+    "generated",
+    "has",
+    "have",
+    "if",
+    "in",
+    "is",
+    "it",
+    "key",
+    "local",
+    "match",
+    "matches",
+    "network",
+    "new",
+    "narrow",
+    "no",
+    "not",
+    "of",
+    "on",
+    "one",
+    "or",
+    "policy",
+    "post",
+    "private",
+    "public",
+    "purpose",
+    "read",
+    "remote",
+    "requests",
+    "routine",
+    "single",
+    "sandbox",
+    "source",
+    "test",
+    "that",
+    "the",
+    "this",
+    "to",
+    "unknown",
+    "was",
+    "with",
+    "workspace",
+    "write",
+    "zero",
+}
+_LOW_SIGNAL_PHRASES = {("no", "new")}
 
 
-def _path_coverage(actual: list[str], required: list[str]) -> bool:
-    return all(item in actual for item in required)
+def _tokens(value: str) -> tuple[str, ...]:
+    normalized = value.lower().replace("_", " ")
+    return tuple(re.findall(r"[a-z0-9]+(?:\.[a-z0-9]+)*", normalized))
+
+
+def _contains_phrase(haystack: tuple[str, ...], needle: tuple[str, ...]) -> bool:
+    if not needle or len(needle) > len(haystack):
+        return False
+    return any(
+        haystack[index : index + len(needle)] == needle
+        for index in range(len(haystack) - len(needle) + 1)
+    )
+
+
+def _keyword_matches(keyword: str, reasoning: tuple[str, ...]) -> bool:
+    keyword_tokens = _tokens(keyword)
+    if not keyword_tokens:
+        return False
+    if len(keyword_tokens) == 1:
+        token = keyword_tokens[0]
+        return token not in _LOW_SIGNAL_SINGLE_KEYWORDS and token in reasoning
+    if keyword_tokens in _LOW_SIGNAL_PHRASES:
+        return False
+    return _contains_phrase(reasoning, keyword_tokens)
 
 
 def score_blast_radius(actual: BlastRadiusConfig, expected: BlastRadiusConfig) -> int:
+    actual_reads = set(actual.readable_paths)
+    expected_reads = set(expected.readable_paths)
+    actual_writes = set(actual.writable_paths)
+    expected_writes = set(expected.writable_paths)
+    actual_hosts = set(actual.network_allowlist)
+    expected_hosts = set(expected.network_allowlist)
+    actual_capabilities = set(actual.capabilities)
+    expected_capabilities = set(expected.capabilities)
+
     score = 100
-    if not _path_coverage(actual.readable_paths, expected.readable_paths):
-        score -= 30
-    if not _path_coverage(actual.writable_paths, expected.writable_paths):
-        score -= 35
+    missing_reads = expected_reads - actual_reads
+    missing_writes = expected_writes - actual_writes
+    missing_hosts = expected_hosts - actual_hosts
+    missing_capabilities = expected_capabilities - actual_capabilities
+    if missing_reads:
+        score -= min(40, 20 * len(missing_reads))
+    if missing_writes:
+        score -= min(50, 25 * len(missing_writes))
     if actual.network_enabled != expected.network_enabled:
-        score -= 25
-    if set(actual.network_allowlist) != set(expected.network_allowlist):
-        score -= 20
-    if not set(expected.capabilities).issubset(actual.capabilities):
-        score -= 20
-    extra_writes = set(actual.writable_paths) - set(expected.writable_paths)
-    extra_hosts = set(actual.network_allowlist) - set(expected.network_allowlist)
-    score -= min(30, 10 * (len(extra_writes) + len(extra_hosts)))
+        score -= 30
+    if missing_hosts:
+        score -= min(40, 20 * len(missing_hosts))
+    if missing_capabilities:
+        score -= min(40, 20 * len(missing_capabilities))
+
+    extra_scope = (
+        (actual_reads - expected_reads)
+        | (actual_writes - expected_writes)
+        | (actual_hosts - expected_hosts)
+        | (actual_capabilities - expected_capabilities)
+    )
+    forbidden_network_escalation = actual.network_enabled and not expected.network_enabled
+    incomplete_scope = bool(
+        missing_reads
+        or missing_writes
+        or missing_hosts
+        or missing_capabilities
+        or actual.network_enabled != expected.network_enabled
+    )
+    if extra_scope or forbidden_network_escalation or incomplete_scope:
+        score = min(score, 60)
     return max(0, score)
 
 
 def grade_decision(scenario: Scenario, decision: PlayerDecision) -> GradeResult:
     truth = scenario.ground_truth
     action_correct = decision.action == truth.correct_action
-    reasoning_terms = _terms(decision.reasoning_text)
+    reasoning_tokens = _tokens(decision.reasoning_text)
     matched: list[str] = []
     for tell, keywords in truth.tell_keywords.items():
-        if any(_terms(keyword) & reasoning_terms for keyword in keywords):
+        if any(_keyword_matches(keyword, reasoning_tokens) for keyword in keywords):
             matched.append(tell)
     missed = [tell for tell in truth.tells if tell not in matched]
     reasoning_score = round(100 * len(matched) / len(truth.tells))

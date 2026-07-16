@@ -15,8 +15,8 @@ scenario. Never expose `ground_truth` through a public API.
 
 ## Model roles
 
-- Generation: `gpt-5.6-luna`.
-- Adaptation: `gpt-5.6-terra`.
+- Optional presentation ordering: `gpt-5.6-luna`; it may only permute whole curated artifacts.
+- Optional blind-spot label selection: `gpt-5.6-terra`.
 - Generated-scenario gate: `gpt-5.6-sol`, max reasoning effort.
 - Reasoning critic: `gpt-5.6-sol`, medium reasoning effort.
 - The deterministic bank must remain fully usable without an API key.

@@ -12,8 +12,8 @@
   <meta name="twitter:description" content="Verified security training for AI coding-agent decisions.">
   <title>Blast Radius — Size the risk before you approve</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%23090a09'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-family='monospace' font-size='26' font-weight='700' fill='%23c8ff3d'%3EBR%3C/text%3E%3C/svg%3E">
-  <link rel="stylesheet" href="/static/styles.css?v=20260715-4">
-  <link rel="stylesheet" href="/static/improvements.css?v=20260715-4">
+  <link rel="stylesheet" href="/static/styles.css?v=20260716-8">
+  <link rel="stylesheet" href="/static/improvements.css?v=20260716-8">
 </head>
 <body>
   <p id="app-status" class="sr-only" aria-live="polite" aria-atomic="true"></p>
@@ -31,6 +31,12 @@
         <p class="kicker">OPERATOR TRAINING / AGENTIC SECURITY</p>
         <h1>Size the risk<br><em>before</em> you approve.</h1>
         <p class="lede">Your coding agent wants to act. Inspect the evidence, constrain the blast radius, and explain the tell. Every verdict comes with receipts.</p>
+        <div class="proof-strip" aria-label="Verified build facts">
+          <div><strong>18</strong><span>curated scenarios</span></div>
+          <div><strong>6</strong><span>threat families</span></div>
+          <div><strong>0</strong><span>commands executed</span></div>
+          <div><strong>100%</strong><span>receipt-backed</span></div>
+        </div>
         <div class="hero-actions">
           <button class="button primary" data-start="demo">Start verified run <span>→</span></button>
           <button class="button ghost" data-start="live" disabled>Try live variation</button>
@@ -56,12 +62,6 @@
           <p><span class="prompt">›</span> Your call?</p>
         </div>
       </aside>
-      <div class="proof-strip">
-        <div><strong>18</strong><span>curated scenarios</span></div>
-        <div><strong>6</strong><span>threat families</span></div>
-        <div><strong>0</strong><span>commands executed</span></div>
-        <div><strong>100%</strong><span>receipt-backed</span></div>
-      </div>
     </section>
 
     <section id="screen-test" class="screen test-screen">
@@ -70,8 +70,10 @@
         <div class="step-chip"><span id="test-step">01</span> / <span id="test-total">—</span></div>
       </div>
       <form id="test-form" class="test-card">
-        <p id="test-prompt" class="question"></p>
-        <div id="test-options" class="option-grid"></div>
+        <fieldset class="question-set">
+          <legend id="test-prompt" class="question" tabindex="-1"></legend>
+          <div id="test-options" class="option-grid"></div>
+        </fieldset>
         <button type="submit" class="button primary test-next">Lock answer <span>→</span></button>
       </form>
     </section>
@@ -92,18 +94,19 @@
         <aside class="decision-panel">
           <div class="panel-label">YOUR DECISION</div>
           <div id="action-buttons" class="action-buttons">
-            <button type="button" data-action="approve" class="action approve"><kbd>A</kbd><strong>APPROVE</strong><span>Run as proposed</span></button>
-            <button type="button" data-action="sandbox" class="action sandbox"><kbd>S</kbd><strong>SANDBOX</strong><span>Constrain permissions</span></button>
-            <button type="button" data-action="reject" class="action reject"><kbd>R</kbd><strong>REJECT</strong><span>Block the action</span></button>
+            <button type="button" data-action="approve" class="action approve" aria-pressed="false"><kbd>A</kbd><strong>APPROVE</strong><span>Run as proposed</span></button>
+            <button type="button" data-action="sandbox" class="action sandbox" aria-pressed="false" aria-controls="sandbox-config" aria-expanded="false"><kbd>S</kbd><strong>SANDBOX</strong><span>Constrain permissions</span></button>
+            <button type="button" data-action="reject" class="action reject" aria-pressed="false"><kbd>R</kbd><strong>REJECT</strong><span>Block the action</span></button>
           </div>
-          <div id="sandbox-config" class="sandbox-config hidden">
+          <div id="sandbox-config" class="sandbox-config hidden" aria-hidden="true">
             <label>Readable paths<input id="read-paths" value="/workspace" autocomplete="off"></label>
             <label>Writable paths<input id="write-paths" value="" placeholder="/workspace/reports" autocomplete="off"></label>
             <label class="toggle-row"><input id="network-enabled" type="checkbox"><span>Allow network egress</span></label>
             <label>Host allowlist<input id="network-hosts" value="" placeholder="docs.example.com" disabled autocomplete="off"></label>
+            <label>Capabilities<input id="capabilities" value="" placeholder="http-get, read-docs" autocomplete="off"></label>
           </div>
-          <label class="reason-label" for="reasoning">NAME THE TELL <span>one clear sentence</span></label>
-          <textarea id="reasoning" maxlength="500" placeholder="I chose this because…"></textarea>
+          <label class="reason-label" for="reasoning">NAME THE TELL <span id="reason-requirement">one clear sentence · minimum 8 characters</span></label>
+          <textarea id="reasoning" minlength="8" maxlength="500" required aria-describedby="reason-requirement" placeholder="I chose this because…"></textarea>
           <p id="grading-status" class="microcopy hidden"></p>
           <div class="decision-footer"><span id="reason-count">0 / 500</span><div><button id="reset-decision" class="button ghost hidden" type="button">Reset</button><button id="submit-decision" class="button primary" disabled>Commit decision</button></div></div>
         </aside>
@@ -116,7 +119,7 @@
         <div id="verdict-seal" class="verdict-seal">CORRECT</div>
         <h2 id="verdict-heading">You contained the blast radius.</h2>
         <p id="verdict-explanation" class="lede"></p>
-        <div class="score-row"><div><strong id="reason-score">0</strong><span>reasoning</span></div><div><strong id="action-score">✓</strong><span>action</span></div><div><strong id="sandbox-score">—</strong><span>sandbox</span></div></div>
+        <div class="score-row"><div><strong id="reason-score">0</strong><span>tell coverage</span></div><div><strong id="action-score">✓</strong><span>action</span></div><div><strong id="sandbox-score">—</strong><span>sandbox</span></div></div>
       </div>
       <div class="receipt-column">
         <h3>Evidence receipts</h3>
@@ -136,7 +139,7 @@
           <small>No score is hardcoded; this line comes from your completed session.</small>
         </div>
         <div class="delta-block"><span>COMPETENCY DELTA</span><strong id="result-delta">—</strong><small id="result-tests">—</small></div>
-        <div class="result-stats"><div><strong id="result-reasoning">0%</strong><span>reasoning score</span></div><div><strong id="result-rounds">0</strong><span>rounds reviewed</span></div></div>
+        <div class="result-stats"><div><strong id="result-reasoning">0%</strong><span>average tell coverage</span></div><div><strong id="result-rounds">0</strong><span>rounds reviewed</span></div></div>
         <button id="share-result" class="button primary">Copy result</button>
         <button id="restart" class="button ghost">Run it again</button>
       </div>
@@ -149,7 +152,7 @@
     </section>
   </main>
   <footer><span>BLAST RADIUS / BUILD WEEK 2026</span><span>Nothing shown here is executed.</span></footer>
-  <script src="/static/app.js?v=20260715-4" defer></script>
-  <script src="/static/integrity-check.js?v=20260715-4" defer></script>
+  <script src="/static/app.js?v=20260716-8" defer></script>
+  <script src="/static/integrity-check.js?v=20260716-8" defer></script>
 </body>
 </html>

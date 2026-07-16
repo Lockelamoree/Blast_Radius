@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -15,6 +16,13 @@ def _as_bool(value: str | None, default: bool = False) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _as_revision(value: str | None) -> str:
+    revision = (value or "").strip().lower()
+    if revision in {"dev", "unknown"} or re.fullmatch(r"[0-9a-f]{7,64}", revision):
+        return revision
+    return "unknown"
+
+
 @dataclass(frozen=True)
 class Settings:
     base_dir: Path = Path(__file__).resolve().parent
@@ -27,6 +35,7 @@ class Settings:
     critic_timeout_seconds: float = float(
         os.getenv("BLAST_RADIUS_CRITIC_TIMEOUT_SECONDS", "8")
     )
+    revision: str = _as_revision(os.getenv("BLAST_RADIUS_REVISION", "unknown"))
     session_create_limit_per_hour: int = int(
         os.getenv("BLAST_RADIUS_SESSION_CREATE_LIMIT_PER_HOUR", "12")
     )
@@ -39,6 +48,18 @@ class Settings:
     generator_model: str = "gpt-5.6-luna"
     adaptation_model: str = "gpt-5.6-terra"
     critic_model: str = "gpt-5.6-sol"
+    generator_max_output_tokens: int = int(
+        os.getenv("BLAST_RADIUS_GENERATOR_MAX_OUTPUT_TOKENS", "4096")
+    )
+    adaptation_max_output_tokens: int = int(
+        os.getenv("BLAST_RADIUS_ADAPTATION_MAX_OUTPUT_TOKENS", "512")
+    )
+    gate_max_output_tokens: int = int(
+        os.getenv("BLAST_RADIUS_GATE_MAX_OUTPUT_TOKENS", "4096")
+    )
+    reasoning_max_output_tokens: int = int(
+        os.getenv("BLAST_RADIUS_REASONING_MAX_OUTPUT_TOKENS", "2048")
+    )
 
     @property
     def data_dir(self) -> Path:

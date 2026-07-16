@@ -4,7 +4,13 @@ import json
 import random
 from pathlib import Path
 
-from blast_radius.models import Scenario, ScenarioFamily, TestQuestion
+from blast_radius.models import (
+    AssessmentForm,
+    Competency,
+    Scenario,
+    ScenarioFamily,
+    TestQuestion,
+)
 
 
 class ScenarioBank:
@@ -24,6 +30,22 @@ class ScenarioBank:
             TestQuestion.model_validate(row)
             for row in self._read_json(data_dir / "questions.json")
         ]
+        question_ids = [question.id for question in self.questions]
+        if len(question_ids) != len(set(question_ids)):
+            raise ValueError("question ids must be unique")
+        for form in AssessmentForm:
+            form_questions = self.questions_for(form)
+            if len(form_questions) != len(Competency):
+                raise ValueError(
+                    f"{form.value} assessment must contain exactly one question per competency"
+                )
+            competencies = [question.competency for question in form_questions]
+            if set(competencies) != set(Competency) or len(competencies) != len(
+                set(competencies)
+            ):
+                raise ValueError(
+                    f"{form.value} assessment must contain exactly one question per competency"
+                )
 
     @staticmethod
     def _read_json(path: Path) -> list[dict]:
@@ -35,6 +57,17 @@ class ScenarioBank:
 
     def get(self, scenario_id: str) -> Scenario:
         return self.scenarios[scenario_id]
+
+    def questions_for(self, form: AssessmentForm) -> list[TestQuestion]:
+        rank = {competency: index for index, competency in enumerate(Competency)}
+        return sorted(
+            (question for question in self.questions if question.form == form),
+            key=lambda question: rank[question.competency],
+        )
+
+    @property
+    def assessment_size(self) -> int:
+        return len(self.questions_for(AssessmentForm.PRE))
 
     def fallback(
         self,
@@ -64,4 +97,3 @@ class ScenarioBank:
             "context-injection-1",
             "market-egress-1",
         ]
-

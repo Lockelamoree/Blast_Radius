@@ -60,6 +60,7 @@ def create_app(config: Settings = settings) -> FastAPI:
             "live_generation": engine.openai.generation_enabled,
             "reasoning_grading": engine.openai.reasoning_grading_state,
             "critic_model": config.critic_model,
+            "revision": config.revision,
         }
 
     return application
