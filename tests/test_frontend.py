@@ -27,7 +27,9 @@ def test_results_render_measured_values_without_hardcoded_zero_scores() -> None:
     assert "^https?:\\/\\/" in app
     assert "state.questions.length" in app
     assert 'id="test-total"' in template
-    assert "SAME 5 SIGNALS" not in app
+    assert "TRANSFER CHECK / ${total} NEW QUESTIONS" in app
+    assert "SAME ${total} SIGNALS" not in app
+    assert template.index('class="proof-strip"') < template.index('class="hero-actions"')
 
 
 def test_caddy_security_policy_does_not_require_inline_code() -> None:
@@ -38,6 +40,10 @@ def test_caddy_security_policy_does_not_require_inline_code() -> None:
     assert "Content-Security-Policy" in caddy
     assert "script-src 'self'" in caddy
     assert "'unsafe-inline'" not in caddy
+    assert "request_body" in caddy
+    assert "max_size 128KB" in caddy
+    assert "output stderr" in caddy
+    assert "format json" in caddy
 
 
 def test_accessibility_and_honest_live_mode_are_wired_without_overlays() -> None:
@@ -55,14 +61,68 @@ def test_accessibility_and_honest_live_mode_are_wired_without_overlays() -> None
     assert 'data-start="live" disabled' in template
     assert 'id="reset-decision"' in template
     assert "Time expired" in app
-    assert "button.disabled=true" in app
+    assert "Decision controls remain available" in app
+    assert "$$('.action').forEach(button=>button.disabled=true)" not in app
     assert "target.focus" in app
+    assert "prompt.focus" in app
+    assert "Question ${state.questionIndex+1} of ${total}" in app
+    assert "if(state.testSubmitting)return" in app
+    assert "const finalAnswers=[...state.answers,answer]" in app
+    assert "state.testSubmitting=true;submitButton.disabled=true" in app
+    assert "state.testSubmitting=false;submitButton.disabled=false" in app
     assert "health.live_generation" in app
     assert "liveGenerationAvailable" in app
     assert "MODEL BUDGET EXHAUSTED" in app
     assert "grade.graded_by===grade.critic_model" in app
+    assert "startsWith('gpt-5.6-sol')?'sol':'verified model'" in app
+    assert ".split('-').pop()" not in app
     assert ":focus-visible" in css
     assert ".sr-only" in css
+
+
+def test_decision_controls_serialize_capabilities_and_expose_selected_state() -> None:
+    root = Path(__file__).parents[1]
+    template = (root / "blast_radius" / "templates" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    app = (root / "blast_radius" / "static" / "app.js").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'id="capabilities"' in template
+    assert "capabilities:csv($('#capabilities').value)" in app
+    assert template.count('aria-pressed="false"') == 3
+    assert 'aria-controls="sandbox-config"' in template
+    assert 'aria-expanded="false"' in template
+    assert "setAttribute('aria-pressed',String(selected))" in app
+    assert "setAttribute('aria-expanded',String(sandboxSelected))" in app
+    assert 'minlength="8"' in template
+    assert 'aria-describedby="reason-requirement"' in template
+    assert "minimum 8 characters" in template
+    assert ".trim().replace(/\\s+/g,' ')" in app
+
+
+def test_assessment_and_score_labels_are_accessible_and_honest() -> None:
+    root = Path(__file__).parents[1]
+    template = (root / "blast_radius" / "templates" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    app = (root / "blast_radius" / "static" / "app.js").read_text(
+        encoding="utf-8"
+    )
+    integrity = (root / "blast_radius" / "static" / "integrity-check.js").read_text(
+        encoding="utf-8"
+    )
+
+    assert '<fieldset class="question-set">' in template
+    assert '<legend id="test-prompt"' in template
+    assert template.count("tell coverage") >= 2
+    assert "reasoning score" not in template
+    assert "tell coverage.`" in app
+    assert "tell coverage`)" in app
+    assert "BLOCKED BEFORE DISPLAY" in integrity
+    assert "PLANTED DEFECT" in integrity
+    assert "FAILED INVARIANT" in integrity
 
 
 def test_social_metadata_and_static_assets_are_cache_busted() -> None:

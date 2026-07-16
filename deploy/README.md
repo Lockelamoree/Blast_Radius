@@ -1,54 +1,66 @@
-# Ubuntu VPS deployment
+# Ubuntu 24.04 LTS VPS deployment
 
-Point a public DNS record at an Ubuntu VPS, then run from a clone:
+Point a public DNS record at the VPS, start from a fresh trusted clone, and use the silent
+prompt so the key value is not written to shell history:
 
 ```bash
-sudo OPENAI_API_KEY='spend-capped-key' bash deploy/deploy.sh blast-radius.example.com
+sudo BLAST_RADIUS_PROMPT_FOR_OPENAI_KEY=1 bash deploy/deploy.sh blast-radius.example.com
 ```
 
-The script installs Python, Caddy, and the app; creates the restricted service user;
-enables both services; obtains HTTPS through Caddy; and verifies `/healthz`. On re-runs it
-preserves the existing key unless `OPENAI_API_KEY` is explicitly supplied, in which case the
-key is updated. A deployment with a configured but unverified critic fails after printing
-the recent service logs. Use `BLAST_RADIUS_ALLOW_DEGRADED_DEPLOY=1` only for an intentional
-deterministic-only deployment.
+The script requires Python 3.11+, builds a fresh root-owned release under
+`/opt/blast-radius-releases`, installs it non-editably, and atomically points
+`/opt/blast-radius` at that release. The service user can write only
+`/var/lib/blast-radius`; it cannot alter source, the virtual environment, deployment helpers,
+or systemd/Caddy configuration. On re-runs the script preserves the existing key unless a
+key is explicitly supplied or prompted, in which case it is updated. An empty explicitly
+supplied `OPENAI_API_KEY` clears it. A deployment with an unverified critic fails after
+printing sanitized recent service logs. Use `BLAST_RADIUS_ALLOW_DEGRADED_DEPLOY=1` only for
+an intentional deterministic-only deployment.
 
 The public profile keeps `BLAST_RADIUS_LIVE_GENERATION=false`: a server-side key enables
-GPT-5.6 reasoning grading, while scenario generation stays deterministic. Set
+GPT-5.6 Sol tell matching, while scenario selection stays deterministic. Set
 `BLAST_RADIUS_DAILY_LLM_BUDGET` to cap model calls per UTC day; once exhausted, the app
-continues with deterministic grading. The default budget is 500 successful structured calls.
+continues with deterministic grading. The default budget is 500 provider-dispatched attempts;
+timeouts and provider errors still count because they can incur usage.
 
 ## Manual deployment
 
-1. Create an unprivileged `blast-radius` service account and clone this repository into
-   `/opt/blast-radius`.
-2. Create the environment and install the locked project interface:
+1. Create an unprivileged `blast-radius` service account, a root-owned release directory,
+   and a separate writable state directory:
 
    ```bash
-   cd /opt/blast-radius
-   python3 -m venv .venv
-   .venv/bin/python -m pip install .
+   sudo install -d -m 755 -o root -g root /opt/blast-radius-releases
+   sudo install -d -m 750 -o blast-radius -g blast-radius /var/lib/blast-radius
    ```
 
-3. Create `/etc/blast-radius.env` owned by root and readable by the service group:
+2. Clone an exact trusted revision into a root-owned release, verify the origin/revision and
+   clean status, create its virtual environment, and install with `python -m pip install .`
+   (never editable). Point `/opt/blast-radius` at the finished release only after validation.
+3. Create `/etc/blast-radius.env` mode `0600`, owned by root:
 
    ```dotenv
-   BLAST_RADIUS_DATABASE=/opt/blast-radius/blast_radius.db
+   BLAST_RADIUS_DATABASE=/var/lib/blast-radius/blast_radius.db
    BLAST_RADIUS_LIVE_GENERATION=false
    BLAST_RADIUS_SESSION_TTL_MINUTES=180
    BLAST_RADIUS_DAILY_LLM_BUDGET=500
    BLAST_RADIUS_CRITIC_TIMEOUT_SECONDS=8
+   BLAST_RADIUS_GENERATOR_MAX_OUTPUT_TOKENS=4096
+   BLAST_RADIUS_ADAPTATION_MAX_OUTPUT_TOKENS=512
+   BLAST_RADIUS_GATE_MAX_OUTPUT_TOKENS=4096
+   BLAST_RADIUS_REASONING_MAX_OUTPUT_TOKENS=2048
+   BLAST_RADIUS_REVISION=the-deployed-git-commit
    OPENAI_API_KEY=spend-capped-server-side-key
    ```
 
-4. Copy `blast-radius.service` to `/etc/systemd/system/`, run
+4. Keep the application checkout and virtual environment root-owned/read-only. Copy
+   `blast-radius.service` to `/etc/systemd/system/`, run
    `sudo systemctl daemon-reload`, then enable and start it.
 5. Replace the hostname in `Caddyfile`, install Caddy from its official repository, copy
    the configuration to `/etc/caddy/Caddyfile`, and reload Caddy.
 6. Verify `https://your-host/healthz` and complete a full run in a logged-out browser.
 
-Do not enable live generation until the deterministic demo has passed its rehearsal and a
-spend-capped server-side API key is configured.
+Do not enable the optional immutable-artifact ordering path for public judging. It adds no
+new evidence and is not needed by the deterministic demo.
 
 After `/healthz` reports `reasoning_grading: "live"`, capture one real reasoning grade:
 

@@ -7,8 +7,10 @@ Wants=network-online.target
 Type=simple
 User=blast-radius
 Group=blast-radius
-WorkingDirectory=/opt/blast-radius
+WorkingDirectory=/var/lib/blast-radius
 EnvironmentFile=/etc/blast-radius.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+UMask=0077
 ExecStart=/opt/blast-radius/.venv/bin/python -m uvicorn blast_radius.main:app --host 127.0.0.1 --port 8000 --workers 1
 Restart=on-failure
 RestartSec=3
@@ -16,7 +18,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/blast-radius
+ReadWritePaths=/var/lib/blast-radius
 
 [Install]
 WantedBy=multi-user.target

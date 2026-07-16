@@ -1,6 +1,13 @@
 # Replace the hostname with the public DNS name for the VPS.
 blast-radius.example.com {
+    log {
+        output stderr
+        format json
+    }
     encode zstd gzip
+    request_body {
+        max_size 128KB
+    }
     reverse_proxy 127.0.0.1:8000
     header {
         X-Content-Type-Options nosniff

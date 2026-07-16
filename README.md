@@ -1,40 +1,43 @@
 # Blast Radius
 
-**Blast Radius is a browser game that teaches developers to operate AI coding agents
-without rubber-stamping dangerous actions.** Inspect a proposed command, dependency, tool
-manifest, diff, retrieved instruction, or marketplace skill; choose **approve**,
-**sandbox**, or **reject**; then explain the tell. The verdict grades the decision and
-reasoning separately and shows concrete evidence receipts.
+**Blast Radius is a browser game for practicing safe approval decisions around AI coding
+agents.** Inspect a proposed command, dependency, tool manifest, diff, retrieved instruction,
+or marketplace skill; choose **approve**, **sandbox**, or **reject**; then name the evidence
+tell. The verdict scores the action, tell coverage, and—when applicable—the exact sandbox
+policy, with receipt links for every scenario.
 
-The application is designed for the OpenAI Build Week 2026 Developer Tools track. It never
-executes scenario content.
+The application targets the OpenAI Build Week 2026 Developer Tools track. Scenario commands
+are inert strings and are never executed.
 
-## Why it is different
-
-Most security games ask you to attack a system. Blast Radius trains the defender/operator
-reflex: deciding what an AI coding agent should be allowed to do. Its core is a verification
-loop, not a quiz answer key:
-
-```text
-verified template -> bounded variation -> correctness gate -> player decision
-                  -> immutable ground truth -> reasoning grade -> receipts
-```
+## What is shipped
 
 - 18 curated, receipt-backed scenarios across six threat families.
-- Mandatory pre-display gate with a tested rejection path and visible self-catch demo.
-- Decision, reasoning, and sandbox quality scored independently.
-- Five-question pre/post test, five-category competency map, and measured category deltas.
-- Deterministic judge mode that reorders only the remaining verified deck toward the
-  learner's weakest measured competency and remains playable without an OpenAI API key.
-- GPT-5.6 reasoning critique when the configured critic is verified; deterministic grading
-  remains the fallback, and live generation stays opt-in.
+- A mandatory deterministic pre-display gate and a visible planted-defect self-catch.
+- A six-round judge mode that never depends on generation and reorders only the unplayed
+  verified deck toward the learner's weakest measured competency.
+- Distinct five-question pre- and post-assessments, one question per competency, with stable
+  per-session option shuffling and measured category deltas.
+- Deterministic phrase matching as the grading floor. When the configured critic is verified,
+  GPT-5.6 Sol may match only immutable allowlisted tells and write a follow-up question.
+- A deterministic fallback for every model timeout, malformed response, provider failure, or
+  exhausted application budget.
+
+The public judging profile keeps `BLAST_RADIUS_LIVE_GENERATION=false`. An optional self-hosted
+experiment can use Luna and Terra to reorder whole, immutable curated artifact cards; the
+model cannot add, rewrite, or omit evidence. Every proposed ordering still passes the
+deterministic gate before the separate Sol gate is called.
+
+```text
+curated scenario -> deterministic gate -> adaptive verified deck -> player decision
+                 -> immutable truth -> tell matching -> cited receipts
+```
 
 ## Try it
 
-Hosted demo: **TODO — add the public HTTPS URL only after the VPS/domain deployment is
-complete and verified from a logged-out browser.**
+Hosted demo: **TODO — add the public HTTPS URL only after it passes the logged-out deployment
+check.**
 
-### Requirements
+Requirements:
 
 - Python 3.11 or newer
 - A current Chrome, Edge, Firefox, or Safari browser
@@ -59,147 +62,176 @@ cp .env.example .env
 python -m uvicorn blast_radius.main:app --reload
 ```
 
-Open <http://127.0.0.1:8000>. The verified run works immediately. Setting only
-`OPENAI_API_KEY` enables GPT-5.6 reasoning critique while keeping every scenario curated.
-Fresh scenario generation is a separate opt-in:
+Open <http://127.0.0.1:8000>. The verified run works without a key. Setting only
+`OPENAI_API_KEY` enables Sol critique while scenario selection stays deterministic:
 
 ```dotenv
-OPENAI_API_KEY=your_server_side_key
-BLAST_RADIUS_LIVE_GENERATION=true
+OPENAI_API_KEY=your_server_side_spend_capped_key
+BLAST_RADIUS_LIVE_GENERATION=false
 BLAST_RADIUS_DAILY_LLM_BUDGET=500
 ```
 
-The key stays server-side and is never included in browser responses or model-payload logs.
-Once the UTC daily call budget is exhausted, grading degrades transparently to the
-deterministic path.
+The key stays server-side. Responses requests use `store: false`, bounded output tokens, no
+SDK retries, and the opaque session UUID as `safety_identifier`. Provider-dispatched attempts
+count against the UTC daily application budget; configure a provider-side project budget as
+the hard financial ceiling.
 
-## Test it
+## Test and release checks
 
 ```powershell
+.\.venv\Scripts\python -m ruff check .
 .\.venv\Scripts\python -m pytest
+.\.venv\Scripts\python .agents/skills/verify-scenario/scripts/verify_scenarios.py
+.\.venv\Scripts\python -m build --wheel
 ```
 
-The suite covers model validation, every curated scenario, the correctness gate, grounded
-grading, model failure and budget fallback, sandbox scoping, adversarial player text, API
-leakage, rate limits, duplicate decisions, and the complete six-round demo session.
-
-Before submission, verify that every verdict receipt points directly to a healthy source:
+Before submission, verify every verdict receipt points directly to a healthy source:
 
 ```powershell
 python scripts/check_evidence_links.py
 ```
 
-This is an intentionally standalone network check, not part of pytest or CI. It fails on
-dead sources and on redirects so judges do not land on stale receipt URLs.
+The link checker is intentionally standalone—not part of pytest or CI—because it needs the
+network. It fails on dead sources and redirects. GitHub Actions runs Ruff, pytest, the
+18-scenario verifier, wheel construction, and packaged-resource inspection on Python 3.11 and
+3.13.
 
 Useful endpoints:
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /healthz` | Non-sensitive deployment health |
-| `GET /api/demo/gate-catch` | Show the gate rejecting a planted hallucination |
+| `GET /healthz` | Non-sensitive health, critic state, bank size, and deployed revision |
+| `GET /api/demo/gate-catch` | Show the gate rejecting a planted defect |
 | `POST /api/sessions` | Start a `demo` or `live` session |
-| `POST /api/sessions/{id}/pretest` | Submit the five baseline answers |
+| `POST /api/sessions/{id}/pretest` | Submit the shuffled baseline form |
 | `POST /api/sessions/{id}/rounds/next` | Retrieve a presentation-only scenario |
-| `POST /api/sessions/{id}/decisions` | Grade an action, reasoning, and sandbox policy |
-| `POST /api/sessions/{id}/posttest` | Submit the repeated test |
-| `GET /api/sessions/{id}/results` | Retrieve the mastery result |
-| `GET /api/docs` | Interactive API reference |
+| `POST /api/sessions/{id}/decisions` | Grade an action, tell coverage, and sandbox policy |
+| `POST /api/sessions/{id}/posttest` | Submit the distinct shuffled transfer form |
+| `GET /api/sessions/{id}/results` | Retrieve competency and pre/post results |
 
-## Architecture and safety model
+`/api/docs` and `/api/openapi.json` are disabled by default. Set
+`BLAST_RADIUS_ENABLE_DOCS=true` only when the interactive reference is intentionally exposed.
 
-FastAPI serves the interface and API from one Python process. Pydantic owns every trust
-boundary. SQLite stores opaque session state, expiration data, and the atomic UTC daily
-model-call budget; there are no accounts or personal profiles.
+## Architecture and trust boundary
 
-Scenario ground truth stays server-side. The browser receives only the ask and artifacts
-until a decision is committed. The deterministic correctness gate verifies template
-membership, family consistency, tell/evidence coverage, visible artifact support, sandbox
-policy safety, and receipt completeness. If generation times out, returns malformed output,
-or fails either gate, a compatible curated fallback is selected. Commands remain inert
-strings with no execution path.
+FastAPI serves the interface and API from one Python process. Pydantic validates every input
+and model output. SQLite stores opaque session state, expiry timestamps, and the atomic UTC
+model-attempt budget; there are no accounts or long-term profiles.
+
+The browser receives only scenario presentation data before a decision. Ground truth,
+answer keys, and the original assessment option order remain server-side. Per-session async
+locks serialize mutations, so simultaneous duplicate decisions persist once and invoke the
+critic at most once under the documented single-worker deployment.
 
 ```text
 Browser
-  -> FastAPI session/API boundary
-      -> deterministic bank + correctness gate
-      -> GPT-5.6 augmentation (optional, budgeted)
-      -> immutable grade + receipts
-      -> SQLite session and daily-budget store
+  -> FastAPI validation + keyed session lock
+      -> curated bank + deterministic correctness gate
+      -> deterministic grade and receipts
+      -> optional GPT-5.6 Sol tell matcher
+      -> SQLite session + atomic attempt budget
 ```
+
+Sandbox paths must be `/workspace` or a true descendant. Hosts are bounded bare hostnames,
+capabilities use canonical names, and a sandbox policy receives a fully correct score only
+when it exactly matches the immutable safe policy—extra scope is not treated as safe.
 
 ### GPT-5.6 roles
 
-All model IDs live in `blast_radius/config.py`:
+The model IDs in `blast_radius/config.py` match the official
+[OpenAI model catalog](https://developers.openai.com/api/docs/models):
 
-- `gpt-5.6-luna`: bounded scenario generation at medium effort.
-- `gpt-5.6-terra`: adaptive blind-spot targeting at low effort.
-- `gpt-5.6-sol`: semantic reasoning critique at medium effort and generated-scenario critique
-  at max effort.
+- `gpt-5.6-sol`: medium-effort tell matching and max-effort secondary presentation review.
+- `gpt-5.6-terra`: low-effort blind-spot label selection in the opt-in presentation path.
+- `gpt-5.6-luna`: medium-effort ordering of immutable curated artifact cards in that same
+  opt-in path.
 
-The build uses the Responses API with Structured Outputs. Sol may add only recognized tells
-from the immutable allowlist and write the follow-up. It cannot rewrite the correct action,
-evidence, receipts, or sandbox policy. Without a key—or after the daily budget is
-exhausted—the same flow uses deterministic grading.
+All calls use the Responses API and strict Structured Outputs. Trusted developer instructions
+and inert user/scenario data are separate messages. Immutable ground truth and deterministic
+action/sandbox results remain authoritative; Sol can only widen allowlisted tell coverage and
+write the follow-up critique.
 
-## Deployment and supported platforms
+## Production deployment and proof capture
 
-- Browsers: current Chrome, Edge, Firefox, and Safari; responsive to mobile widths.
-- Self-hosting: Windows, macOS, and Linux with Python 3.11+.
-- Judge path: **Start verified run** requires no login, API key, Node, Docker, or rebuild.
-
-Production files are in `deploy/`. With DNS already pointed at an Ubuntu VPS:
+Supported platforms are Windows, macOS, and Linux for self-hosting, plus current desktop and
+mobile browsers. Production files in `deploy/` target Ubuntu 24.04 LTS (Python 3.11+ is
+enforced) with Uvicorn under `systemd` and Caddy for HTTPS. Prompt for the spend-capped key so
+its value is not written to shell history:
 
 ```bash
-sudo OPENAI_API_KEY='spend-capped-key' bash deploy/deploy.sh your-domain.example
+sudo BLAST_RADIUS_PROMPT_FOR_OPENAI_KEY=1 bash deploy/deploy.sh your-domain.example
 ```
 
-The script installs the Python service and Caddy, enables HTTPS, and checks `/healthz`.
-It fails if the configured critic cannot be verified and prints recent service logs with the
-provider status/message. Once health reports `reasoning_grading: "live"`, capture the real
-review artifact with:
+The script builds a clean, non-editable, root-owned release; gives the runtime user write
+access only to `/var/lib/blast-radius`; keeps public generation off; records the deployed Git
+revision; validates Caddy; and restarts the service. It first verifies the new local Uvicorn
+process, then the public HTTPS endpoint, and fails unless health reports `ok`, the expected
+revision, 18 scenarios, generation off, and live Sol grading. Once that succeeds:
 
 ```bash
 python scripts/capture_live_grade.py https://your-domain.example
 ```
 
-The script refuses deterministic fallback responses and writes only a real response ID to
-`evidence/live_grade_<response_id>.json`.
+The capture harness requires HTTPS and verified Sol metadata. It runs a prepared public
+session and writes an append-only application receipt containing the requested model, the
+provider-returned model, hashed session correlation, health snapshot, revision, scenario,
+decision, raw application grade, deterministic and critic matches, UTC timestamp, genuine
+`resp_…` response ID, and receipt SHA-256 to
+`evidence/live_grade_<response_id>.json`. It refuses overwrites, secret-like values, prompts,
+and `ground_truth`. Before treating the receipt as external proof, cross-check the response ID
+in `journalctl -u blast-radius.service` and the OpenAI account usage/response record.
+
+## Claim-to-proof map
+
+| Claim | Inspectable proof | Status |
+|---|---|---|
+| 18 scenarios are verified before display | `scenarios.json`, verifier skill, gate tests | Verified locally |
+| Judge mode is deterministic and adaptive | API engine and six-round session tests | Verified locally |
+| Assessments are paired and option-shuffled | `questions.json`, API and bank tests | Verified locally |
+| Model output cannot author truth or evidence | strict DTOs, trusted-base gate tests | Verified locally |
+| Sol grades a real hosted answer | application receipt, matching service log, and provider-account cross-check | Pending VPS/key run |
+| Public generation is off | deployment environment plus `/healthz` | Pending VPS run |
+| Build used Codex | repository guidance and dated commit history | Inspectable |
+| Learning improvement | one consented named pre/post run | Not yet measured |
+
+No learning delta, latency, accuracy, or productivity metric is claimed without a captured
+measurement.
 
 ## Built with Codex
 
-This repository was implemented with Codex beginning July 14, 2026. Evidence in the public
-tree is limited to artifacts a judge can inspect:
+This repository was implemented with Codex beginning July 14, 2026. Public evidence includes:
 
-- `AGENTS.md` and nested guidance encode the non-negotiable engine and UI boundaries.
-- `.agents/skills/verify-scenario/SKILL.md` invokes the real bank-verification workflow.
-- Tests include adversarial player text proving prompt injection cannot alter ground truth.
-- The dated commit history distinguishes the implementation work.
-- Codex `/feedback` Session ID: **TODO — add the real ID from the primary build thread; do
-  not invent one.**
+- `AGENTS.md` and nested guidance encoding the engine and browser invariants.
+- `.agents/skills/verify-scenario/SKILL.md`, which runs the production gate.
+- Adversarial regression tests for truth drift, prompt injection, unsafe sandbox scope,
+  duplicate session mutation, and model failure.
+- Dated commits separating planning import, implementation, and trust hardening.
 
-Measured developer pre/post result: **TODO — add one real named run; no result has been
-claimed yet.** No productivity, learning-delta, latency, or accuracy number is claimed
-without a captured measurement.
+Codex `/feedback` Session ID: **TODO — add the genuine ID from the primary build thread; do
+not invent one.**
+
+Measured developer pre/post result: **TODO — add one consented named run; no result is claimed
+yet.**
 
 ## Prior work and exclusions
 
-The application code in this repository was implemented during the July 13–21, 2026
-submission period; the dated commit history is the evidence for that work.
+The application code was implemented during the July 13–21, 2026 submission period; the
+dated history is the evidence.
 
-MaRa SIFT is prior, external work and is **not integrated into this submission build**. The
-forensic-triage round is deferred; no MaRa code, output, or capability is copied or claimed.
-The six implemented families are dangerous commands, poisoned dependencies, over-scoped
-tools, malicious diffs, poisoned context, and the fictional skill marketplace.
+MaRa SIFT is prior external work and is **not integrated**. The forensic-triage round is
+deferred; no MaRa code, output, MCP use, or capability is copied or claimed. The six shipped
+families are dangerous commands, poisoned dependencies, over-scoped tools, malicious diffs,
+poisoned context, and the fictional skill marketplace.
 
 ## Submission checklist
 
-- [ ] Hosted URL tested from a logged-out browser
-- [ ] Public YouTube demo is under three minutes and has audio
-- [ ] Video shows both Codex collaboration and GPT-5.6 usage
-- [ ] Real `/feedback` Session ID replaces the truthful TODO
-- [ ] One named developer’s measured pre/post result replaces the truthful TODO
-- [ ] Fresh-machine setup instructions have been rehearsed
+- [ ] Hosted URL passes a logged-out browser run with no console errors
+- [ ] `/healthz` reports revision, 18 scenarios, generation off, and live Sol grading
+- [ ] Genuine live-grade artifact is cross-checked against the service log and secret-scanned
+- [ ] One consented named pre/post run replaces the truthful TODO
+- [ ] Genuine `/feedback` Session ID replaces the truthful TODO
+- [ ] Public YouTube demo is under three minutes, has audio, and shows the live proof
+- [ ] Fresh-machine setup is rehearsed
 - [ ] Demo remains available through August 5, 2026
 
 ## License
