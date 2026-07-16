@@ -246,10 +246,15 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
         available, reason = engine.live_generation_availability(
             store.budget_remaining(settings.daily_llm_budget)
         )
-        if state is not None and state.llm_calls_used >= settings.session_llm_call_cap:
-            return False, "budget_exhausted"
-        if state is not None and state.rounds_generated >= settings.generated_rounds_per_session:
-            return False, "round_cap"
+        if state is not None:
+            remaining_rounds = len(state.scenario_order) - state.current_index
+            # One generation attempt costs up to 2 calls; every remaining round
+            # keeps one reserved grading call, so generation can never starve
+            # the live critic for the rest of the session.
+            if state.llm_calls_used + 2 + remaining_rounds > settings.session_llm_call_cap:
+                return False, "grading_reserved"
+            if state.rounds_generated >= settings.generated_rounds_per_session:
+                return False, "round_cap"
         return available, reason
 
     @router.get("/demo/gate-catch")

@@ -496,4 +496,7 @@ def test_live_generation_availability_requires_probe_and_budget(test_settings) -
     assert engine.live_generation_availability(500) == (False, "critic_unverified")
     engine.openai.reasoning_grading_state = "live"
     assert engine.live_generation_availability(0) == (False, "budget_exhausted")
-    assert engine.live_generation_availability(1) == (True, "available")
+    # The tail of the daily budget is reserved for grading, never generation.
+    assert engine.live_generation_availability(1) == (False, "grading_reserved")
+    assert engine.live_generation_availability(60) == (False, "grading_reserved")
+    assert engine.live_generation_availability(61) == (True, "available")

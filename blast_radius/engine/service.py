@@ -73,6 +73,9 @@ class TrustEngine:
             return False, "critic_unverified"
         if daily_budget_remaining <= 0:
             return False, "budget_exhausted"
+        if daily_budget_remaining <= self.settings.generation_budget_reserve:
+            # The tail of the daily budget belongs to grading, never generation.
+            return False, "grading_reserved"
         return True, "available"
 
     @staticmethod
@@ -98,6 +101,7 @@ class TrustEngine:
             "off",
             "critic_unverified",
             "round_cap",
+            "grading_reserved",
             "provider_error",
             "malformed_response",
             "invalid_request",

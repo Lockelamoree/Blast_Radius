@@ -389,7 +389,9 @@ class OpenAIAdapter:
             prompt=prompt,
             output_type=ModelGeneratedPresentation,
             name="blast_radius_presentation",
-            effort="medium",
+            # Rewording is a low-reasoning task and must fit the generation
+            # timeout; the max-effort Sol gate remains the semantic defense.
+            effort="low",
             max_output_tokens=self.settings.generator_max_output_tokens,
             safety_identifier=safety_identifier,
             session_budget=session_budget,

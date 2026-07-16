@@ -162,6 +162,9 @@ def test_judge_path_hotfixes_lock_grading_and_render_honest_states() -> None:
     assert app.count("apiRetry(`/api/sessions/") == 4
     assert app.count("error.status===409") >= 2
     assert "already recorded — continuing" in app
+    # Multi-second round fetches show a busy state; reserved budget is labeled.
+    assert "Generating a fresh variation…" in app
+    assert "reserved for grading" in app
     # Structured 422 details must never render as [object Object].
     assert "typeof body.detail==='string'" in app
     # Failure states carry the .bad modifier instead of success-green.
