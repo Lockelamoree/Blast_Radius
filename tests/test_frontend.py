@@ -181,7 +181,7 @@ def test_judge_path_hotfixes_lock_grading_and_render_honest_states() -> None:
     # Failure states carry the .bad modifier instead of success-green.
     assert "classList.toggle('bad',!grade.action_correct)" in app
     assert "classList.toggle('bad',grade.reasoning_score<50)" in app
-    assert "classList.toggle('bad',data.delta<0)" in app
+    assert "classList.toggle('bad',data.delta<=-3)" in app
     assert "strong.bad" in css
     # The Chromium-dropped grouped progress rule stays split.
     assert "progress.mastery-track::-webkit-progress-value {" in css
@@ -619,3 +619,46 @@ def test_team_and_author_pages_use_external_assets_only() -> None:
     from blast_radius.models import Scenario
 
     Scenario.model_validate(json.loads(match.group(1)))
+
+
+def test_round_one_primer_is_wired() -> None:
+    src = _frontend_sources()
+    assert 'id="round-primer"' in src["template"]
+    assert "data.round_number===1" in src["app"]
+    assert "name the evidence (the tell)" in src["app"]
+    assert ".round-primer" in src["css"]
+
+
+def test_live_generation_is_surfaced_on_the_landing() -> None:
+    src = _frontend_sources()
+    # A GPT-5.6 badge on the live button + an invitational note when available.
+    assert 'class="badge-new">GPT-5.6' in src["template"]
+    assert 'data-start="live" disabled' in src["template"]  # existing pin survives
+    assert "GPT-5.6 can reskin a verified scenario live" in src["app"]
+    assert ".badge-new" in src["css"]
+
+
+def test_landing_groups_secondary_calls_to_action() -> None:
+    src = _frontend_sources()
+    assert 'class="secondary-actions"' in src["template"]
+    assert "More ways to play" in src["template"]
+    assert ".secondary-actions" in src["css"]
+    # The primary CTA stays first; proof strip still precedes the actions.
+    assert src["template"].index('data-start="demo"') < src["template"].index('class="secondary-actions"')
+
+
+def test_oversight_bias_block_is_wired_and_delta_is_demoted() -> None:
+    src = _frontend_sources()
+    assert 'id="oversight-bias"' in src["template"]
+    assert 'id="bias-over-approval"' in src["template"]
+    assert 'id="bias-over-restriction"' in src["template"]
+    assert "data.oversight_bias" in src["app"]
+    assert "bias.dominant==='over_approval'" in src["app"]
+    assert ".oversight-bias" in src["css"]
+    # The delta is demoted to a secondary stat and no longer the hero, and its
+    # caveat marks it as a small-sample calibration.
+    assert 'class="delta-block secondary-stat"' in src["template"]
+    assert "read as directional" in src["template"]
+    assert ".delta-block.secondary-stat strong" in src["css"]
+    # Stable coverage stats now lead the delta on the results card.
+    assert src["template"].index('class="result-stats"') < src["template"].index('class="delta-block secondary-stat"')

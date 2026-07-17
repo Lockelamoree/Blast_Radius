@@ -33,6 +33,7 @@ from blast_radius.models import (
     GenerationStatus,
     InspectionReport,
     LearnerProgress,
+    OversightBias,
     PlayerDecision,
     RoundSummary,
     Scenario,
@@ -128,6 +129,55 @@ def _deterministic_coverage(grade) -> int:
     if not total:
         return 0
     return round(100 * len(grade.deterministic_matched_tells) / total)
+
+
+# Restrictiveness order of the three calls; a wrong call that is less restrictive
+# than the correct one is over-approval, more restrictive is over-restriction.
+_ACTION_RANK = {"approve": 0, "sandbox": 1, "reject": 2}
+_BIAS_SUMMARY = {
+    "over_approval": "Your misses leaned toward approving actions that needed containing — the rubber-stamp reflex. Slow down before you approve.",
+    "over_restriction": "Your misses leaned toward blocking or over-constraining actions that were safer than you treated them. Let the evidence set the ceiling.",
+    "balanced": "Your misses split evenly between waving risk through and over-blocking safe work.",
+    "none": "No misdirected calls this session — every action you took matched the correct call.",
+}
+
+
+def _oversight_bias(grades) -> "OversightBias | None":
+    """Classify each graded round as correct, over-approval, or over-restriction,
+    from the recorded action-vs-correct-action pair. Deterministic and directional
+    — it names which way the wrong calls lean, not a precise score. Grades persisted
+    before the action fields existed (None) are skipped."""
+    graded = correct = over_approval = over_restriction = 0
+    for grade in grades:
+        player = _ACTION_RANK.get(grade.action)
+        expected = _ACTION_RANK.get(grade.correct_action)
+        if player is None or expected is None:
+            continue
+        graded += 1
+        if grade.action_correct or player == expected:
+            correct += 1
+        elif player < expected:
+            over_approval += 1
+        else:
+            over_restriction += 1
+    if not graded:
+        return None
+    if over_approval > over_restriction:
+        dominant = "over_approval"
+    elif over_restriction > over_approval:
+        dominant = "over_restriction"
+    elif over_approval == 0:
+        dominant = "none"
+    else:
+        dominant = "balanced"
+    return OversightBias(
+        graded_rounds=graded,
+        correct=correct,
+        over_approval=over_approval,
+        over_restriction=over_restriction,
+        dominant=dominant,
+        summary=_BIAS_SUMMARY[dominant],
+    )
 
 
 def assessment_option_order(
@@ -1113,6 +1163,7 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
         rounds_needed_nudge = sum(
             1 for grade in state.grades if grade.scenario_id in retried_by_id
         )
+        oversight_bias = _oversight_bias(state.grades)
         if finished_early:
             share_text = (
                 f"I ran Blast Radius: pre {state.pretest_score}/{test_total}, "
@@ -1142,6 +1193,7 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
                 key=weakest.value, label=COMPETENCY_LABELS[weakest]
             ),
             rounds_needed_nudge=rounds_needed_nudge,
+            oversight_bias=oversight_bias,
         )
 
     return router

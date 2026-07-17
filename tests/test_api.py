@@ -1064,3 +1064,59 @@ def test_drill_never_writes_a_team_summary(client) -> None:
         json={"scenario_id": scenario["id"], "action": "reject", "reasoning_text": "Rejecting this drill request outright."},
     )
     assert client.get("/api/team/summary").json()["summaries"] == []
+
+
+def _bias_grade(action: str, correct: str):
+    from blast_radius.models import GradeResult
+
+    return GradeResult(
+        scenario_id="sce-1",
+        verdict="wrong" if action != correct else "correct",
+        action_correct=action == correct,
+        action=action,
+        correct_action=correct,
+        reasoning_score=0,
+        matched_tells=[],
+        missed_tells=[],
+        receipts=[],
+        explanation="x",
+        socratic_followup="y",
+    )
+
+
+def test_oversight_bias_classifies_wrong_calls_by_direction() -> None:
+    from blast_radius.api import _oversight_bias
+
+    bias = _oversight_bias(
+        [
+            _bias_grade("approve", "reject"),  # under-contained -> over-approval
+            _bias_grade("sandbox", "reject"),  # under-contained -> over-approval
+            _bias_grade("reject", "approve"),  # over-contained -> over-restriction
+            _bias_grade("reject", "reject"),  # correct
+        ]
+    )
+    assert bias is not None
+    assert (bias.over_approval, bias.over_restriction, bias.correct) == (2, 1, 1)
+    assert bias.graded_rounds == 4
+    assert bias.dominant == "over_approval"
+    assert "rubber-stamp" in bias.summary
+
+
+def test_oversight_bias_is_none_without_recorded_actions() -> None:
+    # Grades persisted before the action/correct_action fields existed must not
+    # crash or fabricate a tendency — they are simply skipped.
+    from blast_radius.api import _oversight_bias
+    from blast_radius.models import GradeResult
+
+    legacy = GradeResult(
+        scenario_id="sce-1",
+        verdict="correct",
+        action_correct=True,
+        reasoning_score=100,
+        matched_tells=[],
+        missed_tells=[],
+        receipts=[],
+        explanation="x",
+        socratic_followup="y",
+    )
+    assert _oversight_bias([legacy]) is None

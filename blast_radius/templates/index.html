@@ -15,8 +15,8 @@
   <meta name="theme-color" content="#090a09">
   <title>Blast Radius — Size the risk before you approve</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%23090a09'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-family='monospace' font-size='26' font-weight='700' fill='%23c8ff3d'%3EBR%3C/text%3E%3C/svg%3E">
-  <link rel="stylesheet" href="/static/styles.css?v=20260718-1">
-  <link rel="stylesheet" href="/static/improvements.css?v=20260718-1">
+  <link rel="stylesheet" href="/static/styles.css?v=20260718-2">
+  <link rel="stylesheet" href="/static/improvements.css?v=20260718-2">
 </head>
 <body>
   <p id="app-status" class="sr-only" aria-live="polite" aria-atomic="true"></p>
@@ -46,8 +46,11 @@
         </div>
         <div class="hero-actions">
           <button class="button primary" data-start="demo">Start verified run <span>→</span></button>
-          <button class="button ghost" data-start="live" disabled>Try live variation</button>
-          <button class="button ghost" id="start-drill" type="button">90-second daily drill <span>→</span></button>
+          <div class="secondary-actions" aria-label="More ways to play">
+            <span class="secondary-actions-label">More ways to play</span>
+            <button class="button ghost" data-start="live" disabled>Try live variation <span class="badge-new">GPT-5.6</span></button>
+            <button class="button ghost" id="start-drill" type="button">90-second daily drill <span>→</span></button>
+          </div>
         </div>
         <p class="handle-row"><label class="handle-label" for="operator-handle">TEAM HANDLE · OPTIONAL</label><input id="operator-handle" maxlength="40" autocomplete="off" spellcheck="false" placeholder="e.g. max-g"><span class="microcopy handle-note">Shown on the team board only. No email, no account — leave blank to stay anonymous.</span></p>
         <p id="live-note" class="microcopy">Live mode falls back to verified scenarios if generation is unavailable.</p>
@@ -118,6 +121,7 @@
       <p id="adaptive-focus" class="adaptive-focus hidden"></p>
       <p id="timer-status" class="microcopy timer-status hidden"></p>
       <p id="round-provenance" class="round-provenance verified">VERIFIED SCENARIO</p>
+      <p id="round-primer" class="round-primer hidden"></p>
       <div class="round-grid">
         <article class="request-panel">
           <p class="kicker" id="scenario-eyebrow"></p>
@@ -221,8 +225,16 @@
           <strong id="result-summary-line">—</strong>
           <small>No score is hardcoded; this line comes from your completed session.</small>
         </div>
-        <div class="delta-block"><span>COMPETENCY DELTA</span><strong id="result-delta">—</strong><small id="result-tests">—</small></div>
         <div class="result-stats"><div><strong id="result-reasoning">0%</strong><span>average tell coverage</span></div><div><strong id="result-rounds">0</strong><span>rounds reviewed</span></div><div><strong id="result-generated">0/0</strong><span>generated / played</span></div></div>
+        <div id="oversight-bias" class="oversight-bias hidden">
+          <p class="panel-label">OVERSIGHT TENDENCY</p>
+          <div class="bias-bars">
+            <div class="bias-bar"><span>OVER-APPROVAL</span><strong id="bias-over-approval">0</strong></div>
+            <div class="bias-bar"><span>OVER-RESTRICTION</span><strong id="bias-over-restriction">0</strong></div>
+          </div>
+          <p id="bias-summary" class="microcopy">—</p>
+        </div>
+        <div class="delta-block secondary-stat"><span>COMPETENCY DELTA</span><strong id="result-delta">—</strong><small id="result-tests">—</small><small class="delta-caveat">5-question calibration · read as directional, not precise</small></div>
         <button id="share-result" class="button primary">Copy result</button>
         <button id="restart" class="button ghost">Run it again — fresh deck →</button>
         <div class="guardrail-export">
@@ -271,10 +283,10 @@
     </section>
   </main>
   <footer><span>BLAST RADIUS / BUILD WEEK 2026</span><span id="footer-rev" class="footer-rev"></span><span>Nothing shown here is executed.</span></footer>
-  <script src="/static/app.js?v=20260718-1" defer></script>
-  <script src="/static/integrity-check.js?v=20260718-1" defer></script>
-  <script src="/static/guardrails.js?v=20260718-1" defer></script>
-  <script src="/static/resources.js?v=20260718-1" defer></script>
-  <script src="/static/history.js?v=20260718-1" defer></script>
+  <script src="/static/app.js?v=20260718-2" defer></script>
+  <script src="/static/integrity-check.js?v=20260718-2" defer></script>
+  <script src="/static/guardrails.js?v=20260718-2" defer></script>
+  <script src="/static/resources.js?v=20260718-2" defer></script>
+  <script src="/static/history.js?v=20260718-2" defer></script>
 </body>
 </html>

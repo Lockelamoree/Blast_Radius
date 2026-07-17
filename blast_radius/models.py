@@ -301,6 +301,12 @@ class GradeResult(BaseModel):
     family: str | None = None
     verdict: str = Field(pattern=r"^(correct|partial|wrong)$")
     action_correct: bool
+    # The player's chosen action and the scenario's correct action, kept so the
+    # results view can classify a wrong call as over-approval (too permissive) or
+    # over-restriction (too cautious). Optional: rows persisted before this field
+    # existed parse with None and are simply skipped by the oversight-bias tally.
+    action: str | None = None
+    correct_action: str | None = None
     reasoning_score: int = Field(ge=0, le=100)
     blast_radius_score: int | None = Field(default=None, ge=0, le=100)
     matched_tells: list[str]
@@ -423,6 +429,25 @@ class CompetencyRef(BaseModel):
     label: str
 
 
+class OversightBias(BaseModel):
+    """Which direction the player's wrong calls lean, over a finished session.
+
+    Over-approval = allowing an action the correct call would have contained
+    (the rubber-stamping failure this whole product is about). Over-restriction =
+    blocking or over-constraining an action that was safer than the player treated
+    it. Computed deterministically from the recorded action-vs-correct-action pairs;
+    it is a directional tendency, not a precise score."""
+
+    graded_rounds: int = Field(default=0, ge=0)
+    correct: int = Field(default=0, ge=0)
+    over_approval: int = Field(default=0, ge=0)
+    over_restriction: int = Field(default=0, ge=0)
+    dominant: str = Field(
+        default="none", pattern=r"^(over_approval|over_restriction|balanced|none)$"
+    )
+    summary: str = ""
+
+
 class LearnerProgress(BaseModel):
     session_id: str
     pretest_score: int
@@ -438,6 +463,7 @@ class LearnerProgress(BaseModel):
     rounds: list[RoundSummary] = Field(default_factory=list)
     weakest_competency: CompetencyRef | None = None
     rounds_needed_nudge: int = Field(default=0, ge=0)
+    oversight_bias: OversightBias | None = None
 
 
 class DrillResult(BaseModel):

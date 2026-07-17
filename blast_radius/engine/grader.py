@@ -250,6 +250,8 @@ def grade_decision(scenario: Scenario, decision: PlayerDecision) -> GradeResult:
         family=scenario.family.value,
         verdict=verdict,
         action_correct=action_correct,
+        action=decision.action.value,
+        correct_action=truth.correct_action.value,
         reasoning_score=reasoning_score,
         blast_radius_score=blast_score,
         matched_tells=matched,

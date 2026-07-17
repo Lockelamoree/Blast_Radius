@@ -1132,3 +1132,98 @@ a.resource-source:hover .resource-source-title {
     grid-template-columns: 1fr;
   }
 }
+
+/* Review 003: landing CTA triage (#10), live-mode badge (#9), round-1 primer
+   (#8), oversight-bias block, and the demoted competency-delta stat (#7). */
+.secondary-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line);
+}
+
+.secondary-actions-label {
+  font: 9px var(--mono);
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.secondary-actions .button {
+  align-self: flex-start;
+}
+
+.badge-new {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 6px;
+  border: 1px solid var(--acid);
+  color: var(--acid);
+  border-radius: 3px;
+  font: 800 8px var(--mono);
+  letter-spacing: .1em;
+  vertical-align: middle;
+}
+
+.round-primer {
+  font: 12px/1.6 var(--mono);
+  color: #c3c1b8;
+  background: #0f120c;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--acid);
+  padding: 12px 15px;
+  margin: 0 0 18px;
+}
+
+.oversight-bias {
+  border: 1px solid var(--line);
+  padding: 18px;
+  margin-bottom: 28px;
+}
+
+.bias-bars {
+  display: flex;
+  gap: 40px;
+  margin-bottom: 10px;
+}
+
+.bias-bar {
+  display: flex;
+  flex-direction: column;
+}
+
+.bias-bar span {
+  font: 9px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--muted);
+}
+
+.bias-bar strong {
+  font: 34px var(--serif);
+  color: var(--ink);
+}
+
+.oversight-bias.bad .bias-bar:first-child strong {
+  color: var(--orange);
+}
+
+.delta-block.secondary-stat {
+  margin: 0 0 32px;
+}
+
+.delta-block.secondary-stat strong {
+  font: 34px var(--serif);
+  color: var(--muted);
+}
+
+.delta-block.secondary-stat strong.bad {
+  color: var(--orange);
+}
+
+.delta-caveat {
+  display: block;
+  color: #64685e;
+}
