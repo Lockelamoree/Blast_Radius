@@ -21,7 +21,13 @@ from blast_radius.engine.openai_adapter import (
     StructuredCallResult,
 )
 from blast_radius.main import create_app
-from blast_radius.models import AssessmentForm, Competency, GateResult, ScenarioFamily
+from blast_radius.models import (
+    COMPETENCY_LABELS,
+    AssessmentForm,
+    Competency,
+    GateResult,
+    ScenarioFamily,
+)
 
 PRETEST_CORRECT_OPTIONS = {
     "q-command": "Path scope and reversibility",
@@ -420,6 +426,25 @@ def test_finish_early_returns_honest_partial_results(client) -> None:
         f"/api/sessions/{session_id}/posttest",
         json={"answers": [0, 0, 0, 0, 0]},
     ).status_code == 409
+
+
+def test_demo_rounds_name_the_adaptive_focus_after_the_first(client) -> None:
+    session_id = create_started_session(client)
+    first = client.post(f"/api/sessions/{session_id}/rounds/next").json()
+    assert first["round_number"] == 1
+    # Round 1 has no prior signal, so no adaptive focus is claimed.
+    assert first["adaptive_focus"] is None
+    client.post(
+        f"/api/sessions/{session_id}/decisions",
+        json={
+            "scenario_id": first["scenario"]["id"],
+            "action": "reject",
+            "reasoning_text": "The displayed scope or provenance is not trusted enough.",
+        },
+    )
+    second = client.post(f"/api/sessions/{session_id}/rounds/next").json()
+    assert second["round_number"] == 2
+    assert second["adaptive_focus"] in set(COMPETENCY_LABELS.values())
 
 
 def test_finish_early_requires_a_played_round(client) -> None:

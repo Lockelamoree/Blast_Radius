@@ -446,6 +446,12 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
             if provenance == ScenarioProvenance.GENERATED:
                 state.rounds_generated += 1
             store.save(state)
+        # After round 1 the demo deck has been reordered to lead with the player's
+        # weakest area; name it so the adaptive reorder is visible, not silent.
+        adaptive_focus = None
+        if state.mode == "demo" and state.current_index >= 1:
+            weakest = min(Competency, key=lambda item: competency_accuracy(state, item))
+            adaptive_focus = COMPETENCY_LABELS[weakest]
         return {
             "complete": False,
             "round_number": state.current_index + 1,
@@ -453,6 +459,7 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
             "seconds": max(35, 70 - state.current_index * 5),
             "provenance": provenance,
             "generation_status": generation_status,
+            "adaptive_focus": adaptive_focus,
             "scenario": scenario.public_view(),
         }
 

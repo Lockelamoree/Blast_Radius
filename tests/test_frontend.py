@@ -228,6 +228,22 @@ def test_verdict_receipt_renders_provenance_tells_and_divergence() -> None:
     assert ".tell-chip" in css
 
 
+def test_adaptive_focus_line_is_wired() -> None:
+    root = Path(__file__).parents[1]
+    template = (root / "blast_radius" / "templates" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    app = (root / "blast_radius" / "static" / "app.js").read_text(encoding="utf-8")
+    css = (root / "blast_radius" / "static" / "improvements.css").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'id="adaptive-focus"' in template
+    assert "data.adaptive_focus" in app
+    assert "targeting your weakest area" in app
+    assert ".adaptive-focus" in css
+
+
 def test_finish_early_link_and_partial_results_are_wired() -> None:
     root = Path(__file__).parents[1]
     template = (root / "blast_radius" / "templates" / "index.html").read_text(
