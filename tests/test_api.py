@@ -385,6 +385,51 @@ def test_full_demo_session(client, test_settings) -> None:
     assert weakest["label"]
 
 
+def test_finish_early_returns_honest_partial_results(client) -> None:
+    session_id = create_started_session(client)
+    for _ in range(2):
+        round_data = client.post(f"/api/sessions/{session_id}/rounds/next").json()
+        assert client.post(
+            f"/api/sessions/{session_id}/decisions",
+            json={
+                "scenario_id": round_data["scenario"]["id"],
+                "action": "reject",
+                "reasoning_text": "The displayed scope or provenance is not trusted enough.",
+            },
+        ).status_code == 200
+
+    finished = client.post(f"/api/sessions/{session_id}/finish-early")
+    assert finished.status_code == 200
+    assert finished.json() == {"finished_early": True, "rounds_played": 2}
+
+    body = client.get(f"/api/sessions/{session_id}/results").json()
+    assert body["finished_early"] is True
+    assert body["posttest_score"] is None
+    assert body["delta"] is None
+    assert body["rounds_played"] == 2
+    assert len(body["rounds"]) == 2
+    for competency in body["competency_map"].values():
+        assert competency["post_score"] is None
+        assert competency["post_total"] is None
+        assert competency["test_delta"] is None
+    assert "finished early" in body["share_text"]
+
+    # A finished-early session is complete: no more rounds and no post-test.
+    assert client.post(f"/api/sessions/{session_id}/rounds/next").status_code == 409
+    assert client.post(
+        f"/api/sessions/{session_id}/posttest",
+        json={"answers": [0, 0, 0, 0, 0]},
+    ).status_code == 409
+
+
+def test_finish_early_requires_a_played_round(client) -> None:
+    session_id = create_started_session(client)
+    # Nothing has been shown yet, so there is no honest partial state to report.
+    refused = client.post(f"/api/sessions/{session_id}/finish-early")
+    assert refused.status_code == 409
+    assert refused.json()["detail"] == "Play at least one round before finishing early."
+
+
 def test_demo_reorders_only_the_verified_deck_by_weakest_competency(
     test_settings, monkeypatch
 ) -> None:

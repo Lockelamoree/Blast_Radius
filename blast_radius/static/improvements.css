@@ -163,6 +163,27 @@ progress.mastery-track::-moz-progress-bar {
   color: var(--orange);
 }
 
+.finish-early-row {
+  margin: 18px 0 0;
+  text-align: center;
+}
+
+.linklike {
+  padding: 4px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: 11px/1.4 var(--mono);
+  letter-spacing: .06em;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.linklike:hover {
+  color: var(--acid);
+}
+
 .round-provenance {
   margin: 0 0 12px;
   padding: 10px 12px;

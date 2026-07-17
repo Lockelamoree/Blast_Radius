@@ -159,7 +159,7 @@ def test_judge_path_hotfixes_lock_grading_and_render_honest_states() -> None:
     # Transient failures retry with backoff; 409s resync instead of erroring.
     assert "async function apiRetry" in app
     assert "error.status=response.status" in app
-    assert app.count("apiRetry(`/api/sessions/") == 4
+    assert app.count("apiRetry(`/api/sessions/") == 5
     assert app.count("error.status===409") >= 2
     assert "already recorded — continuing" in app
     # Multi-second round fetches show a busy state; reserved budget is labeled.
@@ -226,6 +226,28 @@ def test_verdict_receipt_renders_provenance_tells_and_divergence() -> None:
     # Styling exists for the new elements.
     assert ".verdict-provenance" in css
     assert ".tell-chip" in css
+
+
+def test_finish_early_link_and_partial_results_are_wired() -> None:
+    root = Path(__file__).parents[1]
+    template = (root / "blast_radius" / "templates" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    app = (root / "blast_radius" / "static" / "app.js").read_text(encoding="utf-8")
+    css = (root / "blast_radius" / "static" / "improvements.css").read_text(
+        encoding="utf-8"
+    )
+
+    # A quiet round-screen link finishes early; it only appears from round 2 on.
+    assert 'id="finish-early"' in template
+    assert "see what you've shown so far" in template
+    assert "finish-early`,{method:'POST'}" in app
+    assert "data.round_number<2" in app
+    # Early finish is honest: no fabricated delta, post score, or per-competency post.
+    assert "data.finished_early" in app
+    assert "post-test skipped — delta not measured" in app
+    assert "value.post_score===null" in app
+    assert ".linklike" in css
 
 
 def test_results_recap_and_fresh_deck_cta_are_wired() -> None:

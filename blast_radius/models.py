@@ -352,6 +352,7 @@ class SessionState(BaseModel):
     posttest_answers: list[int] | None = None
     posttest_score: int | None = None
     posttest_competency: dict[str, dict[str, int]] = Field(default_factory=dict)
+    finished_early: bool = False
     scenario_order: list[str]
     current_index: int = 0
     active_scenario_id: str | None = None
@@ -375,9 +376,10 @@ class CompetencyProgress(BaseModel):
     mastery_percent: int = Field(ge=0, le=100)
     pre_score: int = Field(ge=0)
     pre_total: int = Field(ge=0)
-    post_score: int = Field(ge=0)
-    post_total: int = Field(ge=0)
-    test_delta: int
+    # Post-test fields are null when a session is finished early (never fabricated).
+    post_score: int | None = Field(default=None, ge=0)
+    post_total: int | None = Field(default=None, ge=0)
+    test_delta: int | None = None
 
 
 class RoundSummary(BaseModel):
@@ -396,9 +398,10 @@ class CompetencyRef(BaseModel):
 class LearnerProgress(BaseModel):
     session_id: str
     pretest_score: int
-    posttest_score: int
+    posttest_score: int | None = None
     test_total: int
-    delta: int
+    delta: int | None = None
+    finished_early: bool = False
     rounds_played: int
     rounds_generated: int
     competency_map: dict[Competency, CompetencyProgress]

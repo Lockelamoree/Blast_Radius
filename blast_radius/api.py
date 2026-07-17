@@ -341,7 +341,7 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
     ) -> dict:
         if state.pretest_score is None:
             raise HTTPException(status_code=409, detail="Complete the pre-test first.")
-        if state.posttest_score is not None:
+        if state.posttest_score is not None or state.finished_early:
             raise HTTPException(status_code=409, detail="This session is complete.")
         if state.current_index >= len(state.scenario_order):
             return {
@@ -472,6 +472,8 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
         decision: PlayerDecision,
         state: SessionState,
     ) -> dict:
+        if state.finished_early:
+            raise HTTPException(status_code=409, detail="This session was finished early.")
         limit_round_request(request, session_id)
         # Duplicate check runs first: after a processed decision the active slot is
         # cleared, so a client retry must hear the truth, not "request a round".
@@ -537,6 +539,10 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
         load_session(session_id, request)
         async with session_mutations.hold(session_id):
             state = reload_session(session_id)
+            if state.finished_early:
+                raise HTTPException(
+                    status_code=409, detail="This session was finished early."
+                )
             if state.current_index < len(state.scenario_order) or state.active_scenario_id:
                 raise HTTPException(
                     status_code=409, detail="Finish all rounds before the post-test."
@@ -555,16 +561,47 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
                 "total": engine.bank.assessment_size,
             }
 
+    @router.post("/sessions/{session_id}/finish-early")
+    async def finish_early(session_id: str, request: Request) -> dict:
+        load_session(session_id, request)
+        async with session_mutations.hold(session_id):
+            state = reload_session(session_id)
+            if state.pretest_score is None:
+                raise HTTPException(status_code=409, detail="Complete the pre-test first.")
+            if state.posttest_score is not None:
+                raise HTTPException(
+                    status_code=409, detail="This session is already complete."
+                )
+            if not state.grades:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Play at least one round before finishing early.",
+                )
+            state.finished_early = True
+            # Drop any in-flight round so results reflect only answered rounds.
+            state.active_scenario_id = None
+            state.active_scenario_json = None
+            state.active_anchor_id = None
+            state.active_provenance = None
+            state.active_generation_status = None
+            store.save(state)
+            return {"finished_early": True, "rounds_played": len(state.grades)}
+
     @router.get("/sessions/{session_id}/results", response_model=LearnerProgress)
     def results(state: SessionDep) -> LearnerProgress:
-        if state.pretest_score is None or state.posttest_score is None:
+        if state.pretest_score is None:
+            raise HTTPException(status_code=409, detail="Complete the session to view results.")
+        finished_early = state.posttest_score is None
+        if finished_early and not state.finished_early:
             raise HTTPException(status_code=409, detail="Complete the session to view results.")
         average = (
             round(sum(grade.reasoning_score for grade in state.grades) / len(state.grades))
             if state.grades
             else 0
         )
-        delta = state.posttest_score - state.pretest_score
+        # A finished-early session never took the post-test, so the delta is not
+        # measured — report it null rather than fabricate a number.
+        delta = None if finished_early else state.posttest_score - state.pretest_score
         competency_map: dict[Competency, CompetencyProgress] = {}
         for competency in Competency:
             round_record = state.competency.get(
@@ -586,9 +623,11 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
                 mastery_percent=round(100 * hits / total_signals) if total_signals else 0,
                 pre_score=pre.get("score", 0),
                 pre_total=pre.get("total", 0),
-                post_score=post.get("score", 0),
-                post_total=post.get("total", 0),
-                test_delta=post.get("score", 0) - pre.get("score", 0),
+                post_score=None if finished_early else post.get("score", 0),
+                post_total=None if finished_early else post.get("total", 0),
+                test_delta=(
+                    None if finished_early else post.get("score", 0) - pre.get("score", 0)
+                ),
             )
         test_total = engine.bank.assessment_size
         weakest = min(Competency, key=lambda item: competency_accuracy(state, item))
@@ -602,21 +641,30 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
             )
             for index, grade in enumerate(state.grades)
         ]
+        if finished_early:
+            share_text = (
+                f"I ran Blast Radius: pre {state.pretest_score}/{test_total}, "
+                f"{len(state.grades)} agent decisions reviewed, {average}% average tell "
+                f"coverage (finished early — post-test not taken)."
+            )
+        else:
+            share_text = (
+                f"I completed Blast Radius: pre {state.pretest_score}/{test_total} → "
+                f"post {state.posttest_score}/{test_total}, {len(state.grades)} agent decisions, "
+                f"{state.rounds_generated} generated variations, and {average}% average tell coverage."
+            )
         return LearnerProgress(
             session_id=state.id,
             pretest_score=state.pretest_score,
             posttest_score=state.posttest_score,
             test_total=test_total,
             delta=delta,
+            finished_early=finished_early,
             rounds_played=len(state.grades),
             rounds_generated=state.rounds_generated,
             competency_map=competency_map,
             average_reasoning_score=average,
-            share_text=(
-                f"I completed Blast Radius: pre {state.pretest_score}/{test_total} → "
-                f"post {state.posttest_score}/{test_total}, {len(state.grades)} agent decisions, "
-                f"{state.rounds_generated} generated variations, and {average}% average tell coverage."
-            ),
+            share_text=share_text,
             rounds=round_recap,
             weakest_competency=CompetencyRef(
                 key=weakest.value, label=COMPETENCY_LABELS[weakest]
