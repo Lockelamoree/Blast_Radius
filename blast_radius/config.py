@@ -23,6 +23,25 @@ def _as_revision(value: str | None) -> str:
     return "unknown"
 
 
+def parse_access_codes(raw: str) -> dict[str, str]:
+    """Parse ``"judge:CODE,developer:CODE2"`` (or a bare ``"CODE"``) into a
+    ``{code: label}`` map. Blank entries are ignored; a missing label becomes
+    ``"guest"``. Codes are matched exactly, so keep them long and random."""
+    codes: dict[str, str] = {}
+    for entry in raw.split(","):
+        entry = entry.strip()
+        if not entry:
+            continue
+        label, separator, code = entry.partition(":")
+        if not separator:
+            label, code = "guest", entry
+        code = code.strip()
+        label = label.strip() or "guest"
+        if code:
+            codes[code] = label
+    return codes
+
+
 @dataclass(frozen=True)
 class Settings:
     base_dir: Path = Path(__file__).resolve().parent
@@ -68,10 +87,29 @@ class Settings:
     reasoning_max_output_tokens: int = int(
         os.getenv("BLAST_RADIUS_REASONING_MAX_OUTPUT_TOKENS", "2048")
     )
+    # Access gate: when both a secret and at least one code are configured, every
+    # route except /healthz, /access, /logout and /static is gated behind a
+    # signed cookie. Absent config = open (keeps local dev and tests ungated).
+    access_codes: str = os.getenv("BLAST_RADIUS_ACCESS_CODES", "")
+    auth_secret: str = os.getenv("BLAST_RADIUS_AUTH_SECRET", "")
+    auth_cookie_secure: bool = _as_bool(
+        os.getenv("BLAST_RADIUS_AUTH_COOKIE_SECURE"), True
+    )
+    auth_cookie_ttl_days: int = int(
+        os.getenv("BLAST_RADIUS_AUTH_COOKIE_TTL_DAYS", "30")
+    )
 
     @property
     def data_dir(self) -> Path:
         return self.base_dir / "data"
+
+    @property
+    def access_code_map(self) -> dict[str, str]:
+        return parse_access_codes(self.access_codes)
+
+    @property
+    def auth_enabled(self) -> bool:
+        return bool(self.auth_secret) and bool(self.access_code_map)
 
 
 settings = Settings()

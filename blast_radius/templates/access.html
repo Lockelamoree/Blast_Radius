@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Blast Radius · Private preview</title>
+  <style>
+    :root{--ink:#f4f1e8;--muted:#9d9a91;--black:#090a09;--panel:#111310;--line:#2a2d27;--acid:#c8ff3d;--orange:#ff6738;--serif:Georgia,"Times New Roman",serif;--mono:"Cascadia Mono","SFMono-Regular",Consolas,monospace;--sans:Inter,Arial,sans-serif}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(circle at 80% 15%,rgba(200,255,61,.055),transparent 28%),var(--black);color:var(--ink);font-family:var(--sans)}
+    .card{width:100%;max-width:430px;border:1px solid var(--line);background:var(--panel);padding:34px}
+    .brand{display:flex;align-items:center;gap:12px;font-family:var(--mono);font-size:13px;letter-spacing:.17em;margin-bottom:30px}
+    .brand-mark{display:grid;place-items:center;width:34px;height:34px;border:1px solid var(--acid);color:var(--acid);font-weight:800}
+    .kicker{font:700 11px/1.4 var(--mono);letter-spacing:.16em;color:var(--acid);text-transform:uppercase;margin:0 0 14px}
+    h1{font:400 34px/1.05 var(--serif);letter-spacing:-.02em;margin:0 0 14px}
+    .lede{color:#c3c1b8;font-size:14px;line-height:1.6;margin:0 0 24px}
+    form{display:flex;flex-direction:column;gap:12px}
+    input[type=text]{width:100%;background:#090a09;border:1px solid var(--line);color:var(--ink);padding:13px;font:13px var(--mono);letter-spacing:.04em}
+    input[type=text]:focus{outline:1px solid var(--acid);border-color:var(--acid)}
+    button{border:1px solid var(--acid);background:var(--acid);color:#111;cursor:pointer;padding:13px 19px;font:700 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;transition:.2s ease}
+    button:hover{transform:translateY(-1px)}
+    .error{border-left:2px solid var(--orange);color:#ffb89e;font:12px/1.5 var(--sans);padding:8px 0 8px 12px;margin:0 0 6px}
+    .foot{color:#6f736a;font:10px/1.5 var(--mono);letter-spacing:.04em;text-transform:uppercase;margin:22px 0 0}
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="brand"><span class="brand-mark">BR</span><span>BLAST RADIUS</span></div>
+    <p class="kicker">Private preview</p>
+    <h1>Enter your access code</h1>
+    <p class="lede">Blast Radius is open to Devpost judges and selected developers for now. Enter the code you were given to continue.</p>
+    {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+    <form method="post" action="/access" autocomplete="off">
+      <input type="hidden" name="next" value="{{ next }}">
+      <input type="text" name="code" placeholder="access code" aria-label="Access code" autofocus spellcheck="false" autocapitalize="off">
+      <button type="submit">Unlock →</button>
+    </form>
+    <p class="foot">No code? Ask the team for access.</p>
+  </main>
+</body>
+</html>
