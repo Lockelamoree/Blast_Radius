@@ -114,11 +114,16 @@ pre-commit hook or CI step. A `config` check needs the sandbox root expressed as
 **GitHub Action** — gate-verify scenario drafts and screen a PR diff, no secrets required:
 
 ```yaml
-- uses: Lockelamoree/Blast_Radius@main
+- uses: Lockelamoree/Blast_Radius@v1
   with:
     scenarios: "scenarios/*.json"
     diff-base: ${{ github.event.pull_request.base.sha }}
+    fail-on: reject          # or 'sandbox' (strict) / 'never' (advisory, never fails CI)
 ```
+
+The scenario gate (`scenarios`) is exact — safe to require. The diff screen (`diff-base`)
+is a deterministic keyword heuristic that can false-positive; start with `fail-on: never`
+and tighten once you trust it. The Action sets up Python itself and needs no secrets.
 
 **MCP server** — let an MCP-aware agent self-check its own actions. Install the extra and register it:
 

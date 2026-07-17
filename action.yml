@@ -1,8 +1,12 @@
 name: "Blast Radius verify"
 description: >-
-  Run the Blast Radius production correctness gate over scenario drafts and,
-  optionally, screen a pull request's diff for known red-flag patterns.
-  Deterministic and offline — no model runs and no secrets are required.
+  Gate-verify Blast Radius scenario drafts and screen a PR diff for known
+  agent-security red flags. Fully deterministic and offline — no model, no
+  secrets. The scenario gate is exact; the diff screen is a keyword heuristic,
+  not a proof of safety (use fail-on: never for advisory mode).
+branding:
+  icon: shield
+  color: green
 
 inputs:
   scenarios:
@@ -21,6 +25,12 @@ inputs:
 runs:
   using: "composite"
   steps:
+    # Guarantee a supported interpreter on any runner (the package needs >=3.11);
+    # relying on the runner's default python3 breaks on older/self-hosted images.
+    - name: Set up Python
+      uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+      with:
+        python-version: "3.x"
     - name: Install Blast Radius
       shell: bash
       run: python3 -m pip install "${GITHUB_ACTION_PATH}"
