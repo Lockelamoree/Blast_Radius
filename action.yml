@@ -18,6 +18,17 @@ inputs:
     required: false
     default: "reject"
 
+outputs:
+  verdict:
+    description: "Diff screen verdict: reject-recommended | sandbox-recommended | looks-scoped."
+    value: ${{ steps.screen.outputs.verdict }}
+  critical:
+    description: "Count of critical red-flag findings in the screened diff."
+    value: ${{ steps.screen.outputs.critical }}
+  caution:
+    description: "Count of caution findings in the screened diff."
+    value: ${{ steps.screen.outputs.caution }}
+
 runs:
   using: "composite"
   steps:
@@ -31,6 +42,7 @@ runs:
       shell: bash
       run: python3 -m pip install "${GITHUB_ACTION_PATH}"
     - name: Verify scenarios and screen the diff
+      id: screen
       shell: bash
       env:
         BR_SCENARIOS: ${{ inputs.scenarios }}

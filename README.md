@@ -128,7 +128,9 @@ pre-commit hook or CI step. A `config` check needs the sandbox root expressed as
 
 The scenario gate (`scenarios`) is exact — safe to require. The diff screen (`diff-base`)
 is a deterministic keyword heuristic that can false-positive; start with `fail-on: never`
-and tighten once you trust it. The Action sets up Python itself and needs no secrets.
+and tighten once you trust it. The Action sets up Python itself and needs no secrets. It writes
+a per-run **step summary** (verdict + matched flags) and exposes `verdict`, `critical`, and
+`caution` step outputs for downstream steps.
 
 **MCP server** — let an MCP-aware agent self-check its own actions. Install the extra and register it:
 
@@ -141,6 +143,14 @@ pip install "blast-radius[mcp]"
 ```
 
 Tools: `check_artifact`, `verify_scenario`, `get_learn_module`, `get_toolkit_card`.
+
+**Supervisor hook (Codex CLI / Claude Code)** — turn the game into a guardrail. A `PreToolUse`
+hook screens every Bash command your agent proposes and **denies** the ones that trip a known red
+flag — the same engine, now guarding a live approval loop. It fails open (never bricks the agent)
+and never claims a command is safe. `blastradius-supervise` ships with the package; drop
+[`integrations/codex/hooks.json`](integrations/codex/hooks.json) into `~/.codex/` (or add the same
+command to `.claude/settings.json`), and tune the deny threshold with `BLAST_RADIUS_FAIL_ON`. See
+[integrations/codex/README.md](integrations/codex/README.md).
 
 **Daily drill & team board** — a one-round, no-signup `drill` mode (a fresh scenario per browser
 per day, with a browser-local streak and spaced-repetition callbacks) keeps the habit going, and

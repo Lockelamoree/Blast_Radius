@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "blastradius-supervise",
+            "statusMessage": "Blast Radius screening the command",
+            "timeout": 20
+          }
+        ]
+      }
+    ]
+  }
+}
