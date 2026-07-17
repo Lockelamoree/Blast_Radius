@@ -19,6 +19,7 @@ from blast_radius.engine.openai_adapter import SessionLLMBudget
 from blast_radius.models import (
     COMPETENCY_LABELS,
     AssessmentForm,
+    CoachReply,
     Competency,
     CompetencyProgress,
     CompetencyRef,
@@ -42,6 +43,12 @@ class CreateSessionRequest(BaseModel):
 class TestAnswersRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     answers: list[int] = Field(min_length=1, max_length=100)
+
+
+class ReflectRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    scenario_id: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]{2,80}$")
+    question: str = Field(min_length=8, max_length=500)
 
 
 logger = logging.getLogger(__name__)
@@ -536,6 +543,62 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
                 decision,
                 reload_session(session_id),
             )
+
+    @router.post("/sessions/{session_id}/rounds/reflect", response_model=CoachReply)
+    async def reflect_on_round(
+        session_id: str,
+        request: Request,
+        payload: ReflectRequest,
+    ) -> CoachReply:
+        load_session(session_id, request)
+        async with session_mutations.hold(session_id):
+            state = reload_session(session_id)
+            # Coaching is bank-only: generated live-* ground truth is discarded at submit.
+            if payload.scenario_id not in engine.bank.scenarios:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Reflection is available for verified rounds only.",
+                )
+            grade = next(
+                (
+                    result
+                    for result in reversed(state.grades)
+                    if result.scenario_id == payload.scenario_id
+                ),
+                None,
+            )
+            if grade is None:
+                raise HTTPException(
+                    status_code=409, detail="Answer this round before reflecting on it."
+                )
+            if payload.scenario_id in state.reflected_scenario_ids:
+                raise HTTPException(
+                    status_code=409,
+                    detail="You have already used this round's reflection.",
+                )
+            # Reserve one grading call per remaining round so the optional coach can
+            # never starve the critic; if the floor would break, coach deterministically.
+            remaining_rounds = len(state.scenario_order) - state.current_index
+            floor_ok = (
+                state.llm_calls_used + 1 + remaining_rounds <= settings.session_llm_call_cap
+            )
+            session_budget = SessionLLMBudget(
+                limit=settings.session_llm_call_cap if floor_ok else 0,
+                used=state.llm_calls_used if floor_ok else 0,
+            )
+            reply = await engine.coach(
+                engine.bank.get(payload.scenario_id),
+                grade.matched_tells,
+                grade.missed_tells,
+                payload.question,
+                safety_identifier=state.id,
+                session_budget=session_budget,
+            )
+            if floor_ok:
+                state.llm_calls_used = session_budget.used
+            state.reflected_scenario_ids.append(payload.scenario_id)
+            store.save(state)
+            return reply
 
     @router.post("/sessions/{session_id}/posttest")
     async def submit_posttest(

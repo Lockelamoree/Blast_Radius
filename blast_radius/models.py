@@ -321,6 +321,12 @@ class GradeResult(BaseModel):
     policy_deltas: list[PolicyDelta] | None = None
 
 
+class CoachReply(BaseModel):
+    feedback: str
+    addressed_tell: str | None = None
+    coached_by: str = "deterministic"
+
+
 class TestQuestion(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -371,6 +377,7 @@ class SessionState(BaseModel):
     active_generation_status: GenerationStatus | None = None
     last_gate_fallback_reason: str | None = None
     answered_scenario_ids: list[str] = Field(default_factory=list)
+    reflected_scenario_ids: list[str] = Field(default_factory=list)
     shown_scenario_ids: list[str] = Field(default_factory=list)
     llm_calls_used: int = Field(default=0, ge=0)
     rounds_generated: int = Field(default=0, ge=0)

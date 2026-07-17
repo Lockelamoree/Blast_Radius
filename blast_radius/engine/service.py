@@ -18,6 +18,7 @@ from blast_radius.engine.openai_adapter import (
     SessionLLMBudget,
 )
 from blast_radius.models import (
+    CoachReply,
     GenerationStatus,
     GradeResult,
     PlayerDecision,
@@ -404,3 +405,55 @@ class TrustEngine:
             review.response_id,
         )
         return grade
+
+    async def coach(
+        self,
+        scenario: Scenario,
+        matched_tells: list[str],
+        missed_tells: list[str],
+        question: str,
+        *,
+        safety_identifier: str | None = None,
+        session_budget: SessionLLMBudget | None = None,
+    ) -> CoachReply:
+        """One bounded Socratic exchange grounded in verified ground truth.
+
+        Falls back to a deterministic, tell-focused nudge whenever the critic is
+        unavailable, times out, or the budget floor reserves the call for grading.
+        """
+        if self.openai.grading_enabled:
+            try:
+                review = await self.openai.coach_reflection(
+                    scenario,
+                    matched_tells,
+                    missed_tells,
+                    question,
+                    safety_identifier=safety_identifier,
+                    session_budget=session_budget,
+                )
+            except Exception as exc:
+                logger.warning("OpenAI coach reflection failed (%s)", type(exc).__name__)
+                review = None
+            if review is not None:
+                allowed = set(scenario.ground_truth.tells)
+                addressed = review.value.addressed_tell.strip()
+                return CoachReply(
+                    feedback=review.value.feedback.strip(),
+                    addressed_tell=addressed if addressed in allowed else None,
+                    coached_by=review.response_model,
+                )
+        if missed_tells:
+            feedback = (
+                f"You haven't yet named the tell “{missed_tells[0]}”. Which detail in the "
+                "artifacts would let you point to it directly?"
+            )
+            addressed_tell: str | None = missed_tells[0]
+        else:
+            feedback = (
+                "You named every tell in this round. Which single control would most reduce "
+                "the blast radius if this pattern recurs?"
+            )
+            addressed_tell = None
+        return CoachReply(
+            feedback=feedback, addressed_tell=addressed_tell, coached_by="deterministic"
+        )

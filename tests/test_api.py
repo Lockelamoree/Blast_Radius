@@ -455,6 +455,54 @@ def test_finish_early_requires_a_played_round(client) -> None:
     assert refused.json()["detail"] == "Play at least one round before finishing early."
 
 
+def test_reflect_returns_a_bounded_coach_reply_for_a_bank_round(client) -> None:
+    session_id = create_started_session(client)
+    round_data = client.post(f"/api/sessions/{session_id}/rounds/next").json()
+    scenario_id = round_data["scenario"]["id"]
+    client.post(
+        f"/api/sessions/{session_id}/decisions",
+        json={
+            "scenario_id": scenario_id,
+            "action": "reject",
+            "reasoning_text": "This does not feel right but I cannot say exactly why.",
+        },
+    )
+    reflect = client.post(
+        f"/api/sessions/{session_id}/rounds/reflect",
+        json={"scenario_id": scenario_id, "question": "What did I miss on this round?"},
+    )
+    assert reflect.status_code == 200
+    body = reflect.json()
+    assert body["feedback"]
+    # No key in tests, so the deterministic coach answers.
+    assert body["coached_by"] == "deterministic"
+    # One exchange per round — a second reflection on the same round is refused.
+    again = client.post(
+        f"/api/sessions/{session_id}/rounds/reflect",
+        json={"scenario_id": scenario_id, "question": "Can you tell me more please?"},
+    )
+    assert again.status_code == 409
+    assert again.json()["detail"] == "You have already used this round's reflection."
+
+
+def test_reflect_requires_an_answered_bank_round(client) -> None:
+    session_id = create_started_session(client)
+    round_data = client.post(f"/api/sessions/{session_id}/rounds/next").json()
+    # A round that was never answered cannot be reflected on.
+    unanswered = client.post(
+        f"/api/sessions/{session_id}/rounds/reflect",
+        json={"scenario_id": round_data["scenario"]["id"], "question": "Why is this wrong?"},
+    )
+    assert unanswered.status_code == 409
+    # Generated rounds keep no server-side ground truth, so live-* ids are refused.
+    live = client.post(
+        f"/api/sessions/{session_id}/rounds/reflect",
+        json={"scenario_id": "live-deadbeef", "question": "What about this one then?"},
+    )
+    assert live.status_code == 409
+    assert live.json()["detail"] == "Reflection is available for verified rounds only."
+
+
 def test_demo_reorders_only_the_verified_deck_by_weakest_competency(
     test_settings, monkeypatch
 ) -> None:

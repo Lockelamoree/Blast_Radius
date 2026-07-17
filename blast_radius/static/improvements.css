@@ -513,6 +513,33 @@ progress.mastery-track::-moz-progress-bar {
   color: var(--blue);
 }
 
+.reflect {
+  margin: 20px 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+}
+
+.reflect textarea {
+  width: 100%;
+  min-height: 60px;
+  margin: 8px 0 10px;
+  resize: vertical;
+  background: #090a09;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  padding: 10px;
+  font: 12px/1.5 var(--mono);
+}
+
+.reflect-reply {
+  margin: 12px 0 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--acid);
+  color: #c8ccc0;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
 .button:disabled {
   opacity: .45;
   cursor: not-allowed;

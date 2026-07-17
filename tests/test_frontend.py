@@ -231,6 +231,25 @@ def test_verdict_receipt_renders_provenance_tells_and_divergence() -> None:
     assert ".tell-chip" in css
 
 
+def test_socratic_coach_reflection_is_wired() -> None:
+    root = Path(__file__).parents[1]
+    template = (root / "blast_radius" / "templates" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    app = (root / "blast_radius" / "static" / "app.js").read_text(encoding="utf-8")
+    css = (root / "blast_radius" / "static" / "improvements.css").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'id="reflect-block"' in template
+    assert 'id="reflect-input"' in template
+    assert "ASK THE COACH" in template
+    assert "rounds/reflect`" in app
+    # Bank-only: generated rounds never expose a reflection.
+    assert "state.scenario.id.startsWith('live-')" in app
+    assert ".reflect-reply" in css
+
+
 def test_sandbox_policy_debrief_table_is_wired() -> None:
     root = Path(__file__).parents[1]
     template = (root / "blast_radius" / "templates" / "index.html").read_text(
