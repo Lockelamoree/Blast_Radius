@@ -1,0 +1,37 @@
+name: Blast Radius screen
+
+# Dogfoods the repo's own "Blast Radius verify" action: on every pull request it
+# screens the PR diff's added lines through the deterministic red-flag inspector
+# and prints the report. Also runnable on demand from the Actions tab.
+#
+# This uses the action from the current checkout (`uses: ./`) so the workflow
+# always exercises the code in the branch under review. External consumers
+# reference the published Marketplace tag instead:
+#     uses: Lockelamoree/Blast_Radius@v1
+#
+# Report-only by design: this is a security-training corpus, so scenario
+# artifacts, detector keywords, and test fixtures deliberately contain red-flag
+# strings. `fail-on: never` prints every finding without failing CI on the
+# tool's own teaching material. In a normal application repo you would use the
+# default `fail-on: reject` so a real red flag blocks the merge.
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  screen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0 # full history so the diff base and merge-base resolve
+      - name: Screen the diff for agent-security red flags
+        uses: ./
+        with:
+          # On a PR: the base branch tip. On a manual run: the previous commit.
+          diff-base: ${{ github.event.pull_request.base.sha || 'HEAD~1' }}
+          fail-on: never
