@@ -2,6 +2,8 @@ import json
 import re
 from pathlib import Path
 
+from blast_radius.models import BlastRadiusConfig, ScenarioFamily
+
 
 def test_results_render_measured_values_without_hardcoded_zero_scores() -> None:
     root = Path(__file__).parents[1]
@@ -187,7 +189,7 @@ def test_judge_path_hotfixes_lock_grading_and_render_honest_states() -> None:
     # Static assets share one current cache-bust version.
     versions = set(re.findall(r"\?v=([\w-]+)", template))
     assert len(versions) == 1, f"static cache-bust versions diverged: {versions}"
-    assert len(re.findall(r"\?v=", template)) == 4
+    assert len(re.findall(r"\?v=", template)) == 5
     # The first assessment question is announced (screen active before render).
     assert app.count("show('test');renderQuestion();") == 2
     assert "renderQuestion();show('test');" not in app
@@ -227,6 +229,37 @@ def test_verdict_receipt_renders_provenance_tells_and_divergence() -> None:
     # Styling exists for the new elements.
     assert ".verdict-provenance" in css
     assert ".tell-chip" in css
+
+
+def test_guardrail_export_is_wired_and_covers_every_family() -> None:
+    root = Path(__file__).parents[1]
+    template = (root / "blast_radius" / "templates" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    guardrails = (root / "blast_radius" / "static" / "guardrails.js").read_text(
+        encoding="utf-8"
+    )
+    css = (root / "blast_radius" / "static" / "improvements.css").read_text(
+        encoding="utf-8"
+    )
+
+    # Export controls live on the results screen and the script is loaded.
+    assert 'id="copy-guardrails"' in template
+    assert 'id="download-guardrails"' in template
+    assert "/static/guardrails.js?v=" in template
+    assert ".guardrail-export" in css
+    # The static map covers all six families using the real BlastRadiusConfig fields.
+    for family in ScenarioFamily:
+        assert family.value in guardrails
+    for field in BlastRadiusConfig.model_fields:
+        assert field in guardrails
+    # Deterministic and honest: reads the finished session, cites https receipts,
+    # states it makes no model calls, and never issues a network request.
+    assert "state.results" in guardrails
+    assert "buildGuardrailDoc" in guardrails
+    assert "https://" in guardrails
+    assert "no model calls" in guardrails
+    assert "fetch(" not in guardrails
 
 
 def test_landing_proof_card_cites_the_committed_receipt() -> None:
@@ -348,3 +381,4 @@ def test_social_metadata_and_static_assets_are_cache_busted() -> None:
     assert "/static/improvements.css?v=" in template
     assert "/static/app.js?v=" in template
     assert "/static/integrity-check.js?v=" in template
+    assert "/static/guardrails.js?v=" in template
