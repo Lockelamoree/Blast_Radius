@@ -130,13 +130,19 @@ def test_assessment_and_score_labels_are_accessible_and_honest() -> None:
     assert "reasoning score" not in template
     assert "tell coverage, ${$('#tells-named').textContent} tells.`" in app
     assert "tell coverage`)" in app
-    # The self-catch reads as a trust win, not an error: blocked, plainly why.
+    # The self-catch reads as a trust win, not an error: blocked, plainly why,
+    # and closing on the payoff that the same gate runs on everything shown.
     assert "BLOCKED BEFORE DISPLAY" in integrity
     assert "you never saw the fake" in integrity
-    assert "WE PLANTED" in integrity
-    assert "GATE CAUGHT IT" in integrity
+    assert "you can trust what you do see" in integrity
     assert "case=${selectedCase}" in integrity
     assert "review.planted_claim" in integrity
+    # Three numbered beats make the plant visible: real scenario, injected lie,
+    # then the deterministic (no-AI) catch. Lock the full labels, not fragments.
+    assert "1 · THE REAL SCENARIO YOU WOULD SEE" in integrity
+    assert "2 · WE PLANTED THIS LIE" in integrity
+    assert "3 · HOW THE GATE CAUGHT IT · NO AI" in integrity
+    assert "reqeusts==2.32.0" in integrity
 
 
 def test_judge_path_hotfixes_lock_grading_and_render_honest_states() -> None:
@@ -185,9 +191,16 @@ def test_judge_path_hotfixes_lock_grading_and_render_honest_states() -> None:
     assert 'id="grading-status" class="microcopy hidden" aria-live="polite"' in template
     assert "#grading-status::before" in css
     assert ".button:disabled" in css
-    # Self-catch result: claim named once, invariant on its own line, cycle hint.
-    assert "review.reasons.join(' · ').replace(`: ${review.planted_claim}`, '')" in integrity
+    # Self-catch result: the raw gate log is surfaced verbatim as a receipt, and
+    # the panel cycles to the next plant.
+    assert "review.reasons.join(' · ')" in integrity
+    assert "gate log ·" in integrity
     assert "next plant" in integrity
+    # Beat styling: the lie beat is danger-orange, the gate beat is acid, and the
+    # verdict carries the trust-payoff sub-line.
+    assert ".gate-beat.step-lie" in css
+    assert ".gate-beat.step-gate" in css
+    assert ".gate-verdict-sub" in css
     # Static assets share one current cache-bust version.
     versions = set(re.findall(r"\?v=([\w-]+)", template))
     assert len(versions) == 1, f"static cache-bust versions diverged: {versions}"
