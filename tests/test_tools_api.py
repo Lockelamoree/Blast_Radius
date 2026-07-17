@@ -183,6 +183,20 @@ def test_gate_verify_is_developer_only(test_settings: Settings) -> None:
         assert client.post("/api/check", json={"kind": "command", "content": "ls"}).status_code == 200
 
 
+def test_eval_model_route_is_read_only_and_honest(client: TestClient) -> None:
+    # The route serves the committed human-vs-model baseline, or an honest empty
+    # state until one is generated. Either way it never 500s and is shape-stable.
+    body = client.get("/api/eval/model").json()
+    assert isinstance(body["available"], bool)
+    if body["available"]:
+        report = body["report"]
+        assert report["graded_by"] == "deterministic"
+        assert 0 <= report["action_accuracy"] <= 100
+        assert "oversight_bias" in report
+    else:
+        assert "blastradius eval-model" in body["note"]
+
+
 def test_gate_verify_hides_the_draft_schema_from_a_judge(test_settings: Settings) -> None:
     # A restricted judge sending a malformed body must be rejected with 403 by the
     # role dependency BEFORE Pydantic validates the body — a 422 would enumerate the

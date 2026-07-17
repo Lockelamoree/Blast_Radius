@@ -188,6 +188,21 @@ Useful endpoints:
 | `POST /api/sessions/{id}/posttest` | Submit the distinct shuffled transfer form |
 | `GET /api/sessions/{id}/results` | Retrieve competency and pre/post results |
 | `GET /api/team/summary` | Developer-role aggregate of finished-session summaries (team board) |
+| `GET /api/eval/model` | Read-only human-vs-model oversight scorecard (or an honest empty state) |
+
+### Human vs. model oversight
+
+The same engine can score a *model* instead of a person. `blastradius eval-model`
+runs GPT-5.6 as a player through the exact 18 scenarios — it produces the same
+approve/sandbox/reject call and one-sentence tell a human does, and is graded by
+the identical deterministic gate (`grade_decision`). The model never gates
+anything and never sees the ground truth; it is scored on the same evidence a
+human works from, including the [oversight-bias](blast_radius/engine/grader.py)
+axis (over-approval vs. over-restriction) that a human session reports. The
+committed baseline is served read-only at `GET /api/eval/model`; the harness is
+pure and provider-free (`blast_radius/eval/model_eval.py`), so the grading path
+is fully tested with a stub. This is a falsifiable trust claim a gate-less tool
+cannot make: the model takes the same test, on the same gate, as the human.
 
 Under the access gate, `/api/check` accepts any code; `/api/gate/verify` is developer-role only
 (it backs `/author`). The offline CLI is the always-open daily-tool path. `/api/gate/verify`

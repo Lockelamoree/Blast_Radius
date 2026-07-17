@@ -1085,9 +1085,9 @@ def _bias_grade(action: str, correct: str):
 
 
 def test_oversight_bias_classifies_wrong_calls_by_direction() -> None:
-    from blast_radius.api import _oversight_bias
+    from blast_radius.engine.grader import classify_oversight_bias
 
-    bias = _oversight_bias(
+    bias = classify_oversight_bias(
         [
             _bias_grade("approve", "reject"),  # under-contained -> over-approval
             _bias_grade("sandbox", "reject"),  # under-contained -> over-approval
@@ -1105,7 +1105,7 @@ def test_oversight_bias_classifies_wrong_calls_by_direction() -> None:
 def test_oversight_bias_is_none_without_recorded_actions() -> None:
     # Grades persisted before the action/correct_action fields existed must not
     # crash or fabricate a tendency — they are simply skipped.
-    from blast_radius.api import _oversight_bias
+    from blast_radius.engine.grader import classify_oversight_bias
     from blast_radius.models import GradeResult
 
     legacy = GradeResult(
@@ -1119,4 +1119,4 @@ def test_oversight_bias_is_none_without_recorded_actions() -> None:
         explanation="x",
         socratic_followup="y",
     )
-    assert _oversight_bias([legacy]) is None
+    assert classify_oversight_bias([legacy]) is None

@@ -58,6 +58,17 @@ def test_verify_tampered_scenario_file_fails(tmp_path, capsys) -> None:
     assert "FAIL" in capsys.readouterr().out
 
 
+def test_eval_model_subcommand_is_registered_with_defaults() -> None:
+    # The live grading path needs a key and runs on the server, so only the
+    # parser wiring is asserted here.
+    args = cli.build_parser().parse_args(["eval-model"])
+    assert args.command == "eval-model"
+    assert args.func is cli._cmd_eval_model
+    assert args.effort == "low"
+    assert args.max_output_tokens == 2000
+    assert args.model is None
+
+
 def _stdin(text: str):
     import io
 
