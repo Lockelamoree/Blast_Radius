@@ -52,8 +52,10 @@ GREEN_TELLS: frozenset[str] = frozenset(
 # at least one category below (enforced by the sync test).
 RED_TELLS: frozenset[str] = frozenset(
     {
+        "capabilities exceed the stated purpose",
         "declared job does not need secrets",
         "hidden credential upload",
+        "hidden instruction in the tool description",
         "near-miss package name",
         "not in approved lockfile",
         "production authorization bypass",
@@ -70,6 +72,7 @@ RED_TELLS: frozenset[str] = frozenset(
         "unknown publisher",
         "unrestricted egress",
         "untrusted content impersonates authority",
+        "untrusted page impersonates authority",
     }
 )
 

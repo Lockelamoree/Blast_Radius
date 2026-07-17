@@ -256,7 +256,7 @@ python3 -m venv "$RELEASE_DIR/.venv"
 chown -R root:root "$RELEASE_DIR"
 chmod -R u=rwX,go=rX "$RELEASE_DIR"
 runuser -u "$RUNTIME_USER" -- "$RELEASE_DIR/.venv/bin/python" -I -c \
-  "from blast_radius.config import Settings; from blast_radius.engine.bank import ScenarioBank; assert len(ScenarioBank(Settings().data_dir).scenarios) == 18"
+  "from blast_radius.config import Settings; from blast_radius.engine.bank import ScenarioBank; assert len(ScenarioBank(Settings().data_dir).scenarios) == 20"
 
 sed "s/blast-radius\.example\.com/$DOMAIN/g" "$RELEASE_DIR/deploy/Caddyfile" > "$CADDY_CANDIDATE"
 caddy validate --config "$CADDY_CANDIDATE" --adapter caddyfile
@@ -361,7 +361,7 @@ for _ in $(seq 1 20); do
     sleep 1
     continue
   fi
-  if python3 -c 'import json,sys; h=json.load(sys.stdin); expected=(sys.argv[2] == "true"); ok=(h.get("status") == "ok" and h.get("revision") == sys.argv[1] and h.get("bank_scenarios") == 18 and h.get("live_generation") is expected and h.get("critic_model") == "gpt-5.6-sol"); raise SystemExit(0 if ok else 1)' \
+  if python3 -c 'import json,sys; h=json.load(sys.stdin); expected=(sys.argv[2] == "true"); ok=(h.get("status") == "ok" and h.get("revision") == sys.argv[1] and h.get("bank_scenarios") == 20 and h.get("live_generation") is expected and h.get("critic_model") == "gpt-5.6-sol"); raise SystemExit(0 if ok else 1)' \
        "$DEPLOY_REVISION" "$LIVE_GENERATION_VALUE" <<< "$LOCAL_HEALTH_JSON"; then
     LOCAL_HEALTH_VALID=1
     break
@@ -419,8 +419,8 @@ if [[ "$HEALTH_REVISION" != "$DEPLOY_REVISION" ]]; then
   printf 'ERROR: health revision %s does not match deployed revision %s.\n' "$HEALTH_REVISION" "$DEPLOY_REVISION" >&2
   exit 1
 fi
-if [[ "$BANK_SCENARIOS" != "18" ]]; then
-  printf 'ERROR: expected 18 verified scenarios, health reports %s.\n' "$BANK_SCENARIOS" >&2
+if [[ "$BANK_SCENARIOS" != "20" ]]; then
+  printf 'ERROR: expected 20 verified scenarios, health reports %s.\n' "$BANK_SCENARIOS" >&2
   exit 1
 fi
 if [[ "$GENERATION_STATE" != "$LIVE_GENERATION_VALUE" ]]; then

@@ -13,7 +13,8 @@ are inert strings and are never executed.
 
 ## What is shipped
 
-- 18 curated, receipt-backed scenarios across six threat families.
+- 20 curated, receipt-backed scenarios across six threat families — including retrieval
+  (web-fetch) prompt injection and MCP tool-description poisoning.
 - A mandatory deterministic pre-display gate and a visible planted-defect self-catch.
 - A six-round judge mode that never depends on generation and reorders only the unplayed
   verified deck toward the learner's weakest measured competency.
@@ -167,7 +168,7 @@ python scripts/check_evidence_links.py
 The link checker is intentionally standalone—not part of pytest or CI—because it needs the
 network. It fails on dead sources and redirects, and covers the field-guide and toolkit
 citations (`learn.json`, `toolkit.json`) under the same rule as scenario evidence. GitHub Actions runs Ruff, pytest, the
-18-scenario verifier, wheel construction, and packaged-resource inspection on Python 3.11 and
+20-scenario verifier, wheel construction, and packaged-resource inspection on Python 3.11 and
 3.13.
 
 Useful endpoints:
@@ -193,7 +194,7 @@ Useful endpoints:
 ### Human vs. model oversight
 
 The same engine can score a *model* instead of a person. `blastradius eval-model`
-runs GPT-5.6 as a player through the exact 18 scenarios — it produces the same
+runs GPT-5.6 as a player through the exact 20 scenarios — it produces the same
 approve/sandbox/reject call and one-sentence tell a human does, and is graded by
 the identical deterministic gate (`grade_decision`). The model never gates
 anything and never sees the ground truth; it is scored on the same evidence a
@@ -286,7 +287,7 @@ sudo BLAST_RADIUS_PROMPT_FOR_OPENAI_KEY=1 bash deploy/deploy.sh your-domain.exam
 The script builds a clean, non-editable, root-owned release; gives the runtime user write
 access only to `/var/lib/blast-radius`; records the deployed Git revision; validates Caddy;
 and restarts the service. It first verifies the new local Uvicorn process, then the public
-HTTPS endpoint, and fails unless health reports `ok`, the expected revision, 18 scenarios,
+HTTPS endpoint, and fails unless health reports `ok`, the expected revision, 20 scenarios,
 the configured generation state, and live Sol grading. Keep generation off for the first
 proof deployment. Once that succeeds:
 
@@ -319,7 +320,7 @@ present, the Sol probe is live, and daily application budget remains.
 
 | Claim | Inspectable proof | Status |
 |---|---|---|
-| 18 scenarios are verified before display | `scenarios.json`, verifier skill, gate tests | Verified locally |
+| 20 scenarios are verified before display | `scenarios.json`, verifier skill, gate tests | Verified locally |
 | Judge mode is deterministic and adaptive | API engine and six-round session tests | Verified locally |
 | Assessments are paired and option-shuffled | `questions.json`, API and bank tests | Verified locally |
 | Model output cannot author truth or evidence | strict DTOs, trusted-base gate tests | Verified locally |
@@ -357,7 +358,7 @@ dated history is the evidence.
 ## Submission checklist
 
 - [ ] Hosted URL passes a logged-out browser run with no console errors
-- [ ] `/healthz` reports revision, 18 scenarios, the intended generation state, and live Sol grading
+- [ ] `/healthz` reports revision, 20 scenarios, the intended generation state, and live Sol grading
 - [ ] Genuine live-grade artifact is cross-checked against the service log and secret-scanned
 - [ ] Run one consented named pre/post session and record the measured learning delta (currently "Not yet measured")
 - [x] Genuine `/feedback` Session ID captured in the README (see "Built with Codex" above)

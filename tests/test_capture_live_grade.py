@@ -29,7 +29,7 @@ class FakeHostedInstance:
                 "reasoning_grading": "live",
                 "critic_model": self.health_model,
                 "live_generation": False,
-                "bank_scenarios": 18,
+                "bank_scenarios": 20,
                 "revision": "abc123def456",
             }
         if path == "/api/sessions":

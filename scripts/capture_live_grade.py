@@ -100,8 +100,8 @@ def capture_live_grade(
         raise RuntimeError("hosted instance does not report a deployed Git revision")
     if health.get("live_generation") is not False:
         raise RuntimeError("proof capture requires deterministic public scenario selection")
-    if health.get("bank_scenarios") != 18:
-        raise RuntimeError("hosted instance does not report the 18-scenario verified bank")
+    if health.get("bank_scenarios") != 20:
+        raise RuntimeError("hosted instance does not report the 20-scenario verified bank")
     if health.get("critic_model") != EXPECTED_CRITIC_MODEL:
         raise RuntimeError("hosted instance does not report the expected Sol critic")
 

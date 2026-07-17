@@ -49,8 +49,8 @@ def test_seeded_demo_deck_covers_every_family_once_and_is_stable(test_settings) 
 def test_seeded_demo_decks_differ_across_sessions(test_settings) -> None:
     bank = ScenarioBank(test_settings.data_dir)
     decks = {tuple(bank.demo_order(seed=f"session-{index}")) for index in range(80)}
-    # 3 members per family across 6 families gives 729 possible decks; a sample of
-    # 80 seeds must surface more than one so a judge's replay is not identical.
+    # With 3-4 members per family across 6 families there are hundreds of possible
+    # decks; a sample of 80 seeds must surface more than one so a replay is not identical.
     assert len(decks) > 1
 
 
