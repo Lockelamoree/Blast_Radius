@@ -1,9 +1,5 @@
 name: "Blast Radius verify"
-description: >-
-  Gate-verify Blast Radius scenario drafts and screen a PR diff for known
-  agent-security red flags. Fully deterministic and offline — no model, no
-  secrets. The scenario gate is exact; the diff screen is a keyword heuristic,
-  not a proof of safety (use fail-on: never for advisory mode).
+description: "Deterministic, offline CI check: verify Blast Radius scenario drafts and screen PR diffs for agent-security red flags."
 branding:
   icon: shield
   color: green

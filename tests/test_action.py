@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,8 +19,11 @@ def test_action_is_marketplace_ready() -> None:
     assert "icon:" in action and "color:" in action
     # A pinned setup-python step guarantees a supported interpreter on any runner.
     assert "actions/setup-python@" in action
-    # The description stays honest about the diff screen being a heuristic.
-    assert "not a proof of safety" in action
+    # Marketplace caps the description at 125 characters — enforce it here so a
+    # future edit can't silently break publishing.
+    match = re.search(r'^description:\s*"(.+)"\s*$', action, re.M)
+    assert match, "description must be a single double-quoted line"
+    assert len(match.group(1)) < 125
 
 
 def test_action_verify_script_is_strict_and_calls_the_cli() -> None:
