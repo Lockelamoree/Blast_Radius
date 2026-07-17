@@ -341,9 +341,11 @@ def test_landing_proof_card_cites_the_committed_receipt() -> None:
     receipt = json.loads(evidence[0].read_text(encoding="utf-8"))
     response_id = receipt["critic_proof"]["response_id"]
 
-    assert 'class="proof-card"' in template
-    assert ".proof-card" in css
-    # The card is static but honest: it names the real graded scenario, the real
+    # The witnessed grade is folded into the integrity block as its payoff.
+    assert 'class="integrity-proof"' in template
+    assert ".integrity-proof" in css
+    assert 'class="integrity-check"' in template
+    # Still static but honest: it names the real graded scenario, the real
     # response id, and links to the committed receipt file — no runtime fetch.
     assert receipt["scenario"]["id"] in template
     assert response_id in template

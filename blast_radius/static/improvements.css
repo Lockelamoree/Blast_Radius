@@ -209,69 +209,40 @@
   color: #6f736a;
 }
 
-.proof-card {
-  max-width: 650px;
-  margin-top: 24px;
-  padding: 18px;
-  border: 1px solid var(--acid);
-  background: linear-gradient(135deg, #151912, #0d0f0c);
+/* The witnessed grade is folded into the integrity block as its payoff — a
+   quiet footer, not a second acid-bordered card. Keeps the honest facts (real
+   scenario, response id, committed receipt) one line away instead of stacked. */
+.integrity-proof {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  color: #b6b8ac;
+  font: 12px/1.6 var(--sans);
 }
 
-.proof-card .kicker {
-  margin-bottom: 8px;
-}
-
-.proof-card-lede {
-  margin: 0 0 14px;
-  color: #c3c1b8;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.proof-card-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px 20px;
-  margin: 0 0 14px;
-}
-
-.proof-card-grid div {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.proof-card-grid dt {
-  color: var(--muted);
-  font: 8px/1.4 var(--mono);
-  letter-spacing: .1em;
-  text-transform: uppercase;
-}
-
-.proof-card-grid dd {
-  margin: 0;
-  color: var(--ink);
-  font: 11px/1.4 var(--mono);
-  word-break: break-word;
-}
-
-.proof-card-link {
-  display: inline-block;
+.integrity-proof strong {
   color: var(--acid);
-  font: 9px var(--mono);
-  letter-spacing: .08em;
-  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.integrity-proof code {
+  font: 11px var(--mono);
+  color: #d5d7cc;
+  word-break: break-all;
+}
+
+.integrity-proof-link {
+  color: var(--acid);
   text-decoration: none;
 }
 
-.proof-card-link:hover {
-  text-decoration: underline;
+.integrity-proof-link code {
+  color: inherit;
 }
 
-@media (max-width: 560px) {
-  .proof-card-grid {
-    grid-template-columns: 1fr;
-  }
+.integrity-proof-link:hover {
+  text-decoration: underline;
 }
 
 .shareable-summary {

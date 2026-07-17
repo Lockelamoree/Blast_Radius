@@ -15,8 +15,8 @@
   <meta name="theme-color" content="#090a09">
   <title>Blast Radius — Size the risk before you approve</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%23090a09'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-family='monospace' font-size='26' font-weight='700' fill='%23c8ff3d'%3EBR%3C/text%3E%3C/svg%3E">
-  <link rel="stylesheet" href="/static/styles.css?v=20260717-11">
-  <link rel="stylesheet" href="/static/improvements.css?v=20260717-11">
+  <link rel="stylesheet" href="/static/styles.css?v=20260717-12">
+  <link rel="stylesheet" href="/static/improvements.css?v=20260717-12">
 </head>
 <body>
   <p id="app-status" class="sr-only" aria-live="polite" aria-atomic="true"></p>
@@ -55,17 +55,10 @@
           </div>
           <button id="gate-catch" class="button ghost" type="button">Try to slip a fake past the gate →</button>
           <output id="gate-catch-result">Nothing planted yet — press the button.</output>
-        </div>
-        <div class="proof-card">
-          <p class="kicker">WITNESSED GRADE · GPT-5.6 SOL</p>
-          <p class="proof-card-lede">A real GPT-5.6 grade captured on this instance — the critic caught a tell that keyword matching missed.</p>
-          <dl class="proof-card-grid">
-            <div><dt>Scenario</dt><dd>dep-typo-1 · poisoned dependency</dd></div>
-            <div><dt>Critic-only tell</dt><dd>near-miss package name</dd></div>
-            <div><dt>Response id</dt><dd>resp_0990b342…1b4593</dd></div>
-            <div><dt>Captured</dt><dd>2026-07-16</dd></div>
-          </dl>
-          <a class="proof-card-link" href="https://github.com/Lockelamoree/Blast_Radius/blob/main/evidence/live_grade_resp_0990b342aa6152f1016a592698815881a09736626b9f1b4593.json" target="_blank" rel="noopener noreferrer">Inspect the committed receipt ↗</a>
+          <p class="integrity-proof">
+            <strong>Not just theatre:</strong> a real GPT-5.6 Sol grade ran on this instance — on <code>dep-typo-1</code> the critic caught a tell (a near-miss package name) that keyword matching missed.
+            <a class="integrity-proof-link" href="https://github.com/Lockelamoree/Blast_Radius/blob/main/evidence/live_grade_resp_0990b342aa6152f1016a592698815881a09736626b9f1b4593.json" target="_blank" rel="noopener noreferrer">Inspect the committed receipt <code>resp_0990b342…</code> ↗</a>
+          </p>
         </div>
         <nav class="resource-nav" aria-label="Learn and protect">
           <button type="button" class="resource-link" data-open="learn">
@@ -233,9 +226,9 @@
     </section>
   </main>
   <footer><span>BLAST RADIUS / BUILD WEEK 2026</span><span id="footer-rev" class="footer-rev"></span><span>Nothing shown here is executed.</span></footer>
-  <script src="/static/app.js?v=20260717-11" defer></script>
-  <script src="/static/integrity-check.js?v=20260717-11" defer></script>
-  <script src="/static/guardrails.js?v=20260717-11" defer></script>
-  <script src="/static/resources.js?v=20260717-11" defer></script>
+  <script src="/static/app.js?v=20260717-12" defer></script>
+  <script src="/static/integrity-check.js?v=20260717-12" defer></script>
+  <script src="/static/guardrails.js?v=20260717-12" defer></script>
+  <script src="/static/resources.js?v=20260717-12" defer></script>
 </body>
 </html>
