@@ -1,3 +1,4 @@
+import json
 import re
 from pathlib import Path
 
@@ -226,6 +227,28 @@ def test_verdict_receipt_renders_provenance_tells_and_divergence() -> None:
     # Styling exists for the new elements.
     assert ".verdict-provenance" in css
     assert ".tell-chip" in css
+
+
+def test_landing_proof_card_cites_the_committed_receipt() -> None:
+    root = Path(__file__).parents[1]
+    template = (root / "blast_radius" / "templates" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    css = (root / "blast_radius" / "static" / "improvements.css").read_text(
+        encoding="utf-8"
+    )
+    evidence = sorted((root / "evidence").glob("live_grade_*.json"))
+    assert evidence, "the committed live-grade receipt must exist"
+    receipt = json.loads(evidence[0].read_text(encoding="utf-8"))
+    response_id = receipt["critic_proof"]["response_id"]
+
+    assert 'class="proof-card"' in template
+    assert ".proof-card" in css
+    # The card is static but honest: it names the real graded scenario, the real
+    # response id, and links to the committed receipt file — no runtime fetch.
+    assert receipt["scenario"]["id"] in template
+    assert response_id in template
+    assert "evidence/" + evidence[0].name in template
 
 
 def test_landing_grading_pill_and_revision_are_wired() -> None:
