@@ -21,7 +21,7 @@ from blast_radius.engine.openai_adapter import (
     StructuredCallResult,
 )
 from blast_radius.main import create_app
-from blast_radius.models import AssessmentForm, Competency, GateResult
+from blast_radius.models import AssessmentForm, Competency, GateResult, ScenarioFamily
 
 PRETEST_CORRECT_OPTIONS = {
     "q-command": "Path scope and reversibility",
@@ -378,14 +378,6 @@ def test_demo_reorders_only_the_verified_deck_by_weakest_competency(
         raise AssertionError("demo adaptation must not invoke live generation")
 
     monkeypatch.setattr(TrustEngine, "next_scenario", generation_must_not_run)
-    expected_ids = {
-        "cmd-cleanup-2",
-        "dep-typo-1",
-        "tool-scope-1",
-        "diff-exfil-1",
-        "context-injection-1",
-        "market-egress-1",
-    }
 
     with TestClient(create_app(test_settings)) as adaptive_client:
         bank = ScenarioBank(test_settings.data_dir)
@@ -421,8 +413,16 @@ def test_demo_reorders_only_the_verified_deck_by_weakest_competency(
             )
             assert decision.status_code == 200
 
-    assert played[:2] == ["tool-scope-1", "market-egress-1"]
-    assert set(played) == expected_ids
+    played_families = [bank.get(scenario_id).family.value for scenario_id in played]
+    # The weakest competency was capabilities (q-manifest answered wrong); both
+    # capability families sort to the front, overscoped_tool before skill_marketplace
+    # by canonical family rank — regardless of which seeded members were drawn.
+    assert played_families[:2] == [
+        ScenarioFamily.OVERSCOPED_TOOL.value,
+        ScenarioFamily.SKILL_MARKETPLACE.value,
+    ]
+    # Every threat family still appears exactly once in the per-session deck.
+    assert set(played_families) == {family.value for family in ScenarioFamily}
     assert len(played) == len(set(played)) == 6
 
 

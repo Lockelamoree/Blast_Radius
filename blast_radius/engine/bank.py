@@ -88,8 +88,8 @@ class ScenarioBank:
             raise LookupError("no fallback scenario remains")
         return random.Random(seed).choice(choices)
 
-    def demo_order(self) -> list[str]:
-        return [
+    def demo_order(self, seed: str | None = None) -> list[str]:
+        canonical = [
             "cmd-cleanup-2",
             "dep-typo-1",
             "tool-scope-1",
@@ -97,3 +97,19 @@ class ScenarioBank:
             "context-injection-1",
             "market-egress-1",
         ]
+        if seed is None:
+            return canonical
+        # Deck one verified scenario per family in the canonical family order,
+        # picked deterministically from the seed so a session always replays the
+        # same deck while different sessions explore the full curated pool.
+        rng = random.Random(seed)
+        deck: list[str] = []
+        for canonical_id in canonical:
+            family = self.scenarios[canonical_id].family
+            members = sorted(
+                scenario_id
+                for scenario_id, scenario in self.scenarios.items()
+                if scenario.family == family
+            )
+            deck.append(rng.choice(members))
+        return deck

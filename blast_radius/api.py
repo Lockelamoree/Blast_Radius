@@ -166,8 +166,12 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
 
     SessionDep = Annotated[SessionState, Depends(load_session)]
 
-    demo_rank = {
-        scenario_id: index for index, scenario_id in enumerate(engine.bank.demo_order())
+    # Rank by family, not scenario id: every demo deck is one scenario per family
+    # (canonical or per-session seeded), so the adaptive reorder needs a stable
+    # tiebreak that is defined for whichever member a session happened to draw.
+    demo_family_rank = {
+        engine.bank.get(scenario_id).family: index
+        for index, scenario_id in enumerate(engine.bank.demo_order())
     }
 
     def assessment_view(session_id: str, form: AssessmentForm) -> list[dict]:
@@ -237,7 +241,7 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
                     state,
                     competency_for_family(engine.bank.get(scenario_id).family),
                 ),
-                demo_rank[scenario_id],
+                demo_family_rank[engine.bank.get(scenario_id).family],
             )
         )
         state.scenario_order[start:] = remaining
@@ -291,7 +295,7 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
         state = SessionState(
             id=session_id,
             mode=payload.mode,
-            scenario_order=engine.bank.demo_order(),
+            scenario_order=engine.bank.demo_order(seed=session_id),
         )
         store.save(state)
         generation_available, _ = live_generation_availability()

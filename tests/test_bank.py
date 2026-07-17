@@ -31,6 +31,29 @@ def test_public_view_never_contains_ground_truth(test_settings) -> None:
         assert "correct_action" not in str(payload)
 
 
+def test_seeded_demo_deck_covers_every_family_once_and_is_stable(test_settings) -> None:
+    bank = ScenarioBank(test_settings.data_dir)
+    canonical = bank.demo_order()
+    # No seed keeps the canonical curated deck for tests and as the fallback.
+    assert bank.demo_order(seed=None) == canonical
+    families_in_order = [bank.get(scenario_id).family for scenario_id in canonical]
+
+    deck = bank.demo_order(seed="session-a")
+    # A session's deck is deterministic and covers the same families in order.
+    assert bank.demo_order(seed="session-a") == deck
+    assert [bank.get(scenario_id).family for scenario_id in deck] == families_in_order
+    assert len(deck) == len(set(deck)) == len(ScenarioFamily)
+    assert all(scenario_id in bank.scenarios for scenario_id in deck)
+
+
+def test_seeded_demo_decks_differ_across_sessions(test_settings) -> None:
+    bank = ScenarioBank(test_settings.data_dir)
+    decks = {tuple(bank.demo_order(seed=f"session-{index}")) for index in range(80)}
+    # 3 members per family across 6 families gives 729 possible decks; a sample of
+    # 80 seeds must surface more than one so a judge's replay is not identical.
+    assert len(decks) > 1
+
+
 def write_question_fixture(tmp_path, data_dir, mutate):
     fixture_dir = tmp_path / "data"
     shutil.copytree(data_dir, fixture_dir)
