@@ -1,3 +1,31 @@
+.status-pills {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+/* The grading pill is muted until /healthz confirms a live critic, then it
+   lights up acid with a pulse — the reveal starts in the header. */
+#grading-pill .status-dot {
+  background: var(--muted);
+  box-shadow: none;
+}
+
+#grading-pill.live {
+  color: var(--acid);
+}
+
+#grading-pill.live .status-dot {
+  background: var(--acid);
+  box-shadow: 0 0 16px var(--acid);
+  animation: grading-pulse 1.2s ease-in-out infinite;
+}
+
+.footer-rev {
+  color: #6f7368;
+  text-transform: uppercase;
+}
+
 .integrity-check {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -243,7 +271,8 @@ progress.mastery-track::-moz-progress-bar {
 
 @media (prefers-reduced-motion: reduce) {
   #grading-status::before,
-  .verdict-provenance .live-dot {
+  .verdict-provenance .live-dot,
+  #grading-pill.live .status-dot {
     animation: none;
   }
 }

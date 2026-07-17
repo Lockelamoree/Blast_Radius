@@ -15,8 +15,8 @@
   <meta name="theme-color" content="#090a09">
   <title>Blast Radius — Size the risk before you approve</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%23090a09'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-family='monospace' font-size='26' font-weight='700' fill='%23c8ff3d'%3EBR%3C/text%3E%3C/svg%3E">
-  <link rel="stylesheet" href="/static/styles.css?v=20260717-3">
-  <link rel="stylesheet" href="/static/improvements.css?v=20260717-3">
+  <link rel="stylesheet" href="/static/styles.css?v=20260717-4">
+  <link rel="stylesheet" href="/static/improvements.css?v=20260717-4">
 </head>
 <body>
   <p id="app-status" class="sr-only" aria-live="polite" aria-atomic="true"></p>
@@ -25,7 +25,10 @@
     <a class="brand" href="/" aria-label="Blast Radius home">
       <span class="brand-mark">BR</span><span>BLAST RADIUS</span>
     </a>
-    <div class="status-pill"><span class="status-dot"></span> verified scenario bank</div>
+    <div class="status-pills">
+      <div id="grading-pill" class="status-pill"><span class="status-dot"></span> <span id="grading-pill-label">DETERMINISTIC GRADING</span></div>
+      <div class="status-pill"><span class="status-dot"></span> verified scenario bank</div>
+    </div>
   </header>
 
   <main>
@@ -168,8 +171,8 @@
       <button id="return-to-safety" class="button primary">Return to safety</button>
     </section>
   </main>
-  <footer><span>BLAST RADIUS / BUILD WEEK 2026</span><span>Nothing shown here is executed.</span></footer>
-  <script src="/static/app.js?v=20260717-3" defer></script>
-  <script src="/static/integrity-check.js?v=20260717-3" defer></script>
+  <footer><span>BLAST RADIUS / BUILD WEEK 2026</span><span id="footer-rev" class="footer-rev"></span><span>Nothing shown here is executed.</span></footer>
+  <script src="/static/app.js?v=20260717-4" defer></script>
+  <script src="/static/integrity-check.js?v=20260717-4" defer></script>
 </body>
 </html>

@@ -228,6 +228,29 @@ def test_verdict_receipt_renders_provenance_tells_and_divergence() -> None:
     assert ".tell-chip" in css
 
 
+def test_landing_grading_pill_and_revision_are_wired() -> None:
+    root = Path(__file__).parents[1]
+    template = (root / "blast_radius" / "templates" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    app = (root / "blast_radius" / "static" / "app.js").read_text(encoding="utf-8")
+    css = (root / "blast_radius" / "static" / "improvements.css").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'id="grading-pill"' in template
+    assert 'id="grading-pill-label"' in template
+    # The verified-bank chip stays as a second pill next to the grading state.
+    assert template.count("status-pill") >= 2
+    assert "verified scenario bank" in template
+    assert 'id="footer-rev"' in template
+    assert "GPT-5.6 GRADING LIVE · SOL" in app
+    assert "DETERMINISTIC GRADING" in app
+    assert "updateGradingPill" in app
+    assert "health.revision" in app
+    assert "#grading-pill.live" in css
+
+
 def test_adaptive_focus_line_is_wired() -> None:
     root = Path(__file__).parents[1]
     template = (root / "blast_radius" / "templates" / "index.html").read_text(
