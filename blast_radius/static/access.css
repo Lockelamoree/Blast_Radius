@@ -1,0 +1,169 @@
+/* access.css — gate-specific rules for the Blast Radius access page.
+   Reuses the shared design system in styles.css (.noise, .site-header,
+   .brand, .kicker, .lede, .hero-terminal, .proof-strip, .button, etc.).
+   All gate-only layout + the code input live here so styles.css and
+   improvements.css stay pinned. NOTE: this page links styles.css + this
+   file only — NOT improvements.css — so the shared :focus-visible acid
+   ring (improvements.css lines 391-395) is unavailable here and is
+   re-declared below for both the input and the submit button. */
+
+/* The header status-pill row's flex layout also lives only in improvements.css,
+   which this page does not link. Without this the two pills stack vertically and
+   lose their gap; re-declare it so the header matches the main app. */
+.status-pills {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+/* The gate mirrors index.html's two-column hero, but the access form stands in
+   for the hero action buttons as the primary call to action. Vertically center
+   like the real landing so the form reads as the hero, not a stacked card. */
+.gate-landing.active {
+  display: grid;
+  min-height: calc(100vh - 128px);
+  align-content: center;
+}
+
+/* Slightly tighter headline than the marketing hero so the short two-line
+   phrase does not overpower a functional gate. */
+.gate-landing .hero-copy h1 {
+  font-size: clamp(46px, 6vw, 88px);
+  margin-bottom: 8px;
+}
+
+/* The access form is the hero action. Give it room like .hero-actions does. */
+.gate-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 34px;
+  max-width: 560px;
+}
+
+.gate-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1 1 300px;
+  min-width: 0;
+}
+
+.gate-field-label {
+  font: 700 9px/1 var(--mono);
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Mono, boxed input that matches the sandbox-config / textarea fields in the
+   main app rather than a rounded generic login box. The field sits on the
+   deepest surface (#070807) so the placeholder clears contrast. */
+.gate-input {
+  width: 100%;
+  background: #070807;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  padding: 15px 16px;
+  font: 14px var(--mono);
+  letter-spacing: .06em;
+  transition: border-color .2s ease;
+}
+
+/* Placeholder is decorative only — the visible ACCESS CODE label already names
+   the field — but still lifted to ~4.6:1 on #070807 so it is legible. */
+.gate-input::placeholder {
+  color: #8f9284;
+  letter-spacing: .04em;
+}
+
+.gate-input:hover {
+  border-color: #45493f;
+}
+
+/* Local focus outline on the input (the shared improvements.css ring is not
+   loaded on this page). */
+.gate-input:focus {
+  outline: 1px solid var(--acid);
+  border-color: var(--acid);
+}
+
+/* Belt-and-braces keyboard-focus ring for the input, mirroring the shared
+   improvements.css :focus-visible treatment which this page does not link. */
+.gate-input:focus-visible {
+  outline: 3px solid var(--acid);
+  outline-offset: 3px;
+}
+
+.gate-actions {
+  display: flex;
+  flex: 0 0 auto;
+}
+
+/* Match the input's height so the button aligns to the field, not the label. */
+.gate-actions .button {
+  padding-top: 15px;
+  padding-bottom: 15px;
+  white-space: nowrap;
+}
+
+/* Re-declare the visible keyboard-focus ring for the submit button. The shared
+   :focus-visible acid outline lives in improvements.css (lines 391-395), which
+   this gate does NOT link, so without this rule the primary button would have
+   no keyboard focus indicator (WCAG 2.4.7). */
+.gate-submit:focus-visible {
+  outline: 3px solid var(--acid);
+  outline-offset: 3px;
+}
+
+.gate-note {
+  max-width: 560px;
+}
+
+/* The error block reuses the marketing accent language: an orange left-border
+   rule with no fill (matching the .danger-text / agent-note motif), rather than
+   a filled generic-validation banner. */
+.error {
+  margin: 24px 0 0;
+  padding: 10px 0 10px 14px;
+  border-left: 2px solid var(--orange);
+  color: #ffb89e;
+  font: 13px/1.55 var(--sans);
+  max-width: 560px;
+}
+
+/* Push the proof strip down so it bands across the bottom of the hero copy,
+   the way it sits under the marketing hero. */
+.gate-landing .proof-strip {
+  margin-top: 44px;
+}
+
+/* Collapse to a single column on narrow screens: form stacks, button goes full
+   width. The shared 900px breakpoint in styles.css already flips
+   .landing.active to one column and removes the .hero-terminal rotation. */
+@media (max-width: 640px) {
+  .gate-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .gate-actions,
+  .gate-actions .button {
+    width: 100%;
+  }
+
+  .gate-actions .button {
+    justify-content: center;
+    text-align: center;
+  }
+}
+
+/* Honor reduced-motion: drop the input transition. The shared media query in
+   styles.css already kills animations/transitions globally; this is
+   belt-and-braces for the gate-specific transition declared above. */
+@media (prefers-reduced-motion: reduce) {
+  .gate-input {
+    transition: none;
+  }
+}
