@@ -369,6 +369,20 @@ def test_full_demo_session(client, test_settings) -> None:
         assert competency["label"]
     assert "hidden credential upload" not in result.text
     assert "pre 0/5 → post 5/5" in result.json()["share_text"]
+    recap = result.json()["rounds"]
+    assert [entry["round"] for entry in recap] == list(range(1, 7))
+    assert {entry["family"] for entry in recap} == {item.value for item in ScenarioFamily}
+    for entry in recap:
+        assert set(entry) == {
+            "round",
+            "family",
+            "verdict",
+            "action_correct",
+            "reasoning_score",
+        }
+    weakest = result.json()["weakest_competency"]
+    assert weakest["key"] in {item.value for item in Competency}
+    assert weakest["label"]
 
 
 def test_demo_reorders_only_the_verified_deck_by_weakest_competency(

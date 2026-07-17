@@ -228,6 +228,28 @@ def test_verdict_receipt_renders_provenance_tells_and_divergence() -> None:
     assert ".tell-chip" in css
 
 
+def test_results_recap_and_fresh_deck_cta_are_wired() -> None:
+    root = Path(__file__).parents[1]
+    template = (root / "blast_radius" / "templates" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    app = (root / "blast_radius" / "static" / "app.js").read_text(encoding="utf-8")
+    css = (root / "blast_radius" / "static" / "improvements.css").read_text(
+        encoding="utf-8"
+    )
+
+    # Per-round recap and weakest-area focus render above the competency map.
+    assert 'id="round-recap"' in template
+    assert 'id="recap-focus"' in template
+    assert "data.rounds" in app
+    assert "data.weakest_competency" in app
+    assert "round.action_correct" in app
+    assert "round.reasoning_score" in app
+    assert ".recap-row" in css
+    # The replay CTA is honest now that each session decks a fresh scenario mix.
+    assert "Run it again — fresh deck →" in template
+
+
 def test_social_metadata_and_static_assets_are_cache_busted() -> None:
     template = (
         Path(__file__).parents[1] / "blast_radius" / "templates" / "index.html"

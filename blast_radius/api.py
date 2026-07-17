@@ -21,9 +21,11 @@ from blast_radius.models import (
     AssessmentForm,
     Competency,
     CompetencyProgress,
+    CompetencyRef,
     GenerationStatus,
     LearnerProgress,
     PlayerDecision,
+    RoundSummary,
     Scenario,
     SessionState,
     ScenarioProvenance,
@@ -589,6 +591,17 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
                 test_delta=post.get("score", 0) - pre.get("score", 0),
             )
         test_total = engine.bank.assessment_size
+        weakest = min(Competency, key=lambda item: competency_accuracy(state, item))
+        round_recap = [
+            RoundSummary(
+                round=index + 1,
+                family=grade.family or "",
+                verdict=grade.verdict,
+                action_correct=grade.action_correct,
+                reasoning_score=grade.reasoning_score,
+            )
+            for index, grade in enumerate(state.grades)
+        ]
         return LearnerProgress(
             session_id=state.id,
             pretest_score=state.pretest_score,
@@ -603,6 +616,10 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
                 f"I completed Blast Radius: pre {state.pretest_score}/{test_total} → "
                 f"post {state.posttest_score}/{test_total}, {len(state.grades)} agent decisions, "
                 f"{state.rounds_generated} generated variations, and {average}% average tell coverage."
+            ),
+            rounds=round_recap,
+            weakest_competency=CompetencyRef(
+                key=weakest.value, label=COMPETENCY_LABELS[weakest]
             ),
         )
 

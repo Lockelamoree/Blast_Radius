@@ -15,8 +15,8 @@
   <meta name="theme-color" content="#090a09">
   <title>Blast Radius — Size the risk before you approve</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%23090a09'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-family='monospace' font-size='26' font-weight='700' fill='%23c8ff3d'%3EBR%3C/text%3E%3C/svg%3E">
-  <link rel="stylesheet" href="/static/styles.css?v=20260716-14">
-  <link rel="stylesheet" href="/static/improvements.css?v=20260716-14">
+  <link rel="stylesheet" href="/static/styles.css?v=20260717-1">
+  <link rel="stylesheet" href="/static/improvements.css?v=20260717-1">
 </head>
 <body>
   <p id="app-status" class="sr-only" aria-live="polite" aria-atomic="true"></p>
@@ -151,9 +151,14 @@
         <div class="delta-block"><span>COMPETENCY DELTA</span><strong id="result-delta">—</strong><small id="result-tests">—</small></div>
         <div class="result-stats"><div><strong id="result-reasoning">0%</strong><span>average tell coverage</span></div><div><strong id="result-rounds">0</strong><span>rounds reviewed</span></div><div><strong id="result-generated">0/0</strong><span>generated / played</span></div></div>
         <button id="share-result" class="button primary">Copy result</button>
-        <button id="restart" class="button ghost">Run it again</button>
+        <button id="restart" class="button ghost">Run it again — fresh deck →</button>
       </div>
-      <div class="mastery-panel"><div class="panel-label">COMPETENCY MAP</div><div id="mastery-map"></div></div>
+      <div class="mastery-panel">
+        <div class="recap-head"><span class="panel-label">ROUND RECAP</span><span id="recap-focus" class="recap-focus">—</span></div>
+        <div id="round-recap" class="round-recap"></div>
+        <div class="panel-label">COMPETENCY MAP</div>
+        <div id="mastery-map"></div>
+      </div>
     </section>
 
     <section id="screen-error" class="screen error-screen">
@@ -162,7 +167,7 @@
     </section>
   </main>
   <footer><span>BLAST RADIUS / BUILD WEEK 2026</span><span>Nothing shown here is executed.</span></footer>
-  <script src="/static/app.js?v=20260716-14" defer></script>
-  <script src="/static/integrity-check.js?v=20260716-14" defer></script>
+  <script src="/static/app.js?v=20260717-1" defer></script>
+  <script src="/static/integrity-check.js?v=20260717-1" defer></script>
 </body>
 </html>

@@ -291,6 +291,7 @@ class Receipt(BaseModel):
 
 class GradeResult(BaseModel):
     scenario_id: str
+    family: str | None = None
     verdict: str = Field(pattern=r"^(correct|partial|wrong)$")
     action_correct: bool
     reasoning_score: int = Field(ge=0, le=100)
@@ -379,6 +380,19 @@ class CompetencyProgress(BaseModel):
     test_delta: int
 
 
+class RoundSummary(BaseModel):
+    round: int = Field(ge=1)
+    family: str
+    verdict: str = Field(pattern=r"^(correct|partial|wrong)$")
+    action_correct: bool
+    reasoning_score: int = Field(ge=0, le=100)
+
+
+class CompetencyRef(BaseModel):
+    key: str
+    label: str
+
+
 class LearnerProgress(BaseModel):
     session_id: str
     pretest_score: int
@@ -390,3 +404,5 @@ class LearnerProgress(BaseModel):
     competency_map: dict[Competency, CompetencyProgress]
     average_reasoning_score: int
     share_text: str
+    rounds: list[RoundSummary] = Field(default_factory=list)
+    weakest_competency: CompetencyRef | None = None

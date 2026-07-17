@@ -180,6 +180,7 @@ def grade_decision(scenario: Scenario, decision: PlayerDecision) -> GradeResult:
         followup = "Which single control reduces the blast radius most here?"
     return GradeResult(
         scenario_id=scenario.id,
+        family=scenario.family.value,
         verdict=verdict,
         action_correct=action_correct,
         reasoning_score=reasoning_score,
