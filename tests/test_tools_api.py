@@ -181,3 +181,16 @@ def test_gate_verify_is_developer_only(test_settings: Settings) -> None:
         assert client.post("/api/gate/verify", json={"scenario": draft}).status_code == 200
         # /api/check stays open to any code holder (the daily-tool path).
         assert client.post("/api/check", json={"kind": "command", "content": "ls"}).status_code == 200
+
+
+def test_gate_verify_hides_the_draft_schema_from_a_judge(test_settings: Settings) -> None:
+    # A restricted judge sending a malformed body must be rejected with 403 by the
+    # role dependency BEFORE Pydantic validates the body — a 422 would enumerate the
+    # internal ScenarioDraft authoring contract to a role that may not see it.
+    with TestClient(create_app(_auth_settings(test_settings))) as client:
+        client.post("/access", data={"code": "JUDGE-CODE-1", "next": "/"}, follow_redirects=False)
+        response = client.post("/api/gate/verify", json={"scenario": {}})
+        assert response.status_code == 403
+        # The 403 body must not enumerate the draft's internal authoring fields.
+        body = response.text.lower()
+        assert not any(field in body for field in ("template_ref", "ground_truth", "presentation"))

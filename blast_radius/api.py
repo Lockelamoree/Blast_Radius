@@ -487,15 +487,22 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
         _attach_resources(report)
         return report
 
-    @router.post("/gate/verify", response_model=GateResult)
+    @router.post(
+        "/gate/verify",
+        response_model=GateResult,
+        dependencies=[Depends(require_developer)],
+    )
     def gate_verify(payload: GateVerifyRequest, request: Request) -> GateResult:
         """Run the production CorrectnessGate against an author's draft scenario.
 
         Developer-role only, matching the /author page it backs. The draft carries
         its own ground truth (the author's); the gate's reasons only ever quote the
         submitted draft, never a curated scenario's ground truth. (There is no
-        trusted-base comparison here — that path would echo curated tell names.)"""
-        require_developer(request)
+        trusted-base comparison here — that path would echo curated tell names.)
+
+        The role check is a route-level dependency so a restricted role is rejected
+        with 403 *before* Pydantic validates the body — otherwise a malformed draft
+        from a judge would leak the internal ScenarioDraft schema via a 422."""
         gate_verify_limiter.check(f"gate-verify:{client_host(request)}")
         return engine.gate.verify(payload.scenario)
 
