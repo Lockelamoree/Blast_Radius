@@ -216,3 +216,55 @@ def test_evidence_and_receipts_accept_https_sources() -> None:
         excerpt="A supporting artifact excerpt.",
     ).source == source
     assert Receipt(claim="Safe source", evidence="Artifact", source=source).source == source
+
+
+def test_session_state_accepts_drill_mode_and_rejects_unknown_modes() -> None:
+    from blast_radius.models import SessionState
+
+    state = SessionState(id="drill-1", mode="drill", scenario_order=["cmd-exfil-1"])
+    assert state.mode == "drill"
+    assert state.decision_log == {}
+    assert state.retried_grades == []
+    with pytest.raises(ValidationError):
+        SessionState(id="bad-1", mode="daily", scenario_order=[])
+
+
+def test_legacy_session_state_json_without_new_fields_still_validates() -> None:
+    from blast_radius.models import SessionState
+
+    legacy = SessionState(id="legacy-1", mode="demo", scenario_order=["cmd-exfil-1"])
+    payload = legacy.model_dump(mode="json")
+    for field in ("decision_log", "retried_grades", "operator_handle"):
+        payload.pop(field, None)
+    restored = SessionState.model_validate(payload)
+    assert restored.decision_log == {}
+    assert restored.retried_grades == []
+    assert restored.operator_handle is None
+
+
+def test_round_summary_retry_fields_default_and_validate() -> None:
+    from blast_radius.models import RoundSummary
+
+    plain = RoundSummary(
+        round=1, family="dangerous_command", verdict="correct",
+        action_correct=True, reasoning_score=100,
+    )
+    assert plain.retried is False
+    assert plain.retry_verdict is None
+    assert plain.retry_reasoning_score is None
+    with pytest.raises(ValidationError):
+        RoundSummary(
+            round=1, family="dangerous_command", verdict="correct",
+            action_correct=True, reasoning_score=100, retry_verdict="better",
+        )
+
+
+def test_inspection_report_is_honest_by_default() -> None:
+    from blast_radius.models import INSPECTOR_DISCLAIMER, InspectionReport
+
+    report = InspectionReport(kind="command", verdict="looks-scoped")
+    assert report.graded_by == "deterministic"
+    assert report.method == "keyword-heuristic"
+    assert report.disclaimer == INSPECTOR_DISCLAIMER
+    with pytest.raises(ValidationError):
+        InspectionReport(kind="command", verdict="safe")

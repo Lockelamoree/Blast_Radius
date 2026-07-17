@@ -15,11 +15,12 @@
   <meta name="theme-color" content="#090a09">
   <title>Blast Radius — Size the risk before you approve</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%23090a09'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-family='monospace' font-size='26' font-weight='700' fill='%23c8ff3d'%3EBR%3C/text%3E%3C/svg%3E">
-  <link rel="stylesheet" href="/static/styles.css?v=20260717-12">
-  <link rel="stylesheet" href="/static/improvements.css?v=20260717-12">
+  <link rel="stylesheet" href="/static/styles.css?v=20260718-1">
+  <link rel="stylesheet" href="/static/improvements.css?v=20260718-1">
 </head>
 <body>
   <p id="app-status" class="sr-only" aria-live="polite" aria-atomic="true"></p>
+  <p id="retry-note" class="retry-note hidden" aria-hidden="true"></p>
   <div class="noise" aria-hidden="true"></div>
   <header class="site-header">
     <a class="brand" href="/" aria-label="Blast Radius home">
@@ -46,8 +47,19 @@
         <div class="hero-actions">
           <button class="button primary" data-start="demo">Start verified run <span>→</span></button>
           <button class="button ghost" data-start="live" disabled>Try live variation</button>
+          <button class="button ghost" id="start-drill" type="button">90-second daily drill <span>→</span></button>
         </div>
+        <p class="handle-row"><label class="handle-label" for="operator-handle">TEAM HANDLE · OPTIONAL</label><input id="operator-handle" maxlength="40" autocomplete="off" spellcheck="false" placeholder="e.g. max-g"><span class="microcopy handle-note">Shown on the team board only. No email, no account — leave blank to stay anonymous.</span></p>
         <p id="live-note" class="microcopy">Live mode falls back to verified scenarios if generation is unavailable.</p>
+        <div id="history-panel" class="history-panel hidden" aria-label="Your local progress">
+          <div class="history-facts">
+            <div><span>STREAK</span><strong id="history-streak">—</strong></div>
+            <div><span>LAST DELTA</span><strong id="history-last-delta">—</strong></div>
+            <div><span>WEAKEST</span><strong id="history-weakest">—</strong></div>
+          </div>
+          <button id="callback-start" class="button ghost hidden" type="button"></button>
+          <button id="history-clear" class="linklike" type="button">stored only in this browser — clear</button>
+        </div>
         <div class="integrity-check">
           <div>
             <p class="kicker">INTEGRITY CHECK · WHY YOU CAN TRUST THIS</p>
@@ -127,7 +139,7 @@
             <label>Host allowlist<input id="network-hosts" value="" placeholder="docs.example.com" disabled autocomplete="off"></label>
             <label>Capabilities<input id="capabilities" value="" placeholder="http-get, read-docs" autocomplete="off"></label>
           </div>
-          <label class="reason-label" for="reasoning">NAME THE TELL <span id="reason-requirement">one clear sentence · minimum 8 characters</span></label>
+          <label class="reason-label" for="reasoning">NAME THE TELL <span id="reason-requirement">one clear sentence · minimum 8 characters · <kbd>Ctrl/⌘ ↵</kbd> commits</span></label>
           <textarea id="reasoning" minlength="8" maxlength="500" required aria-describedby="reason-requirement" placeholder="I chose this because…"></textarea>
           <p id="grading-status" class="microcopy hidden" aria-live="polite"></p>
           <div class="decision-footer"><span id="reason-count">0 / 500</span><div><button id="reset-decision" class="button ghost hidden" type="button">Reset</button><button id="submit-decision" class="button primary" disabled>Commit decision</button></div></div>
@@ -150,6 +162,12 @@
           <p class="panel-label">TELLS · <span id="tells-named">—</span></p>
           <ul id="tell-list"></ul>
         </div>
+        <div id="critic-callout" class="critic-callout hidden">
+          <p class="panel-label">SECOND REVIEWER</p>
+          <p class="critic-callout-lede">A second reviewer caught what keyword matching missed:</p>
+          <ul id="critic-callout-tells"></ul>
+          <p id="critic-callout-proof" class="microcopy">Verifiable via the response id above.</p>
+        </div>
         <details id="policy-compare" class="policy-compare hidden">
           <summary>Compare your sandbox</summary>
           <table><thead><tr><th>Dimension</th><th>Yours</th><th>Safe</th><th>Status</th></tr></thead><tbody id="policy-rows"></tbody></table>
@@ -165,7 +183,32 @@
           <button id="reflect-submit" class="button ghost" type="button">Ask the coach</button>
           <p id="reflect-reply" class="reflect-reply hidden"></p>
         </div>
+        <div id="revise-block" class="revise hidden">
+          <label for="revise-input" class="panel-label">REVISE YOUR REASONING · ONE COACHED RETRY</label>
+          <p class="microcopy">Action stays fixed — the re-check is deterministic.</p>
+          <textarea id="revise-input" maxlength="500" placeholder="Name the tell you missed…"></textarea>
+          <button id="revise-submit" class="button ghost" type="button">Re-check my reasoning</button>
+          <div id="revise-compare" class="revise-compare hidden">
+            <div class="revise-col"><span class="panel-label">INITIAL</span><strong id="revise-initial">—</strong><small id="revise-initial-tells">—</small></div>
+            <div class="revise-col"><span class="panel-label">COACHED</span><strong id="revise-coached">—</strong><small id="revise-coached-tells">—</small></div>
+          </div>
+        </div>
         <button id="next-round" class="button primary">Next request <span>→</span></button>
+        <p class="microcopy key-hint"><kbd>↵</kbd> Enter continues</p>
+      </div>
+    </section>
+
+    <section id="screen-drill-result" class="screen drill-result-screen">
+      <div class="result-card">
+        <p class="kicker">DAILY DRILL / ONE ROUND</p>
+        <div id="drill-seal" class="verdict-seal">CORRECT</div>
+        <h2 id="drill-heading">Drill complete.</h2>
+        <p id="drill-line" class="lede">—</p>
+        <div class="delta-block"><span>TELL COVERAGE</span><strong id="drill-coverage">—</strong><small id="drill-family">—</small></div>
+        <p id="drill-streak" class="microcopy">—</p>
+        <p class="microcopy">Come back tomorrow for a fresh scenario — your streak is stored only in this browser.</p>
+        <button id="drill-share" class="button primary">Copy result</button>
+        <button id="drill-back" class="button ghost">Back to landing →</button>
       </div>
     </section>
 
@@ -188,8 +231,10 @@
           <div class="guardrail-actions">
             <button id="copy-guardrails" class="button ghost" type="button">Copy guardrails .md</button>
             <button id="download-guardrails" class="button ghost" type="button">Download .md</button>
+            <button id="copy-agents-snippet" class="button ghost" type="button">Copy AGENTS.md snippet</button>
           </div>
           <output id="guardrail-status" class="guardrail-status"></output>
+          <pre id="agents-snippet-preview" class="agents-snippet-preview"></pre>
         </div>
       </div>
       <div class="mastery-panel">
@@ -226,9 +271,10 @@
     </section>
   </main>
   <footer><span>BLAST RADIUS / BUILD WEEK 2026</span><span id="footer-rev" class="footer-rev"></span><span>Nothing shown here is executed.</span></footer>
-  <script src="/static/app.js?v=20260717-12" defer></script>
-  <script src="/static/integrity-check.js?v=20260717-12" defer></script>
-  <script src="/static/guardrails.js?v=20260717-12" defer></script>
-  <script src="/static/resources.js?v=20260717-12" defer></script>
+  <script src="/static/app.js?v=20260718-1" defer></script>
+  <script src="/static/integrity-check.js?v=20260718-1" defer></script>
+  <script src="/static/guardrails.js?v=20260718-1" defer></script>
+  <script src="/static/resources.js?v=20260718-1" defer></script>
+  <script src="/static/history.js?v=20260718-1" defer></script>
 </body>
 </html>

@@ -1,0 +1,88 @@
+.team-main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 36px 24px 80px;
+}
+
+.team-screen .kicker {
+  color: var(--acid);
+  font: 11px/1 var(--mono);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.team-screen h1 {
+  font-family: var(--serif);
+  font-size: clamp(28px, 5vw, 44px);
+  margin: 10px 0 12px;
+}
+
+.team-screen .lede {
+  color: var(--muted);
+  max-width: 62ch;
+  margin: 0 0 28px;
+}
+
+.team-heading {
+  font: 12px/1 var(--mono);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--acid);
+  margin: 34px 0 12px;
+}
+
+.team-empty {
+  border: 1px solid var(--line);
+  padding: 14px 16px;
+  color: var(--muted);
+  background: var(--panel);
+}
+
+.table-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+}
+
+#team-roster,
+#team-recent {
+  width: 100%;
+  border-collapse: collapse;
+  font: 13px/1.5 var(--sans);
+  min-width: 640px;
+}
+
+#team-roster th,
+#team-recent th {
+  text-align: left;
+  padding: 12px 14px;
+  background: var(--panel);
+  color: var(--muted);
+  font: 10px/1 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--line);
+}
+
+#team-roster td,
+#team-recent td {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+}
+
+#team-roster tbody tr:hover,
+#team-recent tbody tr:hover {
+  background: rgba(200, 255, 61, 0.04);
+}
+
+.team-note {
+  margin-top: 22px;
+}
+
+.team-note a {
+  color: var(--acid);
+}
+
+.hidden {
+  display: none !important;
+}

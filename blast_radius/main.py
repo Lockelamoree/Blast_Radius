@@ -12,12 +12,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from blast_radius.api import build_router
-from blast_radius.auth import AttemptLimiter, issue_token, verify_token
+from blast_radius.auth import ACCESS_COOKIE, AttemptLimiter, issue_token, verify_token
 from blast_radius.config import Settings, settings
 from blast_radius.engine import TrustEngine
 from blast_radius.storage import SessionStore
-
-ACCESS_COOKIE = "br_access"
 
 
 def create_app(config: Settings = settings) -> FastAPI:
@@ -210,6 +208,27 @@ def create_app(config: Settings = settings) -> FastAPI:
         response = RedirectResponse("/access", status_code=303)
         response.delete_cookie(ACCESS_COOKIE, path="/")
         return response
+
+    def _developer_page(request: Request, template_name: str) -> HTMLResponse:
+        # The middleware already redirects anonymous users to /access; here we
+        # downgrade an authenticated judge to 403 so only the developer role sees
+        # the team board and the authoring tool. Ungated when auth is off.
+        if auth_enabled and current_role(request) != "developer":
+            return render_access(
+                request,
+                request.url.path,
+                "Developer access is required for this page.",
+                status=403,
+            )
+        return templates.TemplateResponse(request=request, name=template_name)
+
+    @application.get("/team", response_class=HTMLResponse, include_in_schema=False)
+    def team_page(request: Request) -> HTMLResponse:
+        return _developer_page(request, "team.html")
+
+    @application.get("/author", response_class=HTMLResponse, include_in_schema=False)
+    def author_page(request: Request) -> HTMLResponse:
+        return _developer_page(request, "author.html")
 
     return application
 

@@ -102,6 +102,12 @@ def _keyword_matches(keyword: str, reasoning: tuple[str, ...]) -> bool:
     return _contains_phrase(reasoning, keyword_tokens)
 
 
+# Public aliases for headless reuse (inspector, CLI); the grading internals
+# above keep their private names.
+tokenize = _tokens
+keyword_matches = _keyword_matches
+
+
 def score_blast_radius(actual: BlastRadiusConfig, expected: BlastRadiusConfig) -> int:
     actual_reads = set(actual.readable_paths)
     expected_reads = set(expected.readable_paths)

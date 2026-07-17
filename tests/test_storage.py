@@ -64,3 +64,66 @@ def test_store_closes_each_operation_connection(tmp_path, monkeypatch) -> None:
     for _ in range(40):
         assert store.llm_usage() == 0
     assert closed == [True] * 40
+
+
+def test_session_summaries_are_append_only_and_survive_session_expiry(tmp_path) -> None:
+    from blast_radius.models import SessionSummary
+
+    store = SessionStore(tmp_path / "summaries.db", ttl_minutes=180)
+    summary = SessionSummary(
+        session_id="sess-1",
+        finished_at=datetime(2026, 7, 17, 12, tzinfo=UTC),
+        mode="demo",
+        operator_handle="max-g",
+        pretest=3,
+        posttest=5,
+        delta=2,
+        rounds_played=6,
+        rounds_generated=1,
+        average_reasoning=74,
+        families_cleared=5,
+        weakest="provenance",
+        competency_json="{}",
+        finished_early=False,
+    )
+    store.record_summary(summary)
+    # Idempotent under client retries: a second write with different scores
+    # must NOT overwrite the first (append-only).
+    store.record_summary(summary.model_copy(update={"delta": -5}))
+    rows = store.list_summaries()
+    assert len(rows) == 1
+    assert rows[0].delta == 2
+    assert rows[0].operator_handle == "max-g"
+
+    # Deleting the session row does not touch the durable summary.
+    store.delete("sess-1")
+    assert len(store.list_summaries()) == 1
+
+    # A fresh store over the same file still sees it (persists across boots).
+    reopened = SessionStore(tmp_path / "summaries.db", ttl_minutes=180)
+    assert reopened.list_summaries()[0].session_id == "sess-1"
+
+
+def test_session_summaries_preserve_null_delta_for_early_finishes(tmp_path) -> None:
+    from blast_radius.models import SessionSummary
+
+    store = SessionStore(tmp_path / "early.db", ttl_minutes=180)
+    store.record_summary(
+        SessionSummary(
+            session_id="sess-early",
+            finished_at=datetime(2026, 7, 17, 13, tzinfo=UTC),
+            mode="live",
+            pretest=4,
+            rounds_played=2,
+            rounds_generated=0,
+            average_reasoning=50,
+            families_cleared=1,
+            competency_json="{}",
+            finished_early=True,
+        )
+    )
+    row = store.list_summaries()[0]
+    assert row.posttest is None
+    assert row.delta is None
+    assert row.finished_early is True
+    assert row.operator_handle is None

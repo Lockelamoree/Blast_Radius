@@ -204,7 +204,7 @@ def test_judge_path_hotfixes_lock_grading_and_render_honest_states() -> None:
     # Static assets share one current cache-bust version.
     versions = set(re.findall(r"\?v=([\w-]+)", template))
     assert len(versions) == 1, f"static cache-bust versions diverged: {versions}"
-    assert len(re.findall(r"\?v=", template)) == 6
+    assert len(re.findall(r"\?v=", template)) == 7
     # The first assessment question is announced (screen active before render).
     assert app.count("show('test');renderQuestion();") == 2
     assert "renderQuestion();show('test');" not in app
@@ -326,6 +326,10 @@ def test_guardrail_export_is_wired_and_covers_every_family() -> None:
     assert "https://" in guardrails
     assert "no model calls" in guardrails
     assert "fetch(" not in guardrails
+    # The AGENTS.md snippet builder rides alongside, still deterministic.
+    assert "buildAgentsSnippet" in guardrails
+    assert "agents_md" in guardrails
+    assert 'id="copy-agents-snippet"' in template
 
 
 def test_landing_proof_card_cites_the_committed_receipt() -> None:
@@ -486,3 +490,132 @@ def test_learn_and_protect_sections_are_wired() -> None:
     assert ".resource-card" in css
     assert ".resource-nav" in css
     assert ".gate-verdict" in css
+
+
+def _frontend_sources():
+    root = Path(__file__).parents[1]
+    return {
+        "root": root,
+        "template": (root / "blast_radius" / "templates" / "index.html").read_text(encoding="utf-8"),
+        "app": (root / "blast_radius" / "static" / "app.js").read_text(encoding="utf-8"),
+        "css": (root / "blast_radius" / "static" / "improvements.css").read_text(encoding="utf-8"),
+    }
+
+
+def test_keyboard_completion_shortcuts_are_wired() -> None:
+    src = _frontend_sources()
+    assert "event.key==='Enter'" in src["app"]
+    assert "$('#submit-decision').click()" in src["app"]
+    assert "closest('textarea,input,button,a,summary" in src["app"]
+    assert "state.verdictShownAt" in src["app"]
+    assert "Ctrl/⌘" in src["template"]
+    assert 'class="microcopy key-hint"' in src["template"]
+    assert "minimum 8 characters" in src["template"]  # existing pin survives
+
+
+def test_critic_eligibility_preview_is_merged_into_provenance() -> None:
+    src = _frontend_sources()
+    assert "eligible for GPT-5.6 Sol review" in src["app"]
+    assert "never sent to the critic (by design)" in src["app"]
+    assert "criticEligible" in src["app"]
+
+
+def test_finish_early_requires_two_step_confirmation() -> None:
+    src = _frontend_sources()
+    assert "your delta will show as" in src["app"]
+    assert "Click again" in src["app"]
+    assert "disarmFinishEarly" in src["app"]
+    assert ".linklike.armed" in src["css"]
+    assert "see what you've shown so far" in src["template"]  # existing template pin
+    assert "`/api/sessions/${state.sessionId}/finish-early`" in src["app"]
+
+
+def test_retry_status_is_visible_without_a_third_live_region() -> None:
+    src = _frontend_sources()
+    assert 'id="retry-note" class="retry-note hidden" aria-hidden="true"' in src["template"]
+    assert src["template"].count('aria-live="polite"') == 2
+    assert "retrying (attempt" in src["app"]
+    assert ".retry-note" in src["css"]
+
+
+def test_critic_catch_callout_is_distinct_from_the_tell_chip() -> None:
+    src = _frontend_sources()
+    assert 'id="critic-callout"' in src["template"]
+    assert "A second reviewer caught what keyword matching missed:" in src["template"]
+    assert 'id="critic-callout-tells"' in src["template"]
+    assert ".critic-callout" in src["css"]
+    assert "CAUGHT BY GPT-5.6" in src["app"]  # the chip stays
+
+
+def test_operator_handle_input_is_optional_and_honest() -> None:
+    src = _frontend_sources()
+    assert 'id="operator-handle"' in src["template"]
+    assert "leave blank to stay anonymous" in src["template"]
+    assert "operator_handle" in src["app"]
+    assert src["template"].index('class="proof-strip"') < src["template"].index('class="hero-actions"')
+    # An invalid optional handle is caught client-side, not bounced to the error
+    # screen — the app validates before starting a session.
+    assert "HANDLE_RE" in src["app"]
+
+
+def test_daily_drill_flow_is_wired() -> None:
+    src = _frontend_sources()
+    assert 'id="start-drill"' in src["template"]
+    assert "90-second daily drill" in src["template"]
+    assert 'id="screen-drill-result"' in src["template"]
+    assert "mode:'drill'" in src["app"]
+    assert "client_key" in src["app"]
+    assert "window.startDrill" in src["app"]
+    # Drill start must not route through the pretest screen (pinned count == 2).
+    assert src["app"].count("show('test');renderQuestion();") == 2
+
+
+def test_history_is_browser_local_and_clearable() -> None:
+    root = Path(__file__).parents[1]
+    history = (root / "blast_radius" / "static" / "history.js").read_text(encoding="utf-8")
+    template = (root / "blast_radius" / "templates" / "index.html").read_text(encoding="utf-8")
+    assert "blast-radius:v1" in history
+    assert "crypto.randomUUID" in history
+    assert "localStorage" in history
+    assert "due_date" in history
+    assert "fetch(" not in history
+    assert "innerHTML" not in history
+    assert "/static/history.js?v=" in template
+    assert 'id="history-panel"' in template
+    assert "stored only in this browser" in template
+    assert 'id="history-clear"' in template
+    assert 'id="callback-start"' in template
+
+
+def test_revise_retry_is_wired() -> None:
+    src = _frontend_sources()
+    assert 'id="revise-block"' in src["template"]
+    assert 'id="revise-compare"' in src["template"]
+    assert "rounds/retry" in src["app"]
+    assert "re-check is deterministic" in src["template"]
+    assert "round.retried" in src["app"]  # recap shows the coached-nudge chip
+    assert "NAMED AFTER COACHING" in src["app"]
+    assert ".nudge-chip" in src["css"]
+    # The before/after comparison is deterministic-vs-deterministic, not against
+    # a possibly critic-boosted initial score.
+    assert "initial_deterministic_score" in src["app"]
+    assert "retry_baseline_score" in src["app"]
+
+
+def test_team_and_author_pages_use_external_assets_only() -> None:
+    root = Path(__file__).parents[1]
+    team = (root / "blast_radius" / "templates" / "team.html").read_text(encoding="utf-8")
+    author = (root / "blast_radius" / "templates" / "author.html").read_text(encoding="utf-8")
+    for page in (team, author):
+        assert "onclick=" not in page
+        assert "<style" not in page
+        assert "<script>" not in page
+    assert "/static/team.js?v=" in team and "/static/team.css?v=" in team
+    assert "/static/author.js?v=" in author and "/static/author.css?v=" in author
+    # The embedded starter skeleton validates as a real Scenario.
+    author_js = (root / "blast_radius" / "static" / "author.js").read_text(encoding="utf-8")
+    match = re.search(r"SCENARIO_SKELETON\s*=\s*'(\{.*?\})';/\*end-skeleton\*/", author_js, re.S)
+    assert match, "author.js must embed a grep-able SCENARIO_SKELETON"
+    from blast_radius.models import Scenario
+
+    Scenario.model_validate(json.loads(match.group(1)))

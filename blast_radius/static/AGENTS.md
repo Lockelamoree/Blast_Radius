@@ -9,3 +9,8 @@ Node build step.
   not.
 - Preserve keyboard navigation, visible focus, `aria-live` feedback, and mobile layouts.
 - Keep the verified demo usable when OpenAI is unavailable or the daily budget is exhausted.
+- Progress history lives only in the single versioned localStorage key `blast-radius:v1` and
+  stores aggregate results only — never ground truth, assessment answers, or free-text
+  reasoning. Wrap every storage access so private-mode failures degrade to a stateless
+  experience, and keep the visible "stored only in this browser — clear" affordance next to
+  anything the panel renders.

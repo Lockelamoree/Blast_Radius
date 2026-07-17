@@ -18,10 +18,16 @@ dependencies = [
   "uvicorn[standard]>=0.35,<1",
 ]
 
+[project.scripts]
+blastradius = "blast_radius.cli:main"
+blastradius-mcp = "blast_radius.mcp_server:main"
+
 [project.optional-dependencies]
+mcp = ["mcp>=1.2,<2"]
 dev = [
   "build>=1.2,<2",
   "httpx>=0.28,<1",
+  "mcp>=1.2,<2",
   "pytest>=8.4,<9",
   "pytest-asyncio>=1.1,<2",
   "ruff>=0.12,<1",

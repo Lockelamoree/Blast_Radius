@@ -360,7 +360,8 @@ class SessionState(BaseModel):
     id: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    mode: str = Field(pattern=r"^(demo|live)$")
+    mode: str = Field(pattern=r"^(demo|live|drill)$")
+    operator_handle: str | None = None
     pretest_answers: list[int] | None = None
     pretest_score: int | None = None
     pretest_competency: dict[str, dict[str, int]] = Field(default_factory=dict)
@@ -383,6 +384,10 @@ class SessionState(BaseModel):
     rounds_generated: int = Field(default=0, ge=0)
     grades: list[GradeResult] = Field(default_factory=list)
     competency: dict[str, dict[str, int]] = Field(default_factory=dict)
+    # Original decisions for verified (bank) rounds so a coached retry can
+    # re-grade revised reasoning with the action and sandbox policy held fixed.
+    decision_log: dict[str, PlayerDecision] = Field(default_factory=dict)
+    retried_grades: list[GradeResult] = Field(default_factory=list)
 
 
 class CompetencyProgress(BaseModel):
@@ -404,6 +409,13 @@ class RoundSummary(BaseModel):
     verdict: str = Field(pattern=r"^(correct|partial|wrong)$")
     action_correct: bool
     reasoning_score: int = Field(ge=0, le=100)
+    # Coached-retry outcome; null when the round was never revised. The baseline
+    # is the initial grade's DETERMINISTIC coverage, so the before/after chip
+    # compares like with like (the coached re-grade is deterministic-only).
+    retried: bool = False
+    retry_verdict: str | None = Field(default=None, pattern=r"^(correct|partial|wrong)$")
+    retry_reasoning_score: int | None = Field(default=None, ge=0, le=100)
+    retry_baseline_score: int | None = Field(default=None, ge=0, le=100)
 
 
 class CompetencyRef(BaseModel):
@@ -425,3 +437,74 @@ class LearnerProgress(BaseModel):
     share_text: str
     rounds: list[RoundSummary] = Field(default_factory=list)
     weakest_competency: CompetencyRef | None = None
+    rounds_needed_nudge: int = Field(default=0, ge=0)
+
+
+class DrillResult(BaseModel):
+    """Compact summary returned with the decision grade of a one-round drill."""
+
+    family: str
+    competency: CompetencyRef
+    verdict: str = Field(pattern=r"^(correct|partial|wrong)$")
+    action_correct: bool
+    reasoning_score: int = Field(ge=0, le=100)
+    share_text: str
+
+
+class SessionSummary(BaseModel):
+    """Scores-only row persisted when a full session finishes.
+
+    Deliberately carries no reasoning text, answers, or network identifiers —
+    only aggregates plus the optional self-chosen operator handle. Summaries
+    outlive the session TTL so the team board can aggregate finished runs."""
+
+    session_id: str
+    finished_at: datetime
+    mode: str
+    operator_handle: str | None = None
+    pretest: int = Field(ge=0)
+    posttest: int | None = Field(default=None, ge=0)
+    delta: int | None = None
+    rounds_played: int = Field(ge=0)
+    rounds_generated: int = Field(ge=0)
+    average_reasoning: int = Field(ge=0, le=100)
+    families_cleared: int = Field(ge=0)
+    weakest: str | None = None
+    competency_json: str = "{}"
+    finished_early: bool = False
+
+
+INSPECTOR_DISCLAIMER = (
+    "Deterministic keyword screen — no model ran. It flags known red-flag "
+    "patterns; it cannot prove an artifact is safe. 'looks-scoped' means no "
+    "known pattern matched."
+)
+
+
+class InspectionMatch(BaseModel):
+    matched: str
+    excerpt: str
+
+
+class InspectionFinding(BaseModel):
+    category: str
+    label: str
+    severity: str = Field(pattern=r"^(critical|caution)$")
+    families: list[str]
+    matches: list[InspectionMatch]
+
+
+class InspectionReport(BaseModel):
+    kind: str
+    verdict: str = Field(pattern=r"^(reject-recommended|sandbox-recommended|looks-scoped)$")
+    graded_by: str = "deterministic"
+    method: str = "keyword-heuristic"
+    disclaimer: str = INSPECTOR_DISCLAIMER
+    findings: list[InspectionFinding] = Field(default_factory=list)
+    families: list[dict[str, Any]] = Field(default_factory=list)
+    parsed_as: str | None = None
+    score: int | None = Field(default=None, ge=0, le=100)
+    baseline: str | None = Field(default=None, pattern=r"^(explicit|zero-trust)$")
+    policy_deltas: list[PolicyDelta] | None = None
+    learn: dict[str, str] | None = None
+    toolkit: dict[str, str] | None = None

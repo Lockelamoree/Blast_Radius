@@ -88,6 +88,23 @@ class ScenarioBank:
             raise LookupError("no fallback scenario remains")
         return random.Random(seed).choice(choices)
 
+    def drill_pick(
+        self,
+        *,
+        day: str,
+        client_key: str,
+        family: ScenarioFamily | None = None,
+    ) -> Scenario:
+        """Pick one verified scenario for a single-round daily drill.
+
+        Seeded by (day, client_key, family) so the same browser gets a stable
+        scenario within a day but a fresh one the next day; a family pin powers
+        spaced-repetition callbacks. The client key is used only to seed this
+        choice and is never persisted.
+        """
+        seed = f"drill:v1:{day}:{client_key}:{family.value if family else 'any'}"
+        return self.fallback(family=family, seed=seed)
+
     def demo_order(self, seed: str | None = None) -> list[str]:
         canonical = [
             "cmd-cleanup-2",

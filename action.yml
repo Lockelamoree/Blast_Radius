@@ -1,0 +1,33 @@
+name: "Blast Radius verify"
+description: >-
+  Run the Blast Radius production correctness gate over scenario drafts and,
+  optionally, screen a pull request's diff for known red-flag patterns.
+  Deterministic and offline — no model runs and no secrets are required.
+
+inputs:
+  scenarios:
+    description: "Glob of scenario JSON files to gate-verify (e.g. 'scenarios/*.json'). Empty to skip."
+    required: false
+    default: ""
+  diff-base:
+    description: "Git ref to diff against (e.g. the PR base sha). Empty to skip the diff screen."
+    required: false
+    default: ""
+  fail-on:
+    description: "Verdict level that fails the diff screen: reject | sandbox | never."
+    required: false
+    default: "reject"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install Blast Radius
+      shell: bash
+      run: python3 -m pip install "${GITHUB_ACTION_PATH}"
+    - name: Verify scenarios and screen the diff
+      shell: bash
+      env:
+        BR_SCENARIOS: ${{ inputs.scenarios }}
+        BR_DIFF_BASE: ${{ inputs.diff-base }}
+        BR_FAIL_ON: ${{ inputs.fail-on }}
+      run: bash "${GITHUB_ACTION_PATH}/scripts/action_verify.sh"

@@ -97,3 +97,19 @@ def test_bank_rejects_duplicate_form_competency(test_settings, tmp_path) -> None
 
     with pytest.raises(ValueError, match="post assessment"):
         ScenarioBank(data_dir)
+
+
+def test_drill_pick_is_deterministic_and_respects_family(test_settings) -> None:
+    bank = ScenarioBank(test_settings.data_dir)
+    first = bank.drill_pick(day="2026-07-18", client_key="client-abc")
+    again = bank.drill_pick(day="2026-07-18", client_key="client-abc")
+    assert first.id == again.id  # same day + client -> same scenario
+    next_day = bank.drill_pick(day="2026-07-19", client_key="client-abc")
+    # A different day usually rotates the scenario (not asserted strictly to
+    # avoid a 1/18 coincidence), but must still be a valid bank scenario.
+    assert next_day.id in bank.scenarios
+
+    pinned = bank.drill_pick(
+        day="2026-07-18", client_key="client-abc", family=ScenarioFamily.POISONED_DEPENDENCY
+    )
+    assert pinned.family == ScenarioFamily.POISONED_DEPENDENCY

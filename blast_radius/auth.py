@@ -13,6 +13,10 @@ import hashlib
 import hmac
 import time
 
+# Cookie carrying the signed access token. Lives here (not main.py) so API
+# routers can check roles without importing the app module (circular import).
+ACCESS_COOKIE = "br_access"
+
 
 def _b64encode(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).decode("ascii").rstrip("=")

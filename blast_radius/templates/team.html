@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#090a09">
+  <title>Blast Radius · Team board</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%23090a09'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-family='monospace' font-size='26' font-weight='700' fill='%23c8ff3d'%3EBR%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/styles.css?v=20260718-1">
+  <link rel="stylesheet" href="/static/team.css?v=20260718-1">
+</head>
+<body>
+  <div class="noise" aria-hidden="true"></div>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Blast Radius home">
+      <span class="brand-mark">BR</span><span>BLAST RADIUS</span>
+    </a>
+    <div class="status-pills">
+      <div class="status-pill"><span class="status-dot"></span> TEAM BOARD</div>
+      <div class="status-pill"><span class="status-dot"></span> developer view</div>
+    </div>
+  </header>
+
+  <main class="team-main">
+    <section class="team-screen">
+      <p class="kicker">TEAM BOARD / DEVELOPER VIEW</p>
+      <h1>Who has faced the blast radius.</h1>
+      <p class="lede">Finished sessions only. Handles are opt-in; anonymous sessions are aggregated as &ldquo;anonymous&rdquo;. Scores only &mdash; no reasoning text, answers, or IPs are stored.</p>
+
+      <p id="team-empty" class="team-empty hidden">No finished sessions yet — summaries appear when someone completes the post-test or finishes early. Drills are not counted.</p>
+      <p id="team-error" class="error hidden" role="alert"></p>
+
+      <h2 class="team-heading">Roster</h2>
+      <div class="table-scroll">
+        <table id="team-roster">
+          <thead>
+            <tr><th>Handle</th><th>Sessions</th><th>Best &Delta;</th><th>Weakest area</th><th>Families cleared</th><th>Avg tell coverage</th><th>Last seen</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <h2 class="team-heading">Recent sessions</h2>
+      <div class="table-scroll">
+        <table id="team-recent">
+          <thead>
+            <tr><th>Handle</th><th>Mode</th><th>Pre</th><th>Post</th><th>&Delta;</th><th>Rounds</th><th>Avg coverage</th><th>Finished</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="microcopy team-note">Handles are unverified display labels, not identities — they are not unique and grant no access. <a href="/author">Author a scenario &rarr;</a></p>
+    </section>
+  </main>
+
+  <footer><span>BLAST RADIUS / BUILD WEEK 2026</span><span>Scores only. Nothing here is executed.</span></footer>
+  <script src="/static/team.js?v=20260718-1" defer></script>
+</body>
+</html>

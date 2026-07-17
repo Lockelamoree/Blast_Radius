@@ -76,6 +76,15 @@ class Settings:
     session_round_request_cap: int = int(
         os.getenv("BLAST_RADIUS_SESSION_ROUND_REQUEST_CAP", "30")
     )
+    check_limit_per_minute: int = int(
+        os.getenv("BLAST_RADIUS_CHECK_LIMIT_PER_MINUTE", "20")
+    )
+    gate_verify_limit_per_minute: int = int(
+        os.getenv("BLAST_RADIUS_GATE_VERIFY_LIMIT_PER_MINUTE", "10")
+    )
+    team_summary_limit_per_minute: int = int(
+        os.getenv("BLAST_RADIUS_TEAM_SUMMARY_LIMIT_PER_MINUTE", "30")
+    )
     generator_model: str = "gpt-5.6-luna"
     critic_model: str = "gpt-5.6-sol"
     generator_max_output_tokens: int = int(

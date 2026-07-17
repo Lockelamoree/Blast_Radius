@@ -193,3 +193,58 @@ def test_open_redirect_target_is_sanitised(
         )
         assert unlocked.status_code == 303
         assert unlocked.headers["location"] == "/"
+
+
+def _unlock(client: TestClient, code: str) -> None:
+    response = client.post(
+        "/access", data={"code": code, "next": "/"}, follow_redirects=False
+    )
+    assert response.status_code == 303
+    assert client.cookies.get("br_access")
+
+
+def test_team_summary_requires_developer_role(auth_settings: Settings) -> None:
+    # No cookie -> the middleware 401s /api/* before the handler runs.
+    with TestClient(create_app(auth_settings)) as client:
+        assert client.get("/api/team/summary").status_code == 401
+
+    # Judge cookie reaches the handler but is downgraded to 403.
+    with TestClient(create_app(auth_settings)) as client:
+        _unlock(client, "JUDGE-TOKEN-1")
+        assert client.get("/api/team/summary").status_code == 403
+
+    # Developer cookie is allowed.
+    with TestClient(create_app(auth_settings)) as client:
+        _unlock(client, "DEV-TOKEN-2")
+        ok = client.get("/api/team/summary")
+        assert ok.status_code == 200
+        assert "roster" in ok.json()
+
+
+def test_team_and_author_pages_are_developer_only(auth_settings: Settings) -> None:
+    with TestClient(create_app(auth_settings)) as client:
+        anon = client.get("/team", follow_redirects=False)
+        assert anon.status_code == 303
+        assert anon.headers["location"].startswith("/access")
+
+    for path in ("/team", "/author"):
+        with TestClient(create_app(auth_settings)) as client:
+            _unlock(client, "JUDGE-TOKEN-1")
+            assert client.get(path).status_code == 403
+        with TestClient(create_app(auth_settings)) as client:
+            _unlock(client, "DEV-TOKEN-2")
+            assert client.get(path).status_code == 200
+
+
+def test_team_views_are_open_when_auth_is_disabled(tmp_path: Path) -> None:
+    package_dir = Path(__file__).resolve().parents[1] / "blast_radius"
+    open_settings = Settings(
+        base_dir=package_dir,
+        database_path=tmp_path / "open.db",
+        openai_api_key=None,
+        live_generation=False,
+    )
+    with TestClient(create_app(open_settings)) as client:
+        assert client.get("/api/team/summary").status_code == 200
+        assert client.get("/team").status_code == 200
+        assert client.get("/author").status_code == 200

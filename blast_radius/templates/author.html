@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#090a09">
+  <title>Blast Radius · Author a scenario</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%23090a09'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-family='monospace' font-size='26' font-weight='700' fill='%23c8ff3d'%3EBR%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/styles.css?v=20260718-1">
+  <link rel="stylesheet" href="/static/author.css?v=20260718-1">
+</head>
+<body>
+  <div class="noise" aria-hidden="true"></div>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Blast Radius home">
+      <span class="brand-mark">BR</span><span>BLAST RADIUS</span>
+    </a>
+    <div class="status-pills">
+      <div class="status-pill"><span class="status-dot"></span> AUTHORING</div>
+      <div class="status-pill"><span class="status-dot"></span> developer view</div>
+    </div>
+  </header>
+
+  <main class="author-main">
+    <section class="author-screen">
+      <p class="kicker">AUTHORING / DEVELOPER VIEW</p>
+      <h1>Turn a real incident into a scenario.</h1>
+      <p class="lede">Draft a scenario and validate it against the <strong>production correctness gate</strong> before opening a PR. The gate only passes drafts that reference an existing <code>template_ref</code> and cite sources already approved for that template. New templates or citations enter via PR + the <code>verify-scenario</code> CI check &mdash; the running bank is never mutated here.</p>
+
+      <div class="author-actions">
+        <button id="author-template" type="button" class="button ghost">Insert starter skeleton</button>
+        <button id="author-validate" type="button" class="button primary">Validate against the production gate</button>
+        <button id="author-download" type="button" class="button ghost" disabled>Download scenario.json</button>
+      </div>
+
+      <label class="author-label" for="scenario-draft">SCENARIO JSON DRAFT</label>
+      <textarea id="scenario-draft" spellcheck="false" autocapitalize="off" autocomplete="off"
+        placeholder="Paste a scenario JSON draft, or click Insert starter skeleton."></textarea>
+
+      <output id="author-result" class="author-result"></output>
+      <ul id="author-reasons" class="author-reasons"></ul>
+      <p class="microcopy">Nothing here is executed. Validation runs the same deterministic gate that guards every live scenario.</p>
+    </section>
+  </main>
+
+  <footer><span>BLAST RADIUS / BUILD WEEK 2026</span><span>Drafts enter the bank only via PR + CI.</span></footer>
+  <script src="/static/author.js?v=20260718-1" defer></script>
+</body>
+</html>

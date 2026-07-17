@@ -30,8 +30,8 @@ jobs:
         run: python -m pytest
       - name: Verify the curated scenario bank
         run: python .agents/skills/verify-scenario/scripts/verify_scenarios.py
-      - name: Check deployment script syntax
-        run: bash -n deploy/deploy.sh
+      - name: Check shell script syntax
+        run: bash -n deploy/deploy.sh scripts/action_verify.sh
       - name: Build wheel
         run: python -m build --wheel
       - name: Verify packaged runtime resources
@@ -54,3 +54,5 @@ jobs:
           BLAST_RADIUS_DATABASE="$RUNNER_TEMP/wheel-smoke.db" \
             "$RUNNER_TEMP/wheel-smoke/bin/python" -c \
             "from blast_radius.main import app; assert app.title == 'Blast Radius'"
+          "$RUNNER_TEMP/wheel-smoke/bin/blastradius" verify --bank
+          printf 'pytest -q' | "$RUNNER_TEMP/wheel-smoke/bin/blastradius" check --kind command - --fail-on never

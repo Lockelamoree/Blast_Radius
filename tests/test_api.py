@@ -423,7 +423,12 @@ def test_full_demo_session(client, test_settings) -> None:
             "verdict",
             "action_correct",
             "reasoning_score",
+            "retried",
+            "retry_verdict",
+            "retry_reasoning_score",
+            "retry_baseline_score",
         }
+        assert entry["retried"] is False
     weakest = result.json()["weakest_competency"]
     assert weakest["key"] in {item.value for item in Competency}
     assert weakest["label"]
@@ -842,3 +847,220 @@ def test_session_assessments_preserve_options_but_shuffle_positions(
         assert public["options"] != source.options
         assert "correct_index" not in public
         assert "form" not in public
+
+
+def _answered_wrong_or_partial(client: TestClient) -> tuple[str, str, str]:
+    """Complete a full demo pretest, then answer round 1 'reject' with tell-free
+    reasoning — partial (reject scenario) or wrong (approve/sandbox), both
+    retriable in a non-drill session. Returns (session_id, scenario_id, verdict)."""
+    session_id = create_started_session(client)
+    round_data = client.post(f"/api/sessions/{session_id}/rounds/next").json()
+    scenario_id = round_data["scenario"]["id"]
+    graded = client.post(
+        f"/api/sessions/{session_id}/decisions",
+        json={
+            "scenario_id": scenario_id,
+            "action": "reject",
+            "reasoning_text": "I have a general bad feeling about this request overall.",
+        },
+    ).json()
+    return session_id, scenario_id, graded["grade"]["verdict"]
+
+
+def test_retry_regrades_deterministically_without_touching_budget(client) -> None:
+    session_id, scenario_id, verdict = _answered_wrong_or_partial(client)
+    assert verdict in {"partial", "wrong"}
+    response = client.post(
+        f"/api/sessions/{session_id}/rounds/retry",
+        json={
+            "scenario_id": scenario_id,
+            "reasoning_text": "On reflection this reads as an unapproved secret and network egress risk.",
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["initial"]["verdict"] == verdict
+    assert body["coached"]["graded_by"] == "deterministic"
+    assert body["coached"]["critic_used"] is False
+    assert "improved" in body
+    # Second retry on the same round is refused.
+    again = client.post(
+        f"/api/sessions/{session_id}/rounds/retry",
+        json={"scenario_id": scenario_id, "reasoning_text": "Another attempt at the reasoning."},
+    )
+    assert again.status_code == 409
+
+
+def test_retry_rejects_unanswered_generated_and_unknown_rounds(client) -> None:
+    # A non-drill session so the drill guard doesn't mask the checks under test.
+    session_id = create_started_session(client)
+    round_data = client.post(f"/api/sessions/{session_id}/rounds/next").json()
+    scenario_id = round_data["scenario"]["id"]
+    # Not answered yet.
+    unanswered = client.post(
+        f"/api/sessions/{session_id}/rounds/retry",
+        json={"scenario_id": scenario_id, "reasoning_text": "Trying to revise too early here."},
+    )
+    assert unanswered.status_code == 409
+    # A generated (live-*) id is never retriable.
+    generated = client.post(
+        f"/api/sessions/{session_id}/rounds/retry",
+        json={"scenario_id": "live-deadbeef", "reasoning_text": "Revising a generated round."},
+    )
+    assert generated.status_code == 409
+
+
+def test_retry_refuses_correct_rounds_and_feeds_results(client, test_settings) -> None:
+    bank = ScenarioBank(test_settings.data_dir)
+    created = client.post("/api/sessions", json={"mode": "demo"}).json()
+    session_id = created["session_id"]
+    pre_answers = assessment_answers(bank, created["pretest"])
+    client.post(f"/api/sessions/{session_id}/pretest", json={"answers": pre_answers})
+
+    retried_partial: str | None = None
+    for _ in range(6):
+        round_data = client.post(f"/api/sessions/{session_id}/rounds/next").json()
+        scenario_id = round_data["scenario"]["id"]
+        if scenario_id == "cmd-cleanup-2":
+            payload = {
+                "scenario_id": scenario_id,
+                "action": "sandbox",
+                "reasoning_text": "Bound the destructive generated-directory cleanup to the workspace.",
+                "blast_radius_config": {
+                    "readable_paths": ["/workspace/htmlcov"],
+                    "writable_paths": ["/workspace/htmlcov"],
+                    "network_enabled": False,
+                    "network_allowlist": [],
+                    "capabilities": ["delete-generated-files"],
+                },
+            }
+        else:
+            payload = {
+                "scenario_id": scenario_id,
+                "action": "reject",
+                "reasoning_text": "I have a general bad feeling about this request overall.",
+            }
+        grade = client.post(f"/api/sessions/{session_id}/decisions", json=payload).json()["grade"]
+        if grade["verdict"] == "correct" and retried_partial is None:
+            # A correct round cannot be revised.
+            refused = client.post(
+                f"/api/sessions/{session_id}/rounds/retry",
+                json={"scenario_id": scenario_id, "reasoning_text": "Trying to revise a correct round."},
+            )
+            assert refused.status_code == 409
+        if grade["verdict"] in {"partial", "wrong"} and retried_partial is None:
+            retried_partial = scenario_id
+            client.post(
+                f"/api/sessions/{session_id}/rounds/retry",
+                json={
+                    "scenario_id": scenario_id,
+                    "reasoning_text": "On reflection the artifacts show an unapproved egress and secret risk.",
+                },
+            )
+
+    assert retried_partial is not None
+    client.post(f"/api/sessions/{session_id}/finish-early")
+    results = client.get(f"/api/sessions/{session_id}/results").json()
+    assert results["rounds_needed_nudge"] >= 1
+    retried_rows = [row for row in results["rounds"] if row["retried"]]
+    assert retried_rows
+    assert retried_rows[0]["retry_verdict"] is not None
+
+
+def test_retry_survives_legacy_state_without_decision_log(client, test_settings) -> None:
+    from blast_radius.storage import SessionStore
+
+    session_id, scenario_id, _ = _answered_wrong_or_partial(client)
+    store = SessionStore(test_settings.database_path, test_settings.session_ttl_minutes)
+    state = store.get(session_id)
+    # Simulate a session answered before decision_log existed.
+    state.decision_log = {}
+    store.save(state)
+    response = client.post(
+        f"/api/sessions/{session_id}/rounds/retry",
+        json={"scenario_id": scenario_id, "reasoning_text": "Revising after a legacy upgrade path."},
+    )
+    assert response.status_code == 409
+
+
+def _complete_demo(client, bank, *, handle=None, correct=True):
+    payload = {"mode": "demo"}
+    if handle is not None:
+        payload["operator_handle"] = handle
+    created = client.post("/api/sessions", json=payload).json()
+    session_id = created["session_id"]
+    pre = assessment_answers(bank, created["pretest"])
+    client.post(f"/api/sessions/{session_id}/pretest", json={"answers": pre})
+    for _ in range(6):
+        round_data = client.post(f"/api/sessions/{session_id}/rounds/next").json()
+        scenario_id = round_data["scenario"]["id"]
+        if scenario_id == "cmd-cleanup-2":
+            body = {
+                "scenario_id": scenario_id,
+                "action": "sandbox",
+                "reasoning_text": "Bound the destructive generated-directory cleanup to the workspace.",
+                "blast_radius_config": {
+                    "readable_paths": ["/workspace/htmlcov"],
+                    "writable_paths": ["/workspace/htmlcov"],
+                    "network_enabled": False,
+                    "network_allowlist": [],
+                    "capabilities": ["delete-generated-files"],
+                },
+            }
+        else:
+            body = {
+                "scenario_id": scenario_id,
+                "action": "reject",
+                "reasoning_text": "The artifacts show an unapproved secret, scope, provenance, or egress risk.",
+            }
+        client.post(f"/api/sessions/{session_id}/decisions", json=body)
+    done = client.post(f"/api/sessions/{session_id}/rounds/next").json()
+    post = assessment_answers(bank, done["posttest"], incorrect_ids=set() if correct else {q["id"] for q in done["posttest"]})
+    client.post(f"/api/sessions/{session_id}/posttest", json={"answers": post})
+    return session_id
+
+
+def test_operator_handle_is_validated(client) -> None:
+    assert client.post("/api/sessions", json={"mode": "demo", "operator_handle": "x"}).status_code == 422
+    assert client.post("/api/sessions", json={"mode": "demo", "operator_handle": "a" * 41}).status_code == 422
+    assert client.post("/api/sessions", json={"mode": "demo", "operator_handle": "no@emails"}).status_code == 422
+    ok = client.post("/api/sessions", json={"mode": "demo", "operator_handle": "max-g"})
+    assert ok.status_code == 201
+    assert ok.json()["operator_handle"] == "max-g"
+    # The documented/advertised maximum of exactly 40 characters must be accepted.
+    boundary = client.post("/api/sessions", json={"mode": "demo", "operator_handle": "a" * 40})
+    assert boundary.status_code == 201
+
+
+def test_finished_sessions_write_a_durable_team_summary(client, test_settings) -> None:
+    bank = ScenarioBank(test_settings.data_dir)
+    _complete_demo(client, bank, handle="max-g")
+    summary = client.get("/api/team/summary").json()
+    assert summary["summaries"], "a finished session should produce a summary row"
+    row = summary["summaries"][0]
+    assert row["operator_handle"] == "max-g"
+    assert row["posttest"] is not None
+    handles = {entry["handle"] for entry in summary["roster"]}
+    assert "max-g" in handles
+
+
+def test_team_summary_aggregates_anonymous_and_survives_ttl(client, test_settings) -> None:
+    bank = ScenarioBank(test_settings.data_dir)
+    _complete_demo(client, bank)  # no handle -> anonymous
+    _complete_demo(client, bank, handle="dana")
+    summary = client.get("/api/team/summary").json()
+    handles = {entry["handle"] for entry in summary["roster"]}
+    assert "anonymous" in handles
+    assert "dana" in handles
+    assert "persist beyond" in summary["window"]
+
+
+def test_drill_never_writes_a_team_summary(client) -> None:
+    created = client.post("/api/sessions", json={"mode": "drill"}).json()
+    session_id = created["session_id"]
+    scenario = client.post(f"/api/sessions/{session_id}/rounds/next").json()["scenario"]
+    client.post(
+        f"/api/sessions/{session_id}/decisions",
+        json={"scenario_id": scenario["id"], "action": "reject", "reasoning_text": "Rejecting this drill request outright."},
+    )
+    assert client.get("/api/team/summary").json()["summaries"] == []
