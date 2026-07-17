@@ -394,6 +394,11 @@ progress.mastery-track::-moz-progress-bar {
   cursor: pointer;
 }
 
+.sandbox-note {
+  margin-top: 14px;
+  color: #a5a99d;
+}
+
 .verdict-debrief {
   margin: 22px auto 0;
   max-width: 560px;

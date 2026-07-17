@@ -231,6 +231,20 @@ def test_verdict_receipt_renders_provenance_tells_and_divergence() -> None:
     assert ".tell-chip" in css
 
 
+def test_sandbox_honesty_note_is_wired() -> None:
+    root = Path(__file__).parents[1]
+    template = (root / "blast_radius" / "templates" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    app = (root / "blast_radius" / "static" / "app.js").read_text(encoding="utf-8")
+
+    # When the player sandboxed a scenario that has no policy to grade, say so
+    # instead of showing a bare "—".
+    assert 'id="sandbox-note"' in template
+    assert "Sandbox config noted" in app
+    assert "state.selectedAction==='sandbox'&&grade.blast_radius_score===null" in app
+
+
 def test_guardrail_export_is_wired_and_covers_every_family() -> None:
     root = Path(__file__).parents[1]
     template = (root / "blast_radius" / "templates" / "index.html").read_text(
