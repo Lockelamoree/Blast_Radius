@@ -48,6 +48,10 @@ curated anchor -> optional Luna presentation reskin -> deterministic gate -> Sol
 
 Hosted demo: **(https://blastradius.max-gutowski.de/)**
 
+The hosted demo is in private preview behind an access code — judges enter the code from the
+Devpost testing-access field. The local run below needs no code and reproduces the full
+verified experience offline.
+
 Requirements:
 
 - Python 3.11 or newer
@@ -340,8 +344,8 @@ dated history is the evidence.
 - [ ] Hosted URL passes a logged-out browser run with no console errors
 - [ ] `/healthz` reports revision, 18 scenarios, the intended generation state, and live Sol grading
 - [ ] Genuine live-grade artifact is cross-checked against the service log and secret-scanned
-- [ ] One consented named pre/post run replaces the truthful TODO
-- [ ] Genuine `/feedback` Session ID replaces the truthful TODO
+- [ ] Run one consented named pre/post session and record the measured learning delta (currently "Not yet measured")
+- [x] Genuine `/feedback` Session ID captured in the README (see "Built with Codex" above)
 - [ ] Public YouTube demo is under three minutes, has audio, and shows the live proof
 - [ ] Fresh-machine setup is rehearsed
 - [ ] Demo remains available through August 5, 2026
