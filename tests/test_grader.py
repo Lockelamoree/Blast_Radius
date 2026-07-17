@@ -55,6 +55,48 @@ def test_overbroad_sandbox_loses_points(test_settings) -> None:
     assert grade.verdict == "partial"
 
 
+def test_sandbox_policy_deltas_flag_excess_as_leak(test_settings) -> None:
+    scenario = ScenarioBank(test_settings.data_dir).get("tool-docs-2")
+    expected = scenario.ground_truth.safe_blast_radius
+    payload = expected.model_dump(mode="json")
+    payload["capabilities"].append("read-secrets")
+    grade = grade_decision(
+        scenario,
+        PlayerDecision(
+            scenario_id=scenario.id,
+            action="sandbox",
+            reasoning_text="Use a narrow docs allowlist and read-only scope.",
+            blast_radius_config=BlastRadiusConfig.model_validate(payload),
+        ),
+    )
+    assert grade.safe_policy is not None
+    assert grade.policy_deltas is not None
+    statuses = {delta.dimension: delta.status for delta in grade.policy_deltas}
+    # The extra capability the player granted beyond the safe baseline is the leak.
+    assert statuses["Capabilities"] == "excess"
+    assert {delta.dimension for delta in grade.policy_deltas} == {
+        "Readable paths",
+        "Writable paths",
+        "Network hosts",
+        "Capabilities",
+        "Network egress",
+    }
+
+
+def test_non_sandbox_grade_has_no_policy_comparison(test_settings) -> None:
+    scenario = ScenarioBank(test_settings.data_dir).get("cmd-exfil-1")
+    grade = grade_decision(
+        scenario,
+        PlayerDecision(
+            scenario_id=scenario.id,
+            action="reject",
+            reasoning_text="It collects SSH credentials and uses curl for unapproved network egress.",
+        ),
+    )
+    assert grade.safe_policy is None
+    assert grade.policy_deltas is None
+
+
 def test_exact_safe_sandbox_policy_scores_100(test_settings) -> None:
     scenario = ScenarioBank(test_settings.data_dir).get("tool-docs-2")
 

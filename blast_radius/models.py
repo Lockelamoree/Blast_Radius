@@ -289,6 +289,13 @@ class Receipt(BaseModel):
         return value
 
 
+class PolicyDelta(BaseModel):
+    dimension: str
+    yours: str
+    safe: str
+    status: str = Field(pattern=r"^(ok|missing|excess)$")
+
+
 class GradeResult(BaseModel):
     scenario_id: str
     family: str | None = None
@@ -310,6 +317,8 @@ class GradeResult(BaseModel):
     grading_degraded_reason: str | None = None
     deterministic_matched_tells: list[str] = Field(default_factory=list)
     critic_matched_tells: list[str] = Field(default_factory=list)
+    safe_policy: BlastRadiusConfig | None = None
+    policy_deltas: list[PolicyDelta] | None = None
 
 
 class TestQuestion(BaseModel):

@@ -231,6 +231,24 @@ def test_verdict_receipt_renders_provenance_tells_and_divergence() -> None:
     assert ".tell-chip" in css
 
 
+def test_sandbox_policy_debrief_table_is_wired() -> None:
+    root = Path(__file__).parents[1]
+    template = (root / "blast_radius" / "templates" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    app = (root / "blast_radius" / "static" / "app.js").read_text(encoding="utf-8")
+    css = (root / "blast_radius" / "static" / "improvements.css").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'id="policy-compare"' in template
+    assert "Compare your sandbox" in template
+    assert 'id="policy-rows"' in template
+    assert "grade.policy_deltas" in app
+    assert "delta.status==='excess'?'LEAK'" in app
+    assert ".policy-row.excess" in css
+
+
 def test_sandbox_honesty_note_is_wired() -> None:
     root = Path(__file__).parents[1]
     template = (root / "blast_radius" / "templates" / "index.html").read_text(

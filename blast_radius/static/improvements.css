@@ -458,6 +458,61 @@ progress.mastery-track::-moz-progress-bar {
   white-space: nowrap;
 }
 
+.policy-compare {
+  margin: 22px auto 0;
+  max-width: 560px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+}
+
+.policy-compare summary {
+  cursor: pointer;
+  color: var(--muted);
+  font: 9px var(--mono);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.policy-compare table {
+  width: 100%;
+  margin-top: 14px;
+  border-collapse: collapse;
+  font: 10px/1.5 var(--mono);
+}
+
+.policy-compare th {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-weight: 400;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  text-align: left;
+}
+
+.policy-compare td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #1c1f19;
+  color: #c8ccc0;
+  word-break: break-word;
+}
+
+.policy-status {
+  font-weight: 700;
+}
+
+.policy-row.excess .policy-status {
+  color: var(--orange);
+}
+
+.policy-row.ok .policy-status {
+  color: var(--acid);
+}
+
+.policy-row.missing .policy-status {
+  color: var(--blue);
+}
+
 .button:disabled {
   opacity: .45;
   cursor: not-allowed;

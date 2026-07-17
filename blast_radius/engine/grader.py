@@ -7,6 +7,7 @@ from blast_radius.models import (
     BlastRadiusConfig,
     GradeResult,
     PlayerDecision,
+    PolicyDelta,
     Receipt,
     Scenario,
 )
@@ -146,6 +147,60 @@ def score_blast_radius(actual: BlastRadiusConfig, expected: BlastRadiusConfig) -
     return max(0, score)
 
 
+def _format_scope(values: list[str]) -> str:
+    return ", ".join(values) if values else "—"
+
+
+def compute_policy_deltas(
+    actual: BlastRadiusConfig, expected: BlastRadiusConfig
+) -> list[PolicyDelta]:
+    """Compare a sandbox policy to the safe baseline, dimension by dimension.
+
+    Same set logic as score_blast_radius: scope beyond the baseline is the leak
+    (``excess``), scope the baseline needs but the player omitted is ``missing``,
+    an exact match is ``ok``.
+    """
+    deltas: list[PolicyDelta] = []
+    scoped = [
+        ("Readable paths", actual.readable_paths, expected.readable_paths),
+        ("Writable paths", actual.writable_paths, expected.writable_paths),
+        ("Network hosts", actual.network_allowlist, expected.network_allowlist),
+        ("Capabilities", actual.capabilities, expected.capabilities),
+    ]
+    for label, actual_values, expected_values in scoped:
+        actual_set = set(actual_values)
+        expected_set = set(expected_values)
+        if actual_set - expected_set:
+            status = "excess"
+        elif expected_set - actual_set:
+            status = "missing"
+        else:
+            status = "ok"
+        deltas.append(
+            PolicyDelta(
+                dimension=label,
+                yours=_format_scope(actual_values),
+                safe=_format_scope(expected_values),
+                status=status,
+            )
+        )
+    if actual.network_enabled and not expected.network_enabled:
+        network_status = "excess"
+    elif expected.network_enabled and not actual.network_enabled:
+        network_status = "missing"
+    else:
+        network_status = "ok"
+    deltas.append(
+        PolicyDelta(
+            dimension="Network egress",
+            yours="on" if actual.network_enabled else "off",
+            safe="on" if expected.network_enabled else "off",
+            status=network_status,
+        )
+    )
+    return deltas
+
+
 def grade_decision(scenario: Scenario, decision: PlayerDecision) -> GradeResult:
     truth = scenario.ground_truth
     action_correct = decision.action == truth.correct_action
@@ -158,8 +213,14 @@ def grade_decision(scenario: Scenario, decision: PlayerDecision) -> GradeResult:
     reasoning_score = round(100 * len(matched) / len(truth.tells))
 
     blast_score: int | None = None
+    safe_policy: BlastRadiusConfig | None = None
+    policy_deltas: list[PolicyDelta] | None = None
     if decision.action == Action.SANDBOX and truth.safe_blast_radius:
         blast_score = score_blast_radius(decision.blast_radius_config, truth.safe_blast_radius)
+        safe_policy = truth.safe_blast_radius
+        policy_deltas = compute_policy_deltas(
+            decision.blast_radius_config, truth.safe_blast_radius
+        )
 
     if action_correct and reasoning_score >= 60 and (blast_score is None or blast_score >= 70):
         verdict = "correct"
@@ -191,6 +252,8 @@ def grade_decision(scenario: Scenario, decision: PlayerDecision) -> GradeResult:
         explanation=truth.explanation,
         socratic_followup=followup,
         deterministic_matched_tells=list(matched),
+        safe_policy=safe_policy,
+        policy_deltas=policy_deltas,
     )
 
 
