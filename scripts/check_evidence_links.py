@@ -9,9 +9,10 @@ from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
-SCENARIOS_PATH = (
-    Path(__file__).resolve().parents[1] / "blast_radius" / "data" / "scenarios.json"
-)
+DATA_DIR = Path(__file__).resolve().parents[1] / "blast_radius" / "data"
+SCENARIOS_PATH = DATA_DIR / "scenarios.json"
+LEARN_PATH = DATA_DIR / "learn.json"
+TOOLKIT_PATH = DATA_DIR / "toolkit.json"
 TIMEOUT_SECONDS = 10
 USER_AGENT = "Blast-Radius-Evidence-Link-Check/1.0"
 
@@ -65,6 +66,32 @@ def load_sources(path: Path = SCENARIOS_PATH) -> list[str]:
             if not isinstance(source, str) or not source.strip():
                 raise ValueError(f"{scenario_id} has an evidence record without a source")
             sources.add(source)
+    return sorted(sources)
+
+
+def load_learning_sources(
+    learn_path: Path = LEARN_PATH, toolkit_path: Path = TOOLKIT_PATH
+) -> list[str]:
+    """Collect every cited URL from the learn field guide and the toolkit.
+
+    These ship the same trust promise as scenario evidence: no dead or
+    redirected links. Missing files are tolerated so the scenario check still
+    runs on repositories that predate these sections.
+    """
+    sources: set[str] = set()
+    specs = ((learn_path, "modules", "sources"), (toolkit_path, "cards", "tools"))
+    for path, _label, url_key in specs:
+        if not path.exists():
+            continue
+        with path.open(encoding="utf-8") as handle:
+            entries = json.load(handle)
+        if not isinstance(entries, list) or not entries:
+            raise ValueError(f"{path.name} must contain a non-empty list")
+        for entry in entries:
+            for record in entry.get(url_key, []) if isinstance(entry, dict) else []:
+                source = record.get("url") if isinstance(record, dict) else None
+                if isinstance(source, str) and source.strip():
+                    sources.add(source)
     return sorted(sources)
 
 
@@ -129,7 +156,7 @@ def check_url(url: str) -> tuple[bool, str]:
 
 def main() -> int:
     try:
-        sources = load_sources()
+        sources = sorted(set(load_sources()) | set(load_learning_sources()))
     except (OSError, json.JSONDecodeError, ValueError) as exc:
         print(f"[FAIL] unable to load evidence sources: {exc}", file=sys.stderr)
         return 1
@@ -141,7 +168,10 @@ def main() -> int:
         print(f"[{label}] {detail} {source}")
         failures += not ok
 
-    print(f"Checked {len(sources)} distinct evidence source(s); failures: {failures}")
+    print(
+        f"Checked {len(sources)} distinct source(s) across scenarios, field guide, "
+        f"and toolkit; failures: {failures}"
+    )
     return 1 if failures else 0
 
 

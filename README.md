@@ -96,7 +96,8 @@ python scripts/check_evidence_links.py
 ```
 
 The link checker is intentionally standalone—not part of pytest or CI—because it needs the
-network. It fails on dead sources and redirects. GitHub Actions runs Ruff, pytest, the
+network. It fails on dead sources and redirects, and covers the field-guide and toolkit
+citations (`learn.json`, `toolkit.json`) under the same rule as scenario evidence. GitHub Actions runs Ruff, pytest, the
 18-scenario verifier, wheel construction, and packaged-resource inspection on Python 3.11 and
 3.13.
 
@@ -106,6 +107,8 @@ Useful endpoints:
 |---|---|
 | `GET /healthz` | Non-sensitive health, critic/generation state, bank size, and revision |
 | `GET /api/demo/gate-catch?case=tell\|citation` | Show the gate rejecting a planted hallucination |
+| `GET /api/learn` | Field-guide modules (threat, tells, safe default, cited sources) per family |
+| `GET /api/toolkit` | Copy-paste defenses and vetted tools per family |
 | `POST /api/sessions` | Start a `demo` or `live` session |
 | `POST /api/sessions/{id}/pretest` | Submit the shuffled baseline form |
 | `POST /api/sessions/{id}/rounds/next` | Retrieve a presentation-only scenario |

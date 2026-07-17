@@ -1,11 +1,13 @@
 import asyncio
 import hashlib
+import json
 import logging
 import time
 from collections import deque
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+from pathlib import Path
 from threading import Lock
 from typing import Annotated
 from uuid import uuid4
@@ -136,6 +138,15 @@ class SlidingWindowLimiter:
             bucket.append(now)
 
 
+def _load_content_list(path: Path) -> list[dict]:
+    """Load a read-only content file (learn/toolkit) as a validated JSON list."""
+    with path.open(encoding="utf-8") as handle:
+        value = json.load(handle)
+    if not isinstance(value, list) or not value:
+        raise ValueError(f"{path.name} must contain a non-empty JSON list")
+    return value
+
+
 def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -> APIRouter:
     router = APIRouter(prefix="/api")
     limiter = SlidingWindowLimiter()
@@ -152,6 +163,9 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
         window_seconds=settings.session_ttl_minutes * 60,
     )
     session_mutations = SessionMutationLocks()
+
+    learn_modules = _load_content_list(engine.bank.data_dir / "learn.json")
+    toolkit_cards = _load_content_list(engine.bank.data_dir / "toolkit.json")
 
     def client_host(request: Request) -> str:
         return request.client.host if request.client else "unknown"
@@ -296,6 +310,16 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
             "passed": result.passed,
             "reasons": result.reasons,
         }
+
+    @router.get("/learn")
+    def learn(request: Request) -> dict:
+        limiter.check(f"learn:{client_host(request)}")
+        return {"modules": learn_modules}
+
+    @router.get("/toolkit")
+    def toolkit(request: Request) -> dict:
+        limiter.check(f"toolkit:{client_host(request)}")
+        return {"cards": toolkit_cards}
 
     @router.post("/sessions", status_code=status.HTTP_201_CREATED)
     def create_session(payload: CreateSessionRequest, request: Request) -> dict:

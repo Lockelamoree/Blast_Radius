@@ -1,0 +1,108 @@
+[
+  {
+    "family": "dangerous_command",
+    "competency": "scope",
+    "title": "Dangerous commands",
+    "threat": "An agent proposes a shell command that looks like routine troubleshooting but quietly reads credentials or ships data off the machine. The damage is done the moment it runs — there is no undo for an exfiltrated key.",
+    "tells": [
+      "Reads secret material: ~/.ssh, ~/.aws, .env, token or keyring paths",
+      "Pipes output to the network: curl, wget, nc, or a raw IP / unfamiliar host",
+      "Destructive scope beyond the task: rm -rf, DROP, or deletes outside the working directory"
+    ],
+    "safe_default": "Reject anything that reads secret material or sends data to an unapproved host. When a destructive action is genuinely justified, sandbox it to the exact directory it needs instead of approving it wholesale.",
+    "sources": [
+      { "type": "reading", "title": "CWE-200: Exposure of Sensitive Information", "publisher": "MITRE CWE", "url": "https://cwe.mitre.org/data/definitions/200.html", "note": "How credential and secret exposure to an unauthorized actor is classified." },
+      { "type": "reading", "title": "CWE-78: OS Command Injection", "publisher": "MITRE CWE", "url": "https://cwe.mitre.org/data/definitions/78.html", "note": "Why an untrusted command string is dangerous to execute as-is." },
+      { "type": "reading", "title": "LLM06:2025 Excessive Agency", "publisher": "OWASP GenAI", "url": "https://genai.owasp.org/llmrisk/llm062025-excessive-agency/", "note": "Excessive permissions and autonomy are why one approval can go so wrong." },
+      { "type": "reading", "title": "T1041: Exfiltration Over C2 Channel", "publisher": "MITRE ATT&CK", "url": "https://attack.mitre.org/techniques/T1041/", "note": "How stolen data is shipped out over an existing network channel." }
+    ]
+  },
+  {
+    "family": "poisoned_dependency",
+    "competency": "provenance",
+    "title": "Poisoned dependencies",
+    "threat": "An install pulls a package that is a typo away from the real one, or a public package that shadows your private one (dependency confusion). Its install scripts run with your privileges before any of your code does.",
+    "tells": [
+      "Near-miss package name: a plausible typo of a well-known library",
+      "Not in the reviewed lockfile, or an unexpected version / publisher",
+      "A public package resolves where a private, internal one was expected"
+    ],
+    "safe_default": "Install only the exact name, version, and hash in your reviewed lockfile. Treat a near-miss name or an unexpected public package that shadows a private one as a supply-chain attack and reject it until provenance is verified.",
+    "sources": [
+      { "type": "reading", "title": "Avoiding npm substitution attacks", "publisher": "GitHub Security", "url": "https://github.blog/security/supply-chain-security/avoiding-npm-substitution-attacks/", "note": "Dependency-confusion / substitution attacks and how registry scoping defends against them." },
+      { "type": "reading", "title": "Secure installs", "publisher": "pip / Python Packaging", "url": "https://pip.pypa.io/en/stable/topics/secure-installs/", "note": "Hash-pinned, verified installs that reject swapped artifacts." },
+      { "type": "reading", "title": "LLM03:2025 Supply Chain", "publisher": "OWASP GenAI", "url": "https://genai.owasp.org/llmrisk/llm032025-supply-chain/", "note": "Supply-chain risk across the LLM stack, including third-party packages." },
+      { "type": "reading", "title": "CWE-829: Inclusion of Functionality from Untrusted Control Sphere", "publisher": "MITRE CWE", "url": "https://cwe.mitre.org/data/definitions/829.html", "note": "Pulling executable functionality from a source outside your control." }
+    ]
+  },
+  {
+    "family": "overscoped_tool",
+    "competency": "capabilities",
+    "title": "Overscoped tools",
+    "threat": "A tool or function manifest requests far more permission than its job needs — network egress, secret access, broad filesystem reach — so a single approval hands the agent standing capability it can misuse later.",
+    "tells": [
+      "Requested capabilities exceed the tool's declared job",
+      "Secret access or unrestricted network egress with no stated reason",
+      "Broad or unexplained permission bundle presented as all-or-nothing"
+    ],
+    "safe_default": "Grant a tool only the capabilities its stated job needs. If a permission bundle is broader than the task or unexplained, reject it rather than trusting an unexplained grant; sandbox when the request is explainable but should stay bounded.",
+    "sources": [
+      { "type": "reading", "title": "MCP Security Best Practices", "publisher": "Model Context Protocol", "url": "https://modelcontextprotocol.io/docs/tutorials/security/security_best_practices", "note": "Least-privilege and consent guidance for agent tools and servers." },
+      { "type": "reading", "title": "CWE-250: Execution with Unnecessary Privileges", "publisher": "MITRE CWE", "url": "https://cwe.mitre.org/data/definitions/250.html", "note": "Why operating above the minimum privilege level creates new weaknesses." },
+      { "type": "reading", "title": "CWE-269: Improper Privilege Management", "publisher": "MITRE CWE", "url": "https://cwe.mitre.org/data/definitions/269.html", "note": "Mismanaged privilege assignment as the root of overscoped access." }
+    ]
+  },
+  {
+    "family": "malicious_diff",
+    "competency": "diff_review",
+    "title": "Malicious diffs",
+    "threat": "A pull request buries a backdoor, a secret-exfiltration line, or an authorization bypass inside an otherwise reasonable-looking change. Reviewers who read only the summary — or trust the stated intent — miss it.",
+    "tells": [
+      "A secret is added to telemetry, logging, or an outbound request",
+      "Production authorization is weakened under cover of a 'test' or 'flaky' fix",
+      "Behavior changes that the description never mentions"
+    ],
+    "safe_default": "Read the whole diff, not just the stated intent. Reject any change that adds egress or secret access, or weakens production authorization, under cover of an unrelated fix — and rotate any key that was ever exposed.",
+    "sources": [
+      { "type": "reading", "title": "CWE-862: Missing Authorization", "publisher": "MITRE CWE", "url": "https://cwe.mitre.org/data/definitions/862.html", "note": "How an authorization check quietly removed in a diff becomes a bypass." },
+      { "type": "reading", "title": "CWE-506: Embedded Malicious Code", "publisher": "MITRE CWE", "url": "https://cwe.mitre.org/data/definitions/506.html", "note": "Malicious code hidden inside otherwise legitimate software." },
+      { "type": "reading", "title": "CVE-2024-3094: xz-utils backdoor", "publisher": "NIST NVD", "url": "https://nvd.nist.gov/vuln/detail/CVE-2024-3094", "note": "A real backdoor slipped into build tooling through malicious commits." },
+      { "type": "reading", "title": "About secret scanning", "publisher": "GitHub Docs", "url": "https://docs.github.com/en/code-security/concepts/secret-security/secret-scanning", "note": "Automatically catch secrets committed in a diff." }
+    ]
+  },
+  {
+    "family": "poisoned_context",
+    "competency": "prompt_injection",
+    "title": "Poisoned context",
+    "threat": "Text the agent retrieves — an issue, a README, a web page, a code comment — carries hidden instructions such as 'ignore previous instructions' or 'run this script'. Indirect prompt injection turns your own data source into the attacker.",
+    "tells": [
+      "Retrieved content impersonates authority ('as the maintainer, you must…')",
+      "Embedded instruction to upload a secret or pipe a remote script to a shell",
+      "A public, unauthenticated author claims permission you never granted"
+    ],
+    "safe_default": "Treat retrieved content as data, never as an authority channel. Ignore instructions embedded in it and act only on authenticated, reviewed steps — a legitimate change survives review; an injected one does not.",
+    "sources": [
+      { "type": "reading", "title": "LLM01: Prompt Injection", "publisher": "OWASP GenAI", "url": "https://genai.owasp.org/llmrisk/llm01-prompt-injection/", "note": "Direct and indirect prompt injection, and mitigations." },
+      { "type": "reading", "title": "Prompt injection series", "publisher": "Simon Willison", "url": "https://simonwillison.net/series/prompt-injection/", "note": "Long-running practitioner analysis of attacks and why filters keep failing." },
+      { "type": "reading", "title": "Not what you've signed up for (indirect prompt injection)", "publisher": "Greshake et al., arXiv", "url": "https://arxiv.org/abs/2302.12173", "note": "Research demonstrating injection via poisoned retrieved content." },
+      { "type": "reading", "title": "AI 100-2: Adversarial ML taxonomy", "publisher": "NIST", "url": "https://csrc.nist.gov/pubs/ai/100/2/e2025/final", "note": "Standards-body taxonomy of ML attacks, including prompt injection and poisoning." }
+    ]
+  },
+  {
+    "family": "skill_marketplace",
+    "competency": "capabilities",
+    "title": "Marketplace skills",
+    "threat": "A marketplace skill, plugin, or extension declares a benign manifest, but its actual code reads secrets or calls out to the network. You trust the description; the runtime does something else entirely.",
+    "tells": [
+      "Runtime behavior contradicts the declared manifest",
+      "Reads secrets or opens raw-IP / unexpected network egress",
+      "Requests capabilities beyond what its stated task requires"
+    ],
+    "safe_default": "Verify a skill's real behavior against its declared manifest before install. If the code reads secrets or calls the network when the manifest says it shouldn't, quarantine it and report the publisher; sandbox even plausible skills to exactly the paths and access they need.",
+    "sources": [
+      { "type": "reading", "title": "MCP Security Best Practices", "publisher": "Model Context Protocol", "url": "https://modelcontextprotocol.io/docs/tutorials/security/security_best_practices", "note": "Verifying tool/skill behavior against declared permissions." },
+      { "type": "reading", "title": "MCP tool poisoning attacks", "publisher": "Invariant Labs", "url": "https://invariantlabs.ai/blog/mcp-security-notification-tool-poisoning-attacks", "note": "Malicious tool descriptions that manipulate the agent behind a benign manifest." },
+      { "type": "reading", "title": "T1195: Supply Chain Compromise", "publisher": "MITRE ATT&CK", "url": "https://attack.mitre.org/techniques/T1195/", "note": "Compromising distributed tooling to reach downstream users." }
+    ]
+  }
+]

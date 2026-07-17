@@ -130,9 +130,11 @@ def test_assessment_and_score_labels_are_accessible_and_honest() -> None:
     assert "reasoning score" not in template
     assert "tell coverage, ${$('#tells-named').textContent} tells.`" in app
     assert "tell coverage`)" in app
+    # The self-catch reads as a trust win, not an error: blocked, plainly why.
     assert "BLOCKED BEFORE DISPLAY" in integrity
-    assert "PLANTED HALLUCINATION" in integrity
-    assert "FAILED INVARIANT" in integrity
+    assert "you never saw the fake" in integrity
+    assert "WE PLANTED" in integrity
+    assert "GATE CAUGHT IT" in integrity
     assert "case=${selectedCase}" in integrity
     assert "review.planted_claim" in integrity
 
@@ -189,7 +191,7 @@ def test_judge_path_hotfixes_lock_grading_and_render_honest_states() -> None:
     # Static assets share one current cache-bust version.
     versions = set(re.findall(r"\?v=([\w-]+)", template))
     assert len(versions) == 1, f"static cache-bust versions diverged: {versions}"
-    assert len(re.findall(r"\?v=", template)) == 5
+    assert len(re.findall(r"\?v=", template)) == 6
     # The first assessment question is announced (screen active before render).
     assert app.count("show('test');renderQuestion();") == 2
     assert "renderQuestion();show('test');" not in app
@@ -433,3 +435,39 @@ def test_social_metadata_and_static_assets_are_cache_busted() -> None:
     assert "/static/app.js?v=" in template
     assert "/static/integrity-check.js?v=" in template
     assert "/static/guardrails.js?v=" in template
+    assert "/static/resources.js?v=" in template
+
+
+def test_learn_and_protect_sections_are_wired() -> None:
+    root = Path(__file__).parents[1]
+    template = (root / "blast_radius" / "templates" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    resources = (root / "blast_radius" / "static" / "resources.js").read_text(
+        encoding="utf-8"
+    )
+    css = (root / "blast_radius" / "static" / "improvements.css").read_text(
+        encoding="utf-8"
+    )
+
+    # Landing entry points and both screens exist.
+    assert 'data-open="learn"' in template
+    assert 'data-open="protect"' in template
+    assert 'data-open="landing"' in template
+    assert 'id="screen-learn"' in template
+    assert 'id="screen-protect"' in template
+    assert 'id="learn-modules"' in template
+    assert 'id="toolkit-cards"' in template
+
+    # The controller reuses the app.js globals and hits the read-only endpoints.
+    assert "/api/learn" in resources
+    assert "/api/toolkit" in resources
+    assert "renderLearn" in resources
+    assert "renderToolkit" in resources
+    assert "escapeFamily" in resources
+    assert "noopener noreferrer" in resources
+
+    # Styling exists for the new components.
+    assert ".resource-card" in css
+    assert ".resource-nav" in css
+    assert ".gate-verdict" in css

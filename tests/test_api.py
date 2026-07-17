@@ -171,6 +171,44 @@ def test_gate_catch_is_rate_limited(client) -> None:
     assert client.get("/api/demo/gate-catch").status_code == 429
 
 
+def test_learn_field_guide_covers_every_family_with_cited_sources(client) -> None:
+    response = client.get("/api/learn")
+    assert response.status_code == 200
+    modules = response.json()["modules"]
+    families = [module["family"] for module in modules]
+    assert set(families) == {family.value for family in ScenarioFamily}
+    assert len(families) == len(set(families)) == len(ScenarioFamily)
+    for module in modules:
+        assert module["title"] and module["threat"] and module["safe_default"]
+        assert module["tells"], "each family must list tells to spot"
+        assert module["sources"], "each family must cite at least one source"
+        for source in module["sources"]:
+            assert source["url"].startswith("https://")
+            assert source["title"] and source["publisher"]
+
+
+def test_toolkit_covers_every_family_with_actionable_defenses(client) -> None:
+    response = client.get("/api/toolkit")
+    assert response.status_code == 200
+    cards = response.json()["cards"]
+    assert {card["family"] for card in cards} == {f.value for f in ScenarioFamily}
+    for card in cards:
+        assert card["title"] and card["summary"]
+        assert card["steps"], "each card needs concrete steps"
+        assert card["snippets"], "each card needs at least one copy-paste snippet"
+        for snippet in card["snippets"]:
+            assert snippet["label"] and snippet["code"]
+        for tool in card.get("tools", []):
+            assert tool["url"].startswith("https://")
+            assert tool["name"]
+
+
+def test_learn_endpoint_is_rate_limited(client) -> None:
+    for _ in range(45):
+        assert client.get("/api/learn").status_code == 200
+    assert client.get("/api/learn").status_code == 429
+
+
 def test_unknown_session_ids_do_not_allocate_rate_limit_buckets(
     test_settings, monkeypatch
 ) -> None:
