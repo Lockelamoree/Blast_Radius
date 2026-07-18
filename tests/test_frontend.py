@@ -204,7 +204,7 @@ def test_judge_path_hotfixes_lock_grading_and_render_honest_states() -> None:
     # Static assets share one current cache-bust version.
     versions = set(re.findall(r"\?v=([\w-]+)", template))
     assert len(versions) == 1, f"static cache-bust versions diverged: {versions}"
-    assert len(re.findall(r"\?v=", template)) == 7
+    assert len(re.findall(r"\?v=", template)) == 9
     # The first assessment question is announced (screen active before render).
     assert app.count("show('test');renderQuestion();") == 2
     assert "renderQuestion();show('test');" not in app
@@ -212,6 +212,60 @@ def test_judge_path_hotfixes_lock_grading_and_render_honest_states() -> None:
     assert "matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'" in app
     # The share button reverts so a second copy gives feedback.
     assert "setTimeout(()=>{event.target.textContent='Copy result';},2000)" in app
+
+
+def test_codex_pet_is_wired_and_client_only() -> None:
+    root = Path(__file__).parents[1]
+    template = (root / "blast_radius" / "templates" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    app = (root / "blast_radius" / "static" / "app.js").read_text(encoding="utf-8")
+    pet = (root / "blast_radius" / "static" / "pet.js").read_text(encoding="utf-8")
+    pet_css = (root / "blast_radius" / "static" / "pet.css").read_text(encoding="utf-8")
+    history = (root / "blast_radius" / "static" / "history.js").read_text(encoding="utf-8")
+
+    # Both pet assets ship, cache-busted, sharing the single version string.
+    assert "/static/pet.css?v=" in template
+    assert "/static/pet.js?v=" in template
+    versions = set(re.findall(r"\?v=([\w-]+)", template))
+    assert len(versions) == 1, f"static cache-bust versions diverged: {versions}"
+
+    # The pet must not add a third live region or a fourth aria-pressed control
+    # (those exact counts are pinned by other tests); it lives on document.body,
+    # not in the template, and is decorative.
+    assert "pet-panel" not in template
+    assert template.count('aria-live="polite"') == 2
+    assert template.count('aria-pressed="false"') == 3
+
+    # app.js dispatches decoupled CustomEvents the pet consumes; it never names a
+    # pet symbol beyond the fire-and-forget helper.
+    assert "petEmit" in app
+    assert 'new CustomEvent("br:"+t' in app
+    assert "petEmit('screen',{name})" in app
+    assert "petEmit('grading',{})" in app
+    assert "petEmit('verdict'," in app
+    assert "petEmit('drill'," in app
+    assert "petEmit('results'," in app
+
+    # The pet is a pure event consumer: listens to the bus, no network, its own
+    # localStorage key, and never touches the history blob.
+    assert 'window.addEventListener("br:verdict"' in pet
+    assert 'window.addEventListener("br:screen"' in pet
+    assert "blast-radius:pet:v1" in pet
+    assert "blast-radius:v1" not in pet
+    assert "fetch(" not in pet
+    # The only innerHTML assignment is the static, developer-authored SVG scaffold.
+    assert pet.count(".innerHTML =") == 1
+    assert "stage.innerHTML = SVG" in pet
+    assert "window.clearPet" in pet
+    assert "prefers-reduced-motion" in pet
+
+    # Clearing local progress also resets the pet.
+    assert "if (window.clearPet) window.clearPet();" in history
+
+    # Styling exists and honours reduced motion.
+    assert "#pet-panel" in pet_css
+    assert "prefers-reduced-motion" in pet_css
 
 
 def test_verdict_receipt_renders_provenance_tells_and_divergence() -> None:

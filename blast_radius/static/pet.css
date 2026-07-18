@@ -1,0 +1,184 @@
+/* Codex pet — a self-contained companion modeled on OpenAI's default Codex pet
+   "Codey": a chubby chibi bot with a fluffy cloud head, little arms and feet,
+   and a dark terminal "screen" face showing a >_ prompt. Here the prompt glows
+   Blast-Radius acid green — the pet's face speaks the terminal, which is the
+   whole point of the game. Everything is CSP-safe: no inline styles, no external
+   assets. State is driven purely by data-mood / data-face / data-state / data-form
+   attributes set by pet.js, so meaning is carried by shape + attribute.
+
+   Layout rule that matters: the mascot + speech bubble are pointer-events:none
+   so the floating pet can NEVER intercept a click meant for the app beneath it.
+   Only the small toggle puck and the opt-in stats/hatch HUD are interactive, and
+   the HUD is collapsed by default so it adds no footprint over the controls. */
+
+#pet-panel{
+  position:fixed;bottom:16px;right:16px;z-index:6;
+  display:flex;flex-direction:column;align-items:flex-end;gap:8px;
+  font-family:var(--mono);color:var(--ink);
+  pointer-events:none;              /* container is transparent to clicks */
+  max-width:min(230px,48vw);
+  /* chrome stays Blast-Radius acid for brand identity */
+  --pet-accent:var(--acid);
+  --pet-out:#0a1526;
+  --pet-screen:#06080f;
+  --pet-face:var(--acid);           /* terminal prompt colour */
+  --pet-body:#4a9dff;--pet-hi:#aacdff;--pet-sh:#2f6fd0;   /* default: Codex blue */
+}
+.pet-stage,.pet-bubble{pointer-events:none}   /* mascot + bubble never block */
+.pet-toggle,.pet-hud{pointer-events:auto}     /* only these capture clicks */
+
+/* ---- per-form palettes (an homage to the built-in Codex pets) ---- */
+#pet-panel[data-form="acid"]    {--pet-body:#a6e635;--pet-hi:#d6ff87;--pet-sh:#6f9e1c}
+#pet-panel[data-form="dewey"]   {--pet-body:#74cdff;--pet-hi:#d2f0ff;--pet-sh:#358fce}
+#pet-panel[data-form="rocky"]   {--pet-body:#c9b088;--pet-hi:#e6d3ad;--pet-sh:#9c8460;--pet-out:#4a3722}
+#pet-panel[data-form="sentinel"]{--pet-body:#ff8a3d;--pet-hi:#ffc199;--pet-sh:#d65f1f}
+#pet-panel[data-form="bsod"]    {--pet-body:#dbe1ee;--pet-hi:#f3f6fc;--pet-sh:#98a2b6}
+#pet-panel[data-face="error"]   {--pet-face:#ff5a4d}
+
+/* ---- collapsible stats / hatch HUD (opens above the mascot on click) ---- */
+.pet-hud{
+  width:190px;display:none;flex-direction:column;gap:8px;
+  background:color-mix(in srgb,var(--panel) 94%,transparent);
+  border:1px solid var(--line);border-radius:12px;padding:10px;
+  box-shadow:0 10px 30px rgba(0,0,0,.45);backdrop-filter:blur(3px);
+}
+#pet-panel[data-open="true"] .pet-hud{display:flex}
+.pet-meta{display:flex;justify-content:space-between;font-size:10px;letter-spacing:.04em;color:var(--muted);text-transform:uppercase}
+.pet-meta b{color:var(--pet-accent);font-weight:700}
+progress.pet-xp{width:100%;height:5px;border:0;border-radius:3px;background:var(--line);appearance:none;-webkit-appearance:none}
+progress.pet-xp::-webkit-progress-bar{background:var(--line);border-radius:3px}
+progress.pet-xp::-webkit-progress-value{background:var(--pet-accent);border-radius:3px}
+progress.pet-xp::-moz-progress-bar{background:var(--pet-accent);border-radius:3px}
+.pet-hatch{display:flex;gap:4px}
+#pet-hatch{
+  flex:1;min-width:0;background:var(--black);border:1px solid var(--line);border-radius:6px;
+  color:var(--ink);font-family:var(--mono);font-size:10px;padding:4px 6px;
+}
+#pet-hatch:focus-visible{outline:2px solid var(--pet-accent);outline-offset:1px}
+.pet-hatch-btn,.pet-hide-btn{
+  background:transparent;border:1px solid var(--line);border-radius:6px;color:var(--pet-accent);
+  font-family:var(--mono);font-size:10px;padding:4px 6px;cursor:pointer;text-transform:uppercase;letter-spacing:.04em;
+}
+.pet-hatch-btn:hover,.pet-hide-btn:hover{border-color:var(--pet-accent)}
+.pet-hide-btn{align-self:flex-start;color:var(--muted)}
+
+/* ---- speech bubble (coach line; click-through) ---- */
+.pet-bubble{
+  position:relative;max-width:210px;
+  background:var(--black);border:1px solid var(--line);border-left:2px solid var(--pet-accent);
+  border-radius:8px;padding:6px 8px;font-size:11px;line-height:1.35;color:var(--ink);
+}
+.pet-bubble:empty{display:none}
+#pet-bubble-text{display:block}
+
+/* ---- mascot ---- */
+.pet-stage{display:flex;justify-content:flex-end;align-items:flex-end;height:96px}
+.pet-svg{width:88px;height:auto;overflow:visible}
+
+/* ---- toggle puck (the /pet control: reveals the stats/hatch HUD) ---- */
+.pet-toggle{
+  width:34px;height:34px;flex:0 0 34px;
+  background:var(--black);border:1px solid var(--pet-accent);border-radius:9px;
+  color:var(--pet-accent);font-family:var(--mono);font-weight:700;font-size:13px;letter-spacing:.02em;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 6px 18px rgba(0,0,0,.4);
+}
+.pet-toggle:hover{box-shadow:0 0 14px color-mix(in srgb,var(--pet-accent) 55%,transparent)}
+.pet-toggle:focus-visible{outline:2px solid var(--pet-accent);outline-offset:2px}
+
+/* dismissed: hide everything except the summon puck */
+#pet-panel[data-dismissed="true"] .pet-stage,
+#pet-panel[data-dismissed="true"] .pet-bubble,
+#pet-panel[data-dismissed="true"] .pet-hud{display:none}
+#pet-panel[data-dismissed="true"] .pet-toggle{border-radius:50%}
+
+/* ================= chibi sprite ================= */
+.p-out{fill:var(--pet-out)}
+.p-body{fill:var(--pet-body)}
+.p-hi{fill:var(--pet-hi);fill-opacity:.9}
+.p-arm{fill:var(--pet-sh)}
+.p-foot{fill:var(--pet-sh)}
+.p-screen{fill:var(--pet-screen)}
+#pet-panel[data-form="bsod"] .p-screen{fill:#5a0d0d}
+.shape-body{fill:var(--pet-body);stroke:var(--pet-out);stroke-width:3;stroke-linejoin:round}
+.f-eye{fill:var(--pet-out)}
+.f-eyeo{fill:none;stroke:var(--pet-out);stroke-width:1.6}
+.f-line{fill:none;stroke:var(--pet-out);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.f-mouth{fill:none;stroke:var(--pet-out);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.f-blush{fill:#ff8fa3;fill-opacity:.5}
+.ant{stroke:var(--pet-out);stroke-width:3;stroke-linecap:round}
+.p-antball{fill:var(--blue)}
+.warn{fill:#ffcf3d}
+
+/* only one silhouette shows; the cloud (Codey) covers codex / acid / sentinel / custom */
+.form{display:none}
+.form-cloud{display:block}
+#pet-panel[data-form="dewey"] .form-cloud,
+#pet-panel[data-form="rocky"] .form-cloud,
+#pet-panel[data-form="bsod"] .form-cloud{display:none}
+#pet-panel[data-form="dewey"] .form-droplet{display:block}
+#pet-panel[data-form="rocky"] .form-rock{display:block}
+#pet-panel[data-form="bsod"] .form-monitor{display:block}
+
+/* terminal-screen face: one glyph shown per computed data-face */
+.gl{fill:none;stroke:var(--pet-face);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.gld{fill:var(--pet-face)}
+.face-default,.face-happy,.face-sleepy,.face-think,.face-error{display:none}
+#pet-panel[data-face="default"] .face-default{display:block}
+#pet-panel[data-face="happy"]   .face-happy  {display:block}
+#pet-panel[data-face="sleepy"]  .face-sleepy {display:block}
+#pet-panel[data-face="think"]   .face-think  {display:block}
+#pet-panel[data-face="error"]   .face-error  {display:block}
+
+/* ---- thought bubble status overlays ---- */
+.bub-out{fill:var(--pet-out)}
+.bub{fill:var(--ink)}
+.pet-bubble-ov{display:none}
+#pet-panel[data-state="waiting"]  .pet-bubble-ov,
+#pet-panel[data-state="anxious"]  .pet-bubble-ov,
+#pet-panel[data-state="thinking"] .pet-bubble-ov,
+#pet-panel[data-state="done"]     .pet-bubble-ov,
+#pet-panel[data-state="hurt"]     .pet-bubble-ov{display:block}
+.pet-ov{display:none}
+.ov-clock .clk-ring{fill:none;stroke:var(--orange);stroke-width:2}
+.ov-clock line{stroke:var(--orange);stroke-width:2;stroke-linecap:round}
+.ov-check path{fill:none;stroke:var(--acid);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.ov-x line{stroke:var(--orange);stroke-width:3;stroke-linecap:round}
+.gld2{fill:var(--blue)}
+#pet-panel[data-state="waiting"]  .pet-ov-clock{display:block}
+#pet-panel[data-state="anxious"]  .pet-ov-clock{display:block}
+#pet-panel[data-state="thinking"] .pet-ov-think{display:block}
+#pet-panel[data-state="done"]     .pet-ov-check{display:block}
+#pet-panel[data-state="hurt"]     .pet-ov-x{display:block}
+
+/* ================= animation ================= */
+.pet-svg{animation:pet-bob 3.6s ease-in-out infinite}
+#pet-panel[data-face="default"] .face-default line{animation:pet-cursor 1.1s steps(1,end) infinite}
+#pet-panel[data-face="think"] .face-think .gld,
+#pet-panel[data-state="thinking"] .pet-ov-think .gld2{animation:pet-think 1.2s ease-in-out infinite}
+#pet-panel[data-face="think"] .face-think .gld:nth-child(3){animation-delay:.2s}
+#pet-panel[data-face="think"] .face-think .gld:nth-child(4){animation-delay:.4s}
+#pet-panel[data-state="hurt"] .pet-svg{animation:pet-shake .5s ease-in-out}
+#pet-panel[data-form="bsod"] .p-screen{animation:pet-bsod-flicker .35s steps(2) infinite}
+#pet-panel[data-state="done"] .ov-check path{animation:pet-pop .4s ease-out}
+#pet-panel.pet-levelup .pet-svg{animation:pet-bob 3.6s ease-in-out infinite,pet-sparkle .8s ease-out}
+
+@keyframes pet-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes pet-cursor{0%,55%{opacity:1}56%,100%{opacity:.15}}
+@keyframes pet-think{0%,100%{opacity:.25}50%{opacity:1}}
+@keyframes pet-shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-3px)}40%{transform:translateX(3px)}60%{transform:translateX(-2px)}80%{transform:translateX(2px)}}
+@keyframes pet-bsod-flicker{0%{opacity:1}100%{opacity:.8}}
+@keyframes pet-pop{0%{transform:scale(.4)}100%{transform:scale(1)}}
+@keyframes pet-sparkle{0%{filter:drop-shadow(0 0 0 var(--acid))}50%{filter:drop-shadow(0 0 9px var(--acid))}100%{filter:drop-shadow(0 0 0 var(--acid))}}
+
+.pet-svg,.ov-check path{transform-box:view-box}
+
+@media (prefers-reduced-motion:reduce){
+  .pet-svg,.face-default line,.face-think .gld,.pet-ov-think .gld2,.p-screen,.ov-check path,#pet-panel.pet-levelup .pet-svg{animation:none!important}
+}
+
+@media (max-width:520px){
+  #pet-panel{bottom:10px;right:10px}
+  .pet-hud{width:168px}
+  .pet-svg{width:76px}
+}

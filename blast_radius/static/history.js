@@ -226,6 +226,7 @@
   if (clearButton) {
     clearButton.addEventListener("click", () => {
       clearHistory();
+      if (window.clearPet) window.clearPet();
       const panel = $("#history-panel");
       if (panel) panel.classList.add("hidden");
       if (window.announceStatus) window.announceStatus("Local progress cleared from this browser.");
