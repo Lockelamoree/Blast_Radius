@@ -334,7 +334,7 @@ present, the Sol probe is live, and daily application budget remains.
 | Judge mode is deterministic and adaptive | API engine and six-round session tests | Verified locally |
 | Assessments are paired and option-shuffled | `questions.json`, API and bank tests | Verified locally |
 | Model output cannot author truth or evidence | strict DTOs, trusted-base gate tests | Verified locally |
-| Sol grades a real hosted answer | [`evidence/live_grade_resp_0990b342….json`](evidence/live_grade_resp_0990b342aa6152f1016a592698815881a09736626b9f1b4593.json), matching service log, and provider-account cross-check | Captured on the hosted instance, 2026-07-16 |
+| Sol grades a real hosted answer | [`evidence/live_grade_resp_038928ae….json`](evidence/live_grade_resp_038928ae2a9f40c0016a5b67c9d4008197a2349a2d7aa43ecb.json), matching service log, and provider-account cross-check | Captured on the hosted instance, 2026-07-18 |
 | Anchored live variation cannot rewrite truth | presentation DTO, trusted-base gates, provenance/cap tests | Verified locally |
 | The daily-tool engine runs no model and leaks no ground truth | `engine/inspector.py`, `test_inspector.py`, `test_tools_api.py` (no-echo + oracle-guard regressions) | Verified locally |
 | Coached retry cannot game the score | `test_api.py` retry tests (action fixed, tallies untouched, deterministic) | Verified locally |

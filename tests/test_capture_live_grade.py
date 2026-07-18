@@ -3,7 +3,59 @@ import json
 
 import pytest
 
-from scripts.capture_live_grade import capture_live_grade
+from scripts import capture_live_grade as capture_module
+from scripts.capture_live_grade import capture_live_grade, make_json_transport
+
+
+class _FakeResponse:
+    def __init__(self, body: bytes = b"{}"):
+        self._body = body
+
+    def read(self) -> bytes:
+        return self._body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+class _RecordingOpener:
+    def __init__(self):
+        self.calls: list[tuple[str, str]] = []
+
+    def open(self, request, timeout=None):
+        self.calls.append((request.get_method(), request.full_url))
+        if request.full_url.endswith("/access"):
+            return _FakeResponse(b"redirected")
+        if request.full_url.endswith("/healthz"):
+            return _FakeResponse(b'{"status": "ok"}')
+        return _FakeResponse(b"{}")
+
+
+def test_transport_authenticates_through_the_access_gate_once(monkeypatch) -> None:
+    opener = _RecordingOpener()
+    monkeypatch.setattr(capture_module, "build_opener", lambda *a, **k: opener)
+
+    transport = make_json_transport("BR-DEV-EXAMPLE")
+    assert transport("https://blast.example", "/healthz", None) == {"status": "ok"}
+
+    # The very first network action authenticates (POST /access) before /healthz.
+    assert opener.calls[0] == ("POST", "https://blast.example/access")
+    assert opener.calls[1][1] == "https://blast.example/healthz"
+
+    # A subsequent call reuses the cookie and does not re-authenticate.
+    transport("https://blast.example", "/api/learn", None)
+    assert sum(1 for _, url in opener.calls if url.endswith("/access")) == 1
+
+
+def test_transport_without_a_code_never_hits_the_access_gate(monkeypatch) -> None:
+    opener = _RecordingOpener()
+    monkeypatch.setattr(capture_module, "build_opener", lambda *a, **k: opener)
+
+    make_json_transport(None)("https://blast.example", "/healthz", None)
+    assert all(not url.endswith("/access") for _, url in opener.calls)
 
 
 class FakeHostedInstance:

@@ -5,13 +5,15 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 from datetime import UTC, datetime
+from http.cookiejar import CookieJar
 from pathlib import Path
 from typing import Any, Callable
 from urllib.error import HTTPError, URLError
-from urllib.parse import urljoin, urlsplit
-from urllib.request import Request, urlopen
+from urllib.parse import urlencode, urljoin, urlsplit
+from urllib.request import HTTPCookieProcessor, Request, build_opener, urlopen
 
 JsonTransport = Callable[[str, str, dict[str, Any] | None], dict[str, Any]]
 
@@ -74,6 +76,59 @@ def request_json(base_url: str, path: str, payload: dict[str, Any] | None = None
         raise RuntimeError(f"{path} returned HTTP {exc.code}: {detail}") from exc
     except URLError as exc:
         raise RuntimeError(f"could not reach deployed instance: {exc.reason}") from exc
+
+
+def make_json_transport(access_code: str | None = None) -> JsonTransport:
+    """Return a transport that keeps one cookie jar for the whole capture.
+
+    When the hosted instance is in private preview behind the access gate, pass
+    the developer/judge access code: the transport authenticates once against
+    ``POST /access`` (which sets the signed ``br_access`` cookie) and then reuses
+    that cookie for the gated ``/api/*`` calls. With no code it behaves like an
+    ordinary JSON client. Nothing about the captured grade changes — this only
+    lets proof capture reach a gated deployment."""
+
+    opener = build_opener(HTTPCookieProcessor(CookieJar()))
+    state = {"authenticated": False}
+
+    def transport(base_url: str, path: str, payload: dict[str, Any] | None) -> dict:
+        if access_code and not state["authenticated"]:
+            form = urlencode({"code": access_code, "next": "/"}).encode()
+            access_request = Request(
+                urljoin(base_url.rstrip("/") + "/", "access"),
+                data=form,
+                method="POST",
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "User-Agent": "blast-radius-proof/1",
+                },
+            )
+            try:
+                opener.open(access_request, timeout=20).read()  # noqa: S310
+            except HTTPError as exc:
+                detail = exc.read().decode(errors="replace")[:200]
+                raise RuntimeError(f"/access returned HTTP {exc.code}: {detail}") from exc
+            except URLError as exc:
+                raise RuntimeError(f"could not reach deployed instance: {exc.reason}") from exc
+            state["authenticated"] = True
+
+        body = json.dumps(payload).encode() if payload is not None else None
+        request = Request(
+            urljoin(base_url.rstrip("/") + "/", path.lstrip("/")),
+            data=body,
+            method="POST" if payload is not None else "GET",
+            headers={"Content-Type": "application/json", "User-Agent": "blast-radius-proof/1"},
+        )
+        try:
+            with opener.open(request, timeout=20) as response:  # noqa: S310
+                return json.loads(response.read().decode())
+        except HTTPError as exc:
+            detail = exc.read().decode(errors="replace")[:500]
+            raise RuntimeError(f"{path} returned HTTP {exc.code}: {detail}") from exc
+        except URLError as exc:
+            raise RuntimeError(f"could not reach deployed instance: {exc.reason}") from exc
+
+    return transport
 
 
 def capture_live_grade(
@@ -200,8 +255,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("base_url", help="Public HTTPS Blast Radius base URL")
     parser.add_argument("--output-dir", type=Path, default=Path("evidence"))
+    parser.add_argument(
+        "--access-code",
+        default=os.environ.get("BLAST_RADIUS_ACCESS_CODE"),
+        help="private-preview access code, if the hosted instance is gated "
+        "(defaults to $BLAST_RADIUS_ACCESS_CODE)",
+    )
     args = parser.parse_args()
-    output = capture_live_grade(args.base_url, args.output_dir)
+    output = capture_live_grade(
+        args.base_url, args.output_dir, make_json_transport(args.access_code)
+    )
     print(output)
 
 

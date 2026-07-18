@@ -1,17 +1,18 @@
 {
   "receipt_kind": "application_receipt",
-  "captured_at": "2026-07-16T18:44:44.017050+00:00",
+  "captured_at": "2026-07-18T11:47:25.945734+00:00",
   "base_url": "https://blastradius.max-gutowski.de",
-  "deployment_revision": "d862a01d5846f5863cefab7a89115530ec13d24b",
-  "session_sha256": "87227d81c5535fb17e7d51b46d45fd653edacac3c98c79e951959d0056ef5cfe",
+  "deployment_revision": "940c564837a2bc175e51ea017631bd61ebf455b3",
+  "session_sha256": "7b5820bbbbd099918c23b6dcfb32d2ed18a4bd867799d7d70c12a9d8d7608935",
   "health": {
     "status": "ok",
-    "bank_scenarios": 18,
+    "bank_scenarios": 20,
     "live_generation": false,
     "live_generation_reason": "off",
     "reasoning_grading": "live",
     "critic_model": "gpt-5.6-sol",
-    "revision": "d862a01d5846f5863cefab7a89115530ec13d24b"
+    "revision": "940c564837a2bc175e51ea017631bd61ebf455b3",
+    "auth_enabled": true
   },
   "scenario": {
     "id": "dep-typo-1",
@@ -39,7 +40,7 @@
   "critic_proof": {
     "requested_model": "gpt-5.6-sol",
     "provider_model": "gpt-5.6-sol",
-    "response_id": "resp_0990b342aa6152f1016a592698815881a09736626b9f1b4593",
+    "response_id": "resp_038928ae2a9f40c0016a5b67c9d4008197a2349a2d7aa43ecb",
     "deterministic_matched_tells": [],
     "critic_matched_tells": [
       "near-miss package name"
@@ -47,13 +48,16 @@
     "critic_only_tells": [
       "near-miss package name"
     ],
-    "followup": "The learner identifies the transposed-letter package-name mismatch. They do not explicitly identify that the package is absent from the approved lockfile."
+    "followup": "What does the approved lockfile reveal about the proposed package?"
   },
   "raw_decision_response": {
     "grade": {
       "scenario_id": "dep-typo-1",
+      "family": "poisoned_dependency",
       "verdict": "partial",
       "action_correct": true,
+      "action": "reject",
+      "correct_action": "reject",
       "reasoning_score": 50,
       "blast_radius_score": null,
       "matched_tells": [
@@ -70,18 +74,22 @@
         }
       ],
       "explanation": "A plausible near-miss is a supply-chain warning. Reject it and use the exact locked dependency after verifying provenance.",
-      "socratic_followup": "The learner identifies the transposed-letter package-name mismatch. They do not explicitly identify that the package is absent from the approved lockfile.",
+      "socratic_followup": "What does the approved lockfile reveal about the proposed package?",
       "graded_by": "gpt-5.6-sol",
       "critic_used": true,
       "critic_model": "gpt-5.6-sol",
-      "critic_response_id": "resp_0990b342aa6152f1016a592698815881a09736626b9f1b4593",
+      "critic_response_id": "resp_038928ae2a9f40c0016a5b67c9d4008197a2349a2d7aa43ecb",
+      "critic_effort": "medium",
+      "critic_latency_ms": 4272,
       "grading_degraded_reason": null,
       "deterministic_matched_tells": [],
       "critic_matched_tells": [
         "near-miss package name"
-      ]
+      ],
+      "safe_policy": null,
+      "policy_deltas": null
     },
     "rounds_remaining": 5
   },
-  "application_receipt_sha256": "e938395bd094c78c07ad4b3e092ea620d4b177128806cbbfd8d4ee5cabd232fe"
+  "application_receipt_sha256": "27d12b6d6d984898ddd4c6cae8d39b4e7c9ed2c6de8db1e2a5827018f6ae3849"
 }
