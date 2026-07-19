@@ -171,6 +171,11 @@ async function openResource(target) {
     window.announceStatus('Returned to the start.');
     return;
   }
+  if (target === 'integrity') {
+    show('integrity');
+    window.announceStatus('Integrity check: watch the deterministic gate block a planted fake, then see the committed proof.');
+    return;
+  }
   const screen = target === 'learn' ? 'learn' : 'protect';
   const kind = target === 'learn' ? 'learn' : 'protect';
   show(screen);

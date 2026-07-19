@@ -12,10 +12,23 @@ import base64
 import hashlib
 import hmac
 import time
+import uuid
 
 # Cookie carrying the signed access token. Lives here (not main.py) so API
 # routers can check roles without importing the app module (circular import).
 ACCESS_COOKIE = "br_access"
+
+# Cookie carrying the persistent per-user identity token, independent of the
+# shared access role. The value is issue_token(secret, "uid:<hex>") so it is
+# unforgeable; verify_token round-trips the whole "uid:<hex>" back because it
+# splits the payload on the LAST colon.
+UID_COOKIE = "br_uid"
+UID_PREFIX = "uid:"
+# When the access gate is disabled (local dev / tests) there is no secret to
+# sign with, so we fall back to an unsigned, clearly-marked token. It is stable
+# per browser via the cookie but trivially forgeable — acceptable only because
+# an ungated instance has no identity to protect.
+UID_OPEN_PREFIX = "uid-open:"
 
 
 def _b64encode(data: bytes) -> str:
@@ -76,6 +89,39 @@ def verify_token(
     if current - issued > max_age_seconds or issued > current + 60:
         return None
     return role
+
+
+def mint_uid_token(secret: str) -> str:
+    """Issue a fresh persistent-user token. Signed when a secret is configured,
+    otherwise an unsigned dev-only fallback (see UID_OPEN_PREFIX)."""
+    uid = uuid.uuid4().hex
+    if secret:
+        return issue_token(secret, f"{UID_PREFIX}{uid}")
+    return f"{UID_OPEN_PREFIX}{uid}"
+
+
+def resolve_uid(
+    secret: str,
+    token: str | None,
+    *,
+    max_age_seconds: int,
+    now: float | None = None,
+) -> str | None:
+    """Return the stable uid encoded by ``token``, or None if it is not a valid
+    user token. Rejects an access-role token pasted into the uid slot so a role
+    cookie can never be adopted as an identity."""
+    if not token:
+        return None
+    if secret:
+        role = verify_token(secret, token, max_age_seconds=max_age_seconds, now=now)
+        if role and role.startswith(UID_PREFIX):
+            return role
+        return None
+    # Ungated fallback: accept an unsigned uid-open token verbatim, bounded so a
+    # junk cookie cannot grow unbounded. No signature to verify without a secret.
+    if token.startswith(UID_OPEN_PREFIX) and len(token) <= 96:
+        return token
+    return None
 
 
 class AttemptLimiter:

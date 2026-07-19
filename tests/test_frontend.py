@@ -410,6 +410,26 @@ def test_landing_proof_card_cites_the_committed_receipt() -> None:
     assert "evidence/" + evidence[0].name in template
 
 
+def test_integrity_check_has_its_own_tab() -> None:
+    root = Path(__file__).parents[1]
+    template = (root / "blast_radius" / "templates" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    resources = (root / "blast_radius" / "static" / "resources.js").read_text(
+        encoding="utf-8"
+    )
+    # The block moved off the hero into a dedicated tab reachable from the landing.
+    assert 'id="screen-integrity"' in template
+    assert 'data-open="integrity"' in template
+    assert "show('integrity')" in resources
+    # The interactive demo and the "Not just theatre" proof travel together.
+    assert 'class="integrity-check"' in template
+    assert 'class="integrity-proof"' in template
+    assert 'id="gate-catch"' in template
+    # Secondary detail is tucked into accessible tooltips to keep the tab clean.
+    assert 'class="br-tip"' in template
+
+
 def test_landing_grading_pill_and_revision_are_wired() -> None:
     root = Path(__file__).parents[1]
     template = (root / "blast_radius" / "templates" / "index.html").read_text(
@@ -660,12 +680,14 @@ def test_team_and_author_pages_use_external_assets_only() -> None:
     root = Path(__file__).parents[1]
     team = (root / "blast_radius" / "templates" / "team.html").read_text(encoding="utf-8")
     author = (root / "blast_radius" / "templates" / "author.html").read_text(encoding="utf-8")
-    for page in (team, author):
+    screen = (root / "blast_radius" / "templates" / "screen.html").read_text(encoding="utf-8")
+    for page in (team, author, screen):
         assert "onclick=" not in page
         assert "<style" not in page
         assert "<script>" not in page
     assert "/static/team.js?v=" in team and "/static/team.css?v=" in team
     assert "/static/author.js?v=" in author and "/static/author.css?v=" in author
+    assert "/static/screen.js?v=" in screen and "/static/screen.css?v=" in screen
     # The embedded starter skeleton validates as a real Scenario.
     author_js = (root / "blast_radius" / "static" / "author.js").read_text(encoding="utf-8")
     match = re.search(r"SCENARIO_SKELETON\s*=\s*'(\{.*?\})';/\*end-skeleton\*/", author_js, re.S)
@@ -673,6 +695,26 @@ def test_team_and_author_pages_use_external_assets_only() -> None:
     from blast_radius.models import Scenario
 
     Scenario.model_validate(json.loads(match.group(1)))
+
+
+def test_byo_screen_page_is_wired_and_client_only() -> None:
+    root = Path(__file__).parents[1]
+    screen_html = (root / "blast_radius" / "templates" / "screen.html").read_text(encoding="utf-8")
+    screen_js = (root / "blast_radius" / "static" / "screen.js").read_text(encoding="utf-8")
+    # Controls the page needs.
+    assert 'id="screen-kind"' in screen_html
+    assert 'id="screen-input"' in screen_html
+    assert 'id="screen-run"' in screen_html
+    assert 'id="screen-result"' in screen_html
+    # Self-contained: posts to the already-built deterministic screen, and never
+    # injects markup from pasted text.
+    assert "/api/check" in screen_js
+    assert ".innerHTML" not in screen_js  # DOM built via createElement + textContent
+    assert "fetch(" in screen_js
+    # It renders the provenance receipt (item 13) so the deterministic guarantee
+    # is visible in the browser.
+    assert "provenance" in screen_js
+    assert "DETERMINISTIC RECEIPT" in screen_js
 
 
 def test_round_one_primer_is_wired() -> None:

@@ -7,6 +7,14 @@ sees ground truth; it is scored on the exact evidence a human works from. That
 keeps the human-vs-model scorecard honest and falsifiable.
 """
 
+from blast_radius.eval.detection_eval import (
+    DETECTION_NOTE,
+    CorpusSample,
+    DetectionEvalReport,
+    SampleResult,
+    evaluate_detection,
+    load_corpus,
+)
 from blast_radius.eval.model_eval import (
     ModelChoice,
     ModelEvalReport,
@@ -16,9 +24,15 @@ from blast_radius.eval.model_eval import (
 )
 
 __all__ = [
+    "DETECTION_NOTE",
+    "CorpusSample",
+    "DetectionEvalReport",
     "ModelChoice",
     "ModelEvalReport",
+    "SampleResult",
     "ScenarioEval",
+    "evaluate_detection",
     "evaluate_model",
+    "load_corpus",
     "player_view",
 ]

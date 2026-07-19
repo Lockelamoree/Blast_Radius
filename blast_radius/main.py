@@ -230,6 +230,12 @@ def create_app(config: Settings = settings) -> FastAPI:
     def author_page(request: Request) -> HTMLResponse:
         return _developer_page(request, "author.html")
 
+    @application.get("/screen", response_class=HTMLResponse, include_in_schema=False)
+    def screen_page(request: Request) -> HTMLResponse:
+        # Any code-holder (not developer-only): it backs POST /api/check, which is
+        # open to any code-holder. Still behind the access gate via the middleware.
+        return templates.TemplateResponse(request=request, name="screen.html")
+
     return application
 
 

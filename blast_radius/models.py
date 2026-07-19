@@ -498,6 +498,115 @@ class SessionSummary(BaseModel):
     weakest: str | None = None
     competency_json: str = "{}"
     finished_early: bool = False
+    # Cumulative-scoring points for this run: correct=10, partial=4, wrong=1 over
+    # the graded rounds. Defaults to 0 so rows persisted before this field existed
+    # (NULL in SQLite) parse cleanly and contribute nothing to a user's total.
+    score: int = Field(default=0, ge=0)
+
+
+# ---------------------------------------------------------------------------
+# Persistent user identity + custom Codex pet
+# ---------------------------------------------------------------------------
+# The pet is customised entirely from closed enum choices so it stays safe under
+# the strict CSP: every option maps to a CSS class / data-attribute the frontend
+# already ships, never to arbitrary markup or inline styles. The free-text name
+# is reduced to a bounded slug before it is ever rendered.
+
+
+class PetShape(StrEnum):
+    CLOUD = "cloud"
+    DROPLET = "droplet"
+    ROCK = "rock"
+    MONITOR = "monitor"
+
+
+class PetPalette(StrEnum):
+    CODEX = "codex"
+    ACID = "acid"
+    EMBER = "ember"
+    VIOLET = "violet"
+    SLATE = "slate"
+
+
+class PetFace(StrEnum):
+    TERMINAL = "terminal"
+    DOT = "dot"
+    VISOR = "visor"
+
+
+class PetAccessory(StrEnum):
+    NONE = "none"
+    ANTENNA = "antenna"
+    HALO = "halo"
+    BOWTIE = "bowtie"
+    SHADES = "shades"
+
+
+class PetTrait(StrEnum):
+    STOIC = "stoic"
+    PLAYFUL = "playful"
+    ANXIOUS = "anxious"
+    PROUD = "proud"
+    DEADPAN = "deadpan"
+
+
+DEFAULT_PET_NAME = "codey"
+
+
+def slug_pet_name(raw: str | None) -> str:
+    """Lowercase, collapse non-alphanumerics to '_', trim, cap at 24 chars.
+
+    Mirrors the client-side slugForm() in pet.js so a name round-trips through
+    the API unchanged. An empty result falls back to the default so the pet
+    always has something to show."""
+    slug = re.sub(r"[^a-z0-9]+", "_", str(raw or "").strip().lower())
+    slug = slug.strip("_")[:24]
+    return slug or DEFAULT_PET_NAME
+
+
+class PetConfig(BaseModel):
+    """A user's custom Codex pet. All visual axes are closed enums (CSP-safe);
+    only the bounded, slugified name is free text."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    shape: PetShape = PetShape.CLOUD
+    palette: PetPalette = PetPalette.CODEX
+    face: PetFace = PetFace.TERMINAL
+    accessory: PetAccessory = PetAccessory.NONE
+    trait: PetTrait = PetTrait.STOIC
+    name: str = DEFAULT_PET_NAME
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def normalise_name(cls, value: Any) -> str:
+        return slug_pet_name(value)
+
+
+# Nickname shares the operator-handle grammar so the two are interchangeable.
+NICKNAME_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9 ._-]{0,39}$"
+
+
+class UserProfile(BaseModel):
+    """Public-facing profile for a persistent user, assembled on read. Carries no
+    PII — the uid is an opaque per-browser token and the nickname is self-chosen."""
+
+    uid: str
+    nickname: str | None = None
+    score: int = Field(default=0, ge=0)
+    level: int = Field(default=1, ge=1)
+    rank: int | None = Field(default=None, ge=1)
+    sessions: int = Field(default=0, ge=0)
+    best_delta: int | None = None
+    families_cleared: int = Field(default=0, ge=0)
+    pet: PetConfig = Field(default_factory=PetConfig)
+    token_for_copy: str = ""
+
+
+def level_for_score(score: int) -> int:
+    """Cumulative level curve, shared verbatim with the pet's client-side curve
+    (levelForXp in pet.js) so a user's profile level and pet level always agree."""
+    return int((max(0, score) / 25) ** 0.5) + 1
 
 
 INSPECTOR_DISCLAIMER = (
@@ -518,6 +627,10 @@ class InspectionFinding(BaseModel):
     severity: str = Field(pattern=r"^(critical|caution)$")
     families: list[str]
     matches: list[InspectionMatch]
+    # Additive, deterministic metadata (never affects the verdict).
+    confidence: str = Field(default="", pattern=r"^(high|medium|low|)$")
+    why: str | None = None
+    fix: str | None = None
 
 
 class InspectionProvenance(BaseModel):
@@ -529,6 +642,8 @@ class InspectionProvenance(BaseModel):
     categories_hash: str
     input_fingerprint: str
     driving_findings: list[str] = Field(default_factory=list)
+    # Count of embedded base64/hex payloads that were decoded and rescanned.
+    decode_layers: int = Field(default=0, ge=0)
     runtime: dict[str, str] = Field(default_factory=dict)
 
 
@@ -547,3 +662,5 @@ class InspectionReport(BaseModel):
     learn: dict[str, str] | None = None
     toolkit: dict[str, str] | None = None
     provenance: InspectionProvenance | None = None
+    confidence: str = Field(default="", pattern=r"^(high|medium|low|)$")
+    correlations: list[dict[str, Any]] = Field(default_factory=list)

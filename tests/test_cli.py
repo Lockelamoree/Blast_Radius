@@ -69,6 +69,39 @@ def test_eval_model_subcommand_is_registered_with_defaults() -> None:
     assert args.model is None
 
 
+def test_eval_detection_subcommand_is_registered_with_defaults() -> None:
+    args = cli.build_parser().parse_args(["eval-detection"])
+    assert args.command == "eval-detection"
+    assert args.func is cli._cmd_eval_detection
+    assert args.corpus is None
+    assert args.out is None
+    assert args.check_baseline is False
+
+
+def test_eval_detection_runs_offline_and_emits_json(capsys) -> None:
+    # Fully offline (no key): the whole point of scoring the deterministic screen.
+    assert cli.main(["eval-detection", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["graded_by"] == "deterministic"
+    assert 0.0 <= payload["recall"] <= 1.0
+    assert 0.0 <= payload["precision"] <= 1.0
+    assert payload["categories_hash"]
+    assert "confusion" in payload and "per_category" in payload
+
+
+def test_eval_detection_check_baseline_passes_on_committed_tree(capsys) -> None:
+    assert cli.main(["eval-detection", "--check-baseline"]) == 0
+    assert "hold vs baseline" in capsys.readouterr().out
+
+
+def test_eval_detection_human_table_leads_with_disclaimer(capsys) -> None:
+    assert cli.main(["eval-detection"]) == 0
+    out = capsys.readouterr().out
+    assert out.lstrip().startswith("Deterministic keyword screen")
+    assert "Known blind spots" in out
+    assert "verdict confusion" in out
+
+
 def _stdin(text: str):
     import io
 

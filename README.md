@@ -160,6 +160,38 @@ clear); the optional team handle is a display label, never an account. Developer
 scenarios from real incidents at `/author` and validate them against the production gate before
 opening a PR.
 
+### Measure the screen — accuracy and known blind spots
+
+A daily-driver guard is only as trustworthy as its measured accuracy, so the screen is scored
+against a labeled corpus of malicious and benign artifacts
+([`blast_radius/data/detection_corpus.jsonl`](blast_radius/data/detection_corpus.jsonl)). The
+runner is pure and offline — no model, no key — so anyone can reproduce it:
+
+```bash
+blastradius eval-detection                 # precision/recall/F1, confusion matrix, per-category
+blastradius eval-detection --check-baseline # exit 1 if accuracy regresses (CI gate)
+```
+
+The committed scorecard ([`detection_eval_baseline.json`](blast_radius/data/detection_eval_baseline.json))
+is served read-only at `GET /api/eval/detection`. High recall on this corpus does **not** mean
+real-world attacks are caught — the corpus intentionally encodes the evasions the screen misses as
+`xfail` rows, so the blind spots below are machine-checked, not aspirational.
+
+Engine `1.1.0` closed eight gaps the corpus had recorded (IPv6 egress URLs, `ncat`/`socat`/`scp`/`telnet`,
+`.netrc`/kubeconfig/`.pgpass` credential files, split/long `rm` flags, and a bounded base64/hex
+decode-then-rescan pass), lifting corpus recall from 0.70 to 0.94. Those rows are now `pass`; a test
+fails if any silently regresses.
+
+**Known blind spots that remain.** These are why the screen never claims an artifact is safe. Each
+row maps to a corpus id you can inspect and re-run.
+
+| Evasion the screen misses | Category | Severity | Corpus id |
+| --- | --- | --- | --- |
+| Variable-indirected secret paths (`$CRED_DIR/…`) | `secrets_access` | high | `fn-secret-var-09` |
+| Natural-language prompt injection beyond fixed phrases | `authority_override` | high | `fn-authority-nl-10` |
+| False positive: any egress tool flags benign API calls without an allowlist | `unapproved_egress` | medium (noise) | `fp-curl-github-01` |
+| False positive: `test mode` / bounded `rm -rf ./dir` in benign code | `auth_bypass`, `destructive_scope` | medium (noise) | `fp-testmode-comment-02`, `fp-rm-node-modules-03` |
+
 ## Test and release checks
 
 ```powershell
@@ -200,6 +232,7 @@ Useful endpoints:
 | `GET /api/sessions/{id}/results` | Retrieve competency and pre/post results |
 | `GET /api/team/summary` | Developer-role aggregate of finished-session summaries (team board) |
 | `GET /api/eval/model` | Read-only human-vs-model oversight scorecard (or an honest empty state) |
+| `GET /api/eval/detection` | Read-only detection scorecard for the deterministic screen: precision/recall over a labeled corpus, plus documented blind spots |
 
 ### Human vs. model oversight
 

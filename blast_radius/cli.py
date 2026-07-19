@@ -41,7 +41,7 @@ def _infer_kind(args: argparse.Namespace, content: str) -> str:
     return "command"
 
 
-def _render_human(report: InspectionReport) -> None:
+def _render_human(report: InspectionReport, *, explain: bool = False) -> None:
     print(f"verdict: {report.verdict}  ({report.method}, {report.graded_by})")
     if report.parsed_as:
         print(f"parsed as: {report.parsed_as}")
@@ -50,9 +50,15 @@ def _render_human(report: InspectionReport) -> None:
     if not report.findings:
         print("no known red-flag pattern matched.")
     for finding in report.findings:
-        print(f"  [{finding.severity}] {finding.label} ({finding.category})")
+        tier = f", {finding.confidence} confidence" if explain and finding.confidence else ""
+        print(f"  [{finding.severity}] {finding.label} ({finding.category}{tier})")
         for match in finding.matches:
             print(f"      - {match.matched}: {match.excerpt}")
+        if explain:
+            if finding.why:
+                print(f"      why: {finding.why}")
+            if finding.fix:
+                print(f"      fix: {finding.fix}")
     if report.policy_deltas:
         for delta in report.policy_deltas:
             if delta.status != "ok":
@@ -75,6 +81,7 @@ def _cmd_check(args: argparse.Namespace) -> int:
                 Path(args.expected).read_text(encoding="utf-8")
             )
         report = inspector.inspect_config(config, expected)
+        kind = "config"
     else:
         content = _read_source(args.artifact, args.diff)
         kind = _infer_kind(args, content)
@@ -83,10 +90,15 @@ def _cmd_check(args: argparse.Namespace) -> int:
             return 2
         report = inspector.inspect_text(content, kind=kind)
 
+    if not args.no_audit:
+        from blast_radius import audit
+
+        audit.record(report, kind=kind, source="cli")
+
     if args.json:
         print(report.model_dump_json(indent=2))
     else:
-        _render_human(report)
+        _render_human(report, explain=args.explain)
 
     threshold = _FAIL_ON_THRESHOLD[args.fail_on]
     return 1 if _VERDICT_RANK[report.verdict] >= threshold else 0
@@ -118,6 +130,43 @@ def _cmd_verify(args: argparse.Namespace) -> int:
             failures += 1
             print(f"FAIL {scenario.id}: {'; '.join(result.reasons)}")
     return 1 if failures else 0
+
+
+def _cmd_audit(args: argparse.Namespace) -> int:
+    """Review the local, fingerprint-only record of what the screen has flagged.
+    Contains no raw commands, diffs, excerpts, or secrets — only hashes, verdicts,
+    and category ids."""
+    from blast_radius import audit
+
+    entries = audit.read_entries(limit=args.limit)
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "path": str(audit.audit_path()),
+                    "summary": audit.summarize(entries),
+                    "entries": entries,
+                },
+                indent=2,
+            )
+        )
+        return 0
+    if not entries:
+        print(f"no audit entries at {audit.audit_path()}")
+        return 0
+    summary = audit.summarize(entries)
+    plural = "entry" if summary["total"] == 1 else "entries"
+    print(f"audit log: {audit.audit_path()}  ({summary['total']} {plural})")
+    for verdict, count in summary["by_verdict"].items():
+        print(f"  {verdict}: {count}")
+    print("recent:")
+    for entry in entries:
+        categories = ",".join(entry.get("categories", [])) or "-"
+        print(
+            f"  {entry.get('ts', '')}  {entry.get('verdict', ''):<20} "
+            f"{entry.get('kind', ''):<8} [{categories}]  {entry.get('fingerprint', '')[:12]}"
+        )
+    return 0
 
 
 def _cmd_eval_model(args: argparse.Namespace) -> int:
@@ -192,6 +241,136 @@ def _cmd_eval_model(args: argparse.Namespace) -> int:
     return 0
 
 
+_VERDICT_ABBR = {
+    "looks-scoped": "scoped",
+    "sandbox-recommended": "sandbox",
+    "reject-recommended": "reject",
+}
+_DETECTION_BASELINE = _DATA_DIR / "detection_eval_baseline.json"
+
+
+def _render_detection(report) -> None:
+    from blast_radius.eval import DETECTION_NOTE
+
+    print(DETECTION_NOTE)
+    print()
+    print(f"detection screen — {report.method}, {report.graded_by}")
+    print(f"engine {report.engine_version}  categories {report.categories_hash[:12]}…")
+    print(
+        f"samples: {report.total}  (malicious {report.malicious}, benign {report.benign})"
+    )
+    print(
+        f"precision {report.precision}  recall {report.recall}  "
+        f"F1 {report.f1}  false-positive-rate {report.false_positive_rate}"
+    )
+    print(
+        f"  TP {report.true_positive}  FN {report.false_negative}  "
+        f"FP {report.false_positive}  TN {report.true_negative}"
+    )
+    print()
+    verdicts = ["looks-scoped", "sandbox-recommended", "reject-recommended"]
+    width = 9
+    corner = "exp \\ act"
+    print("verdict confusion (rows = expected, cols = actual):")
+    print("  " + f"{corner:<18}" + "".join(f"{_VERDICT_ABBR[v]:>{width}}" for v in verdicts))
+    for expected in verdicts:
+        row = report.confusion[expected]
+        print(
+            "  "
+            + f"{_VERDICT_ABBR[expected]:<18}"
+            + "".join(f"{row[actual]:>{width}}" for actual in verdicts)
+        )
+    print()
+    print("per-category  (recall | precision | support):")
+    for category, stats in report.per_category.items():
+        print(
+            f"  {category:<26} {stats['recall']:.3f} | "
+            f"{stats['precision']:.3f} | {stats['support']}"
+        )
+    print()
+    print(f"Known blind spots (xfail): {report.xfail_total}")
+    if report.xfail_unexpectedly_passing:
+        print(
+            f"  ! {report.xfail_unexpectedly_passing} xfail sample(s) now meet expectation "
+            "— promote them to status=pass"
+        )
+    if report.pass_regressions:
+        print(f"  ! {report.pass_regressions} pass sample(s) no longer meet expectation")
+
+
+def _check_detection_baseline(report) -> int:
+    """Fail (exit 1) if any headline metric or per-category recall drops below the
+    committed baseline, or a defended (`pass`) sample regressed. A deterministic
+    engine plus a fixed corpus makes this a hard, reproducible regression gate."""
+    if not _DETECTION_BASELINE.exists():
+        print(
+            "no committed detection baseline; run `blastradius eval-detection --out`",
+            file=sys.stderr,
+        )
+        return 2
+    baseline = json.loads(_DETECTION_BASELINE.read_text(encoding="utf-8"))
+    epsilon = 1e-9
+    regressions: list[str] = []
+    for metric in ("precision", "recall", "f1"):
+        current = getattr(report, metric)
+        prior = baseline.get(metric, 0.0)
+        if current + epsilon < prior:
+            regressions.append(f"{metric} {current} < baseline {prior}")
+    if report.false_positive_rate > baseline.get("false_positive_rate", 1.0) + epsilon:
+        regressions.append(
+            f"false_positive_rate {report.false_positive_rate} > "
+            f"baseline {baseline['false_positive_rate']}"
+        )
+    for category, stats in baseline.get("per_category", {}).items():
+        current = report.per_category.get(category, {}).get("recall", 0.0)
+        if current + epsilon < stats.get("recall", 0.0):
+            regressions.append(f"{category} recall {current} < baseline {stats['recall']}")
+    if report.pass_regressions:
+        regressions.append(f"{report.pass_regressions} defended sample(s) regressed")
+    if regressions:
+        print("DETECTION REGRESSION vs committed baseline:", file=sys.stderr)
+        for line in regressions:
+            print(f"  - {line}", file=sys.stderr)
+        return 1
+    print(
+        f"detection metrics hold vs baseline "
+        f"(recall={report.recall} precision={report.precision} f1={report.f1})"
+    )
+    return 0
+
+
+def _cmd_eval_detection(args: argparse.Namespace) -> int:
+    """Score the deterministic screen against the labeled corpus. Fully offline —
+    no model, no key. Prints an honest scorecard; `--out` writes the committed
+    baseline and `--check-baseline` gates regressions in CI."""
+    from datetime import UTC, datetime
+
+    from blast_radius.eval import evaluate_detection, load_corpus
+
+    corpus_path = Path(args.corpus) if args.corpus else (_DATA_DIR / "detection_corpus.jsonl")
+    report = evaluate_detection(load_corpus(corpus_path))
+
+    if args.check_baseline:
+        return _check_detection_baseline(report)
+
+    if args.out is not None:
+        payload = report.to_dict()
+        payload["generated_at"] = datetime.now(UTC).isoformat()
+        out = Path(args.out)
+        out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        print(
+            f"wrote {out}\n  recall={report.recall} precision={report.precision} "
+            f"f1={report.f1} blind_spots={report.xfail_total}"
+        )
+        return 0
+
+    if args.json:
+        print(json.dumps(report.to_dict(), indent=2))
+    else:
+        _render_detection(report)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="blastradius",
@@ -208,6 +387,16 @@ def build_parser() -> argparse.ArgumentParser:
     check.add_argument("--expected", help="path to an expected BlastRadiusConfig JSON (config only)")
     check.add_argument("--json", action="store_true", help="emit the full JSON report")
     check.add_argument(
+        "--explain",
+        action="store_true",
+        help="show per-finding confidence, rationale, and remediation",
+    )
+    check.add_argument(
+        "--no-audit",
+        action="store_true",
+        help="do not append a fingerprint-only entry to the local audit log",
+    )
+    check.add_argument(
         "--fail-on",
         choices=["reject", "sandbox", "never"],
         default="reject",
@@ -220,6 +409,15 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument("--bank", action="store_true", help="verify the whole curated bank")
     verify.set_defaults(func=_cmd_verify)
 
+    auditp = sub.add_parser(
+        "audit", help="review the local, fingerprint-only detection audit log"
+    )
+    auditp.add_argument(
+        "--limit", type=int, default=20, help="show the most recent N entries (default 20)"
+    )
+    auditp.add_argument("--json", action="store_true", help="emit entries + summary as JSON")
+    auditp.set_defaults(func=_cmd_audit)
+
     evalp = sub.add_parser(
         "eval-model",
         help="grade a model through the bank on the same gate a human uses (needs a key)",
@@ -231,6 +429,26 @@ def build_parser() -> argparse.ArgumentParser:
     evalp.add_argument("--max-output-tokens", type=int, default=2000)
     evalp.add_argument("--out", help="output path (default: packaged model_eval_baseline.json)")
     evalp.set_defaults(func=_cmd_eval_model)
+
+    detect = sub.add_parser(
+        "eval-detection",
+        help="score the deterministic screen against the labeled corpus (offline, no key)",
+    )
+    detect.add_argument("--corpus", help="corpus path (default: packaged detection_corpus.jsonl)")
+    detect.add_argument("--json", action="store_true", help="emit the full JSON scorecard")
+    detect.add_argument(
+        "--out",
+        nargs="?",
+        const=str(_DETECTION_BASELINE),
+        default=None,
+        help="write the baseline scorecard (bare flag writes the packaged baseline)",
+    )
+    detect.add_argument(
+        "--check-baseline",
+        action="store_true",
+        help="exit 1 if metrics regress below the committed baseline",
+    )
+    detect.set_defaults(func=_cmd_eval_detection)
     return parser
 
 

@@ -262,6 +262,65 @@
   text-decoration: underline;
 }
 
+/* The integrity block now lives on its own tab (screen-integrity) instead of the
+   hero, so relax the hero-tuned width/top-margin and let it breathe full-width. */
+.resource-screen .integrity-check {
+  margin-top: 4px;
+  max-width: 760px;
+}
+
+/* A hover/focus tooltip anchored near the right edge would otherwise widen the
+   page on narrow screens; clip the tab's own x-overflow (tooltips pop upward, so
+   y stays visible) instead of letting the whole page scroll sideways. */
+#screen-integrity {
+  overflow-x: clip;
+}
+
+/* Landing teaser that points at the integrity tab — quiet, one line, no card. */
+.integrity-teaser {
+  margin-top: 24px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Reusable hover/focus tooltip. Text lives in aria-label so screen readers get
+   the full explanation and the visible surface stays clean. */
+.br-tip {
+  position: relative;
+  border-bottom: 1px dotted var(--muted);
+  cursor: help;
+  outline: none;
+}
+
+.br-tip::after {
+  content: attr(aria-label);
+  position: absolute;
+  left: 0;
+  bottom: 130%;
+  z-index: 20;
+  width: max-content;
+  max-width: min(260px, calc(100vw - 32px));
+  padding: 8px 10px;
+  background: #0d0f0c;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--ink);
+  font: 11px/1.45 var(--sans);
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: normal;
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition: opacity .12s ease, transform .12s ease;
+}
+
+.br-tip:hover::after,
+.br-tip:focus-visible::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .shareable-summary {
   display: flex;
   flex-direction: column;
@@ -1066,6 +1125,108 @@ a.resource-source:hover .resource-source-title {
   font-family: var(--serif);
   font-size: 22px;
   color: var(--acid);
+}
+
+/* ---- persistent profile strip ---- */
+.profile-strip {
+  margin: 16px 0 0;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.profile-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+  margin-bottom: 10px;
+}
+.profile-facts span {
+  display: block;
+  font: 9px/1 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.profile-facts strong {
+  font-family: var(--serif);
+  font-size: 20px;
+  color: var(--acid);
+}
+.profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 6px;
+}
+.profile-adopt-input {
+  width: 100%;
+  background: var(--black);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font: 12px/1.4 var(--mono);
+  padding: 6px 8px;
+  margin-bottom: 6px;
+}
+.profile-adopt-input:focus-visible {
+  outline: 2px solid var(--acid);
+  outline-offset: 1px;
+}
+.profile-note {
+  margin: 0;
+}
+
+/* ---- public leaderboard ---- */
+.leaderboard-panel {
+  margin: 16px 0 0;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.leaderboard-label {
+  font: 9px/1 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 10px;
+}
+.leaderboard-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.leaderboard-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font: 12px/1.3 var(--mono);
+  padding: 4px 6px;
+  border-left: 2px solid transparent;
+}
+.leaderboard-row.you {
+  border-left-color: var(--acid);
+  background: color-mix(in srgb, var(--acid) 9%, transparent);
+}
+.lb-rank {
+  color: var(--muted);
+  min-width: 28px;
+}
+.lb-name {
+  flex: 1;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.leaderboard-row.you .lb-name {
+  color: var(--acid);
+}
+.lb-meta {
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 #callback-start {

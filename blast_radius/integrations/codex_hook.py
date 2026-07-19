@@ -54,6 +54,13 @@ def main() -> int:
         print(f"blast-radius: command not screened ({type(exc).__name__})", file=sys.stderr)
         return _emit("allow")
 
+    try:  # fingerprint-only audit trail; never blocks the agent if it fails
+        from blast_radius import audit
+
+        audit.record(report, kind="command", source="hook")
+    except Exception:  # noqa: BLE001 - auditing must never break the guard
+        pass
+
     fail_on = os.environ.get("BLAST_RADIUS_FAIL_ON", "reject")
     threshold = _THRESHOLD.get(fail_on, 2)
     labels = "; ".join(finding.label for finding in report.findings)

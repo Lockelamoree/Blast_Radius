@@ -85,6 +85,12 @@ class Settings:
     team_summary_limit_per_minute: int = int(
         os.getenv("BLAST_RADIUS_TEAM_SUMMARY_LIMIT_PER_MINUTE", "30")
     )
+    me_limit_per_minute: int = int(
+        os.getenv("BLAST_RADIUS_ME_LIMIT_PER_MINUTE", "60")
+    )
+    adopt_limit_per_hour: int = int(
+        os.getenv("BLAST_RADIUS_ADOPT_LIMIT_PER_HOUR", "20")
+    )
     generator_model: str = "gpt-5.6-luna"
     critic_model: str = "gpt-5.6-sol"
     generator_max_output_tokens: int = int(

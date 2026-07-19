@@ -1132,3 +1132,132 @@ def test_oversight_bias_is_none_without_recorded_actions() -> None:
         socratic_followup="y",
     )
     assert classify_oversight_bias([legacy]) is None
+
+
+# --------------------------------------------------------------------------
+# Persistent users, custom pet, and the public leaderboard
+# --------------------------------------------------------------------------
+def _play_full_demo(client, bank) -> str:
+    """Play a complete demo session (pretest -> 6 rounds -> posttest) so a durable
+    summary with a score is recorded. Returns the session id."""
+    created = client.post("/api/sessions", json={"mode": "demo"}).json()
+    session_id = created["session_id"]
+    client.post(
+        f"/api/sessions/{session_id}/pretest",
+        json={"answers": assessment_answers(bank, created["pretest"])},
+    )
+    for _ in range(6):
+        round_data = client.post(f"/api/sessions/{session_id}/rounds/next").json()
+        scenario_id = round_data["scenario"]["id"]
+        if scenario_id == "cmd-cleanup-2":
+            payload = {
+                "scenario_id": scenario_id,
+                "action": "sandbox",
+                "reasoning_text": "Bound the destructive generated-directory cleanup to the workspace.",
+                "blast_radius_config": {
+                    "readable_paths": ["/workspace/htmlcov"],
+                    "writable_paths": ["/workspace/htmlcov"],
+                    "network_enabled": False,
+                    "network_allowlist": [],
+                    "capabilities": ["delete-generated-files"],
+                },
+            }
+        else:
+            payload = {
+                "scenario_id": scenario_id,
+                "action": "reject",
+                "reasoning_text": "The artifacts show an unapproved secret, scope, provenance, or egress risk.",
+            }
+        assert client.post(f"/api/sessions/{session_id}/decisions", json=payload).status_code == 200
+    done = client.post(f"/api/sessions/{session_id}/rounds/next")
+    post_answers = assessment_answers(bank, done.json()["posttest"])
+    client.post(f"/api/sessions/{session_id}/posttest", json={"answers": post_answers})
+    return session_id
+
+
+def test_me_mints_a_stable_persistent_identity(client) -> None:
+    first = client.get("/api/me")
+    assert first.status_code == 200
+    assert client.cookies.get("br_uid")
+    profile = first.json()
+    assert profile["score"] == 0
+    assert profile["level"] == 1
+    assert profile["rank"] is None
+    assert profile["nickname"] is None
+    assert profile["pet"]["shape"] == "cloud"
+    assert profile["token_for_copy"]
+    # A second call with the same cookie returns the same identity, not a new one.
+    again = client.get("/api/me").json()
+    assert again["token_for_copy"] == profile["token_for_copy"]
+
+
+def test_nickname_persists_validates_and_defaults_the_handle(client) -> None:
+    client.get("/api/me")
+    assert client.post("/api/me/nickname", json={"nickname": "max-g"}).json()["nickname"] == "max-g"
+    assert client.get("/api/me").json()["nickname"] == "max-g"
+    # Bad nicknames are rejected by the same grammar as the operator handle.
+    assert client.post("/api/me/nickname", json={"nickname": "!!"}).status_code == 422
+    # A new session with no explicit handle inherits the saved nickname.
+    created = client.post("/api/sessions", json={"mode": "demo"}).json()
+    assert created["operator_handle"] == "max-g"
+    # Blank clears back to anonymous.
+    assert client.post("/api/me/nickname", json={"nickname": ""}).json()["nickname"] is None
+
+
+def test_custom_pet_persists_and_rejects_unknown_options(client) -> None:
+    client.get("/api/me")
+    valid = {
+        "shape": "droplet", "palette": "violet", "face": "visor",
+        "accessory": "halo", "trait": "playful", "name": "Sir Byte!!",
+    }
+    saved = client.put("/api/me/pet", json=valid)
+    assert saved.status_code == 200
+    assert saved.json()["pet"]["name"] == "sir_byte"  # slugified server-side
+    # Persisted for the next load.
+    pet = client.get("/api/me").json()["pet"]
+    assert pet["shape"] == "droplet" and pet["palette"] == "violet"
+    # Closed enums reject anything off-list, and unknown keys are forbidden.
+    assert client.put("/api/me/pet", json={**valid, "shape": "banana"}).status_code == 422
+    assert client.put("/api/me/pet", json={**valid, "wings": True}).status_code == 422
+
+
+def test_score_accrues_and_surfaces_on_the_public_leaderboard(client, test_settings) -> None:
+    bank = ScenarioBank(test_settings.data_dir)
+    client.post("/api/me/nickname", json={"nickname": "max-g"})
+    _play_full_demo(client, bank)
+    profile = client.get("/api/me").json()
+    assert profile["score"] > 0
+    assert profile["sessions"] == 1
+    assert profile["rank"] == 1
+    board = client.get("/api/leaderboard")
+    assert board.status_code == 200
+    rows = board.json()["leaderboard"]
+    mine = next(row for row in rows if row["is_you"])
+    assert mine["nickname"] == "max-g"
+    assert mine["score"] == profile["score"]
+    assert mine["rank"] == 1
+
+
+def test_adopt_recovers_a_profile_and_throttles_bad_tokens(test_settings) -> None:
+    with TestClient(create_app(test_settings)) as owner:
+        token = owner.get("/api/me").json()["token_for_copy"]
+        owner.post("/api/me/nickname", json={"nickname": "riley"})
+
+    with TestClient(create_app(test_settings)) as other:
+        other.get("/api/me")  # gets its own fresh identity first
+        adopted = other.post("/api/me/adopt", json={"token": token})
+        assert adopted.status_code == 200
+        assert adopted.json()["nickname"] == "riley"
+        # Now this browser IS that user.
+        assert other.get("/api/me").json()["nickname"] == "riley"
+
+    with TestClient(create_app(test_settings)) as attacker:
+        # Bad tokens are rejected, and repeated guesses get throttled.
+        seen_429 = False
+        for _ in range(30):
+            status = attacker.post("/api/me/adopt", json={"token": "not-a-real-token"}).status_code
+            assert status in (401, 429)
+            if status == 429:
+                seen_429 = True
+                break
+        assert seen_429

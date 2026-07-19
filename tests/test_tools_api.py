@@ -197,6 +197,22 @@ def test_eval_model_route_is_read_only_and_honest(client: TestClient) -> None:
         assert "blastradius eval-model" in body["note"]
 
 
+def test_eval_detection_route_is_read_only_and_honest(client: TestClient) -> None:
+    # Serves the committed detection scorecard, or an honest empty state. Never
+    # 500s and stays shape-stable; the honesty note travels in the payload.
+    body = client.get("/api/eval/detection").json()
+    assert isinstance(body["available"], bool)
+    if body["available"]:
+        report = body["report"]
+        assert report["graded_by"] == "deterministic"
+        assert 0.0 <= report["recall"] <= 1.0
+        assert 0.0 <= report["precision"] <= 1.0
+        assert "no model ran" in report["note"]
+        assert report["xfail_total"] >= 0
+    else:
+        assert "blastradius eval-detection" in body["note"]
+
+
 def test_gate_verify_hides_the_draft_schema_from_a_judge(test_settings: Settings) -> None:
     # A restricted judge sending a malformed body must be rejected with 403 by the
     # role dependency BEFORE Pydantic validates the body — a 422 would enumerate the

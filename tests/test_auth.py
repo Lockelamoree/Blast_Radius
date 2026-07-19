@@ -6,6 +6,8 @@ from fastapi.testclient import TestClient
 from blast_radius.auth import (
     AttemptLimiter,
     issue_token,
+    mint_uid_token,
+    resolve_uid,
     verify_token,
 )
 from blast_radius.config import Settings, parse_access_codes
@@ -37,6 +39,36 @@ def test_token_expiry_and_future_dating() -> None:
     # Clearly future-dated tokens are rejected (beyond skew tolerance).
     future = issue_token(SECRET, "judge", issued_at=5_000)
     assert verify_token(SECRET, future, max_age_seconds=100, now=1_000) is None
+
+
+def test_uid_token_round_trips_and_rejects_role_tokens() -> None:
+    # A signed token is opaque (a base64 cookie value); it resolves back to the
+    # full "uid:<hex>" identity, which is the stable per-user key.
+    token = mint_uid_token(SECRET)
+    resolved = resolve_uid(SECRET, token, max_age_seconds=3600)
+    assert resolved is not None and resolved.startswith("uid:")
+    assert resolve_uid(SECRET, token, max_age_seconds=3600) == resolved
+    # An access-role token pasted into the uid slot must NOT be accepted as an
+    # identity (can't adopt a role cookie as a user).
+    role_token = issue_token(SECRET, "judge")
+    assert resolve_uid(SECRET, role_token, max_age_seconds=3600) is None
+    # Tampered, expired, and missing tokens all fail closed.
+    assert resolve_uid(SECRET, token + "x", max_age_seconds=3600) is None
+    assert resolve_uid("other-secret", token, max_age_seconds=3600) is None
+    assert resolve_uid(SECRET, None, max_age_seconds=3600) is None
+
+
+def test_uid_open_fallback_when_no_secret_configured() -> None:
+    # Without a secret (ungated dev / tests) we mint an unsigned uid-open token and
+    # accept it verbatim so identity is still stable per browser.
+    token = mint_uid_token("")
+    assert token.startswith("uid-open:")
+    assert resolve_uid("", token, max_age_seconds=3600) == token
+    # Junk / oversized values are rejected even in the open fallback.
+    assert resolve_uid("", "uid-open:" + "z" * 200, max_age_seconds=3600) is None
+    assert resolve_uid("", "not-a-uid", max_age_seconds=3600) is None
+    # With a secret configured, an unsigned uid-open token is not accepted.
+    assert resolve_uid(SECRET, token, max_age_seconds=3600) is None
 
 
 def test_verify_token_fails_closed_on_non_ascii_signature() -> None:
@@ -221,6 +253,21 @@ def test_team_summary_requires_developer_role(auth_settings: Settings) -> None:
         assert "roster" in ok.json()
 
 
+def test_persistent_profile_works_behind_the_gate(auth_settings: Settings) -> None:
+    with TestClient(create_app(auth_settings)) as client:
+        # /api/me is gated like the rest of the API until a code is presented.
+        assert client.get("/api/me").status_code == 401
+        _unlock(client, "JUDGE-TOKEN-1")
+        me = client.get("/api/me")
+        assert me.status_code == 200
+        assert client.cookies.get("br_uid")
+        # The leaderboard is open to any code-holder (not developer-only).
+        assert client.get("/api/leaderboard").status_code == 200
+        # With signing on, a forged uid token cannot be adopted.
+        forged = client.post("/api/me/adopt", json={"token": "uid:deadbeef.forged-sig"})
+        assert forged.status_code == 401
+
+
 def test_team_and_author_pages_are_developer_only(auth_settings: Settings) -> None:
     with TestClient(create_app(auth_settings)) as client:
         anon = client.get("/team", follow_redirects=False)
@@ -234,6 +281,19 @@ def test_team_and_author_pages_are_developer_only(auth_settings: Settings) -> No
         with TestClient(create_app(auth_settings)) as client:
             _unlock(client, "DEV-TOKEN-2")
             assert client.get(path).status_code == 200
+
+
+def test_screen_page_is_gated_but_open_to_any_code_holder(auth_settings: Settings) -> None:
+    with TestClient(create_app(auth_settings)) as client:
+        anon = client.get("/screen", follow_redirects=False)
+        assert anon.status_code == 303
+        assert anon.headers["location"].startswith("/access")
+    # Unlike /team and /author (developer-only), /screen admits a JUDGE code too —
+    # it backs the any-code-holder POST /api/check.
+    for token in ("JUDGE-TOKEN-1", "DEV-TOKEN-2"):
+        with TestClient(create_app(auth_settings)) as client:
+            _unlock(client, token)
+            assert client.get("/screen").status_code == 200
 
 
 def test_team_views_are_open_when_auth_is_disabled(tmp_path: Path) -> None:

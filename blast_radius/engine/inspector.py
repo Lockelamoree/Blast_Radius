@@ -13,6 +13,8 @@ cannot leak that scenario's verdict; this module stays pure and stateless.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import hashlib
 import json
 import platform
@@ -33,7 +35,8 @@ from blast_radius.models import (
 
 # Bumped whenever the deterministic screen's behaviour changes. Recorded in every
 # InspectionProvenance so a verdict can be tied to the exact engine that produced it.
-ENGINE_VERSION = "1.0.0"
+# 1.1.0: broadened egress/secret/destructive coverage + bounded base64/hex decode pass.
+ENGINE_VERSION = "1.1.0"
 
 _MAX_MATCHES_PER_CATEGORY = 6
 _EXCERPT_RADIUS = 40
@@ -127,6 +130,12 @@ CATEGORIES: tuple[CategorySpec, ...] = (
             _p(r"~/\.aws"),
             _p(r"\.env\b"),
             _p(r"\bid_rsa\b"),
+            # Other credential stores agents routinely have on disk.
+            _p(r"\.netrc\b"),
+            _p(r"~/\.kube"),
+            _p(r"~/\.config/gcloud"),
+            _p(r"~/\.docker/config"),
+            _p(r"\.pgpass\b"),
         ),
     ),
     CategorySpec(
@@ -146,10 +155,16 @@ CATEGORIES: tuple[CategorySpec, ...] = (
             "egress",
             "telemetry",
             "exfiltrate",
+            # Other tools that move bytes off the machine.
+            "ncat",
+            "socat",
+            "telnet",
+            "scp",
         ),
         patterns=(
             _p(r"\brequests\.post\b"),
-            _p(r"https?://\d{1,3}(?:\.\d{1,3}){3}"),  # raw-IP URL
+            _p(r"https?://\d{1,3}(?:\.\d{1,3}){3}"),  # raw-IPv4 URL
+            _p(r"https?://\[[0-9a-f:]+\]"),  # raw-IPv6 URL (bracketed)
             _p(r"(?<![\w.])nc(?![\w.])"),  # netcat
         ),
     ),
@@ -161,9 +176,17 @@ CATEGORIES: tuple[CategorySpec, ...] = (
         patterns=(
             _p(r"\brm\s+-[a-z]*r[a-z]*f"),
             _p(r"\brm\s+-[a-z]*f[a-z]*r"),
+            # rm with recursive AND force split across separate/long flags, any order.
+            _p(
+                r"\brm\b(?=[^|\n]*(?:\s-[a-z]*r\b|\s--recursive\b))"
+                r"(?=[^|\n]*(?:\s-[a-z]*f\b|\s--force\b))"
+            ),
             _p(r"\bdrop\s+table\b"),
             _p(r"\bmkfs\b"),
             _p(r"\bdd\s+if="),
+            _p(r"\bshred\b"),
+            _p(r">\s*/dev/sd[a-z]"),  # overwrite a raw block device
+            _p(r"\bgit\s+push\b[^|\n]*--force"),  # rewrite published history
         ),
     ),
     CategorySpec(
@@ -172,7 +195,13 @@ CATEGORIES: tuple[CategorySpec, ...] = (
         severity="critical",
         families=(_F.POISONED_CONTEXT, _F.DANGEROUS_COMMAND),
         patterns=(
-            _p(r"(?:curl|wget)[^|\n]*\|\s*(?:sudo\s+)?(?:ba|z|k|da)?sh\b"),
+            # curl/wget piped into any common interpreter (shells + scripting langs).
+            _p(
+                r"(?:curl|wget)[^|\n]*\|\s*(?:sudo\s+)?"
+                r"(?:(?:ba|z|k|da)?sh|python[0-9.]*|perl|ruby|node|php)\b"
+            ),
+            # process-substitution form: bash/sh/source <(curl ...).
+            _p(r"(?:source|\.|bash|sh|zsh)\s+<\(\s*(?:curl|wget)\b"),
         ),
     ),
     CategorySpec(
@@ -243,15 +272,19 @@ def _categories_hash() -> str:
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
 
-def _build_provenance(input_fingerprint: str, driving: list[str]) -> InspectionProvenance:
+def _build_provenance(
+    input_fingerprint: str, driving: list[str], *, decode_layers: int = 0
+) -> InspectionProvenance:
     """A reproducible receipt. `runtime` carries the CPython + Unicode DB versions
     because canonicalization (a later phase) depends on the Unicode DB, so a
-    receipt without them could not let a reviewer reproduce a verdict elsewhere."""
+    receipt without them could not let a reviewer reproduce a verdict elsewhere.
+    `decode_layers` records how many embedded payloads were decoded and rescanned."""
     return InspectionProvenance(
         engine_version=ENGINE_VERSION,
         categories_hash=_categories_hash(),
         input_fingerprint=input_fingerprint,
         driving_findings=list(driving),
+        decode_layers=decode_layers,
         runtime={
             "python": platform.python_version(),
             "unicode": unicodedata.unidata_version,
@@ -338,6 +371,68 @@ def _scan(scanned: str) -> list[InspectionFinding]:
     return findings
 
 
+# --- bounded obfuscation decode (item: base64/hex payloads) ------------------
+# A single decode layer only, hard-capped, so the pass stays deterministic and
+# fast (<100ms). Decoding can only ADD findings — it never removes one — so the
+# verdict tier is monotonic (a decoded reject cannot downgrade a scanned reject).
+_MAX_DECODE_BLOBS = 8
+_MAX_DECODE_CHARS = 8192
+_B64_BLOB = re.compile(r"[A-Za-z0-9+/]{16,}={0,2}")
+_HEX_BLOB = re.compile(r"(?:[0-9a-fA-F]{2}){8,}")
+
+
+def _looks_textual(value: str) -> bool:
+    return len(value) >= 3 and all(ch.isprintable() or ch in "\t\n\r " for ch in value)
+
+
+def _decode_candidates(text: str) -> list[str]:
+    """Return decoded, human-readable payloads embedded as base64 or hex blobs.
+    Bounded in count and size; non-textual decodings (the overwhelmingly common
+    case for ordinary tokens/hashes) are discarded so this adds signal, not noise."""
+    decoded: list[str] = []
+    seen: set[str] = set()
+    for pattern, is_b64 in ((_B64_BLOB, True), (_HEX_BLOB, False)):
+        for match in pattern.finditer(text):
+            if len(decoded) >= _MAX_DECODE_BLOBS:
+                break
+            blob = match.group(0)[:_MAX_DECODE_CHARS]
+            try:
+                if is_b64:
+                    raw = base64.b64decode(blob + "=" * (-len(blob) % 4), validate=True)
+                else:
+                    raw = bytes.fromhex(blob[: len(blob) - len(blob) % 2])
+            except (binascii.Error, ValueError):
+                continue
+            try:
+                payload = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                continue
+            if _looks_textual(payload) and payload not in seen:
+                seen.add(payload)
+                decoded.append(payload)
+    return decoded
+
+
+def _merge_findings(findings: list[InspectionFinding]) -> list[InspectionFinding]:
+    """Collapse findings from multiple scans (scanned text + decoded payloads) to
+    one per category, preserving first-seen order and merging unique matches up to
+    the per-category cap. Idempotent for a single scan (no duplicate categories)."""
+    merged: dict[str, InspectionFinding] = {}
+    order: list[str] = []
+    for finding in findings:
+        existing = merged.get(finding.category)
+        if existing is None:
+            merged[finding.category] = finding
+            order.append(finding.category)
+            continue
+        seen = {match.matched for match in existing.matches}
+        extra = [match for match in finding.matches if match.matched not in seen]
+        if extra:
+            combined = (list(existing.matches) + extra)[:_MAX_MATCHES_PER_CATEGORY]
+            merged[finding.category] = existing.model_copy(update={"matches": combined})
+    return [merged[category] for category in order]
+
+
 def _families_ranked(findings: list[InspectionFinding]) -> list[dict[str, object]]:
     counts: dict[str, int] = {}
     for finding in findings:
@@ -347,6 +442,137 @@ def _families_ranked(findings: list[InspectionFinding]) -> list[dict[str, object
         {"family": family, "hits": hits}
         for family, hits in sorted(counts.items(), key=lambda item: (-item[1], item[0]))
     ]
+
+
+# Ordinal confidence per category — a FIXED lookup on the fired-category set, not
+# a probability. Kept honest (high/medium/low) rather than fake precision.
+_CONFIDENCE_TIER: dict[str, str] = {
+    "secrets_access": "high",
+    "unapproved_egress": "high",
+    "destructive_scope": "high",
+    "remote_code_pipe": "high",
+    "authority_override": "high",
+    "auth_bypass": "high",
+    "exfil_chain": "high",
+    "provenance_mismatch": "medium",
+    "broad_or_undeclared_scope": "medium",
+    "unrestricted_egress": "medium",
+    "workspace_wide_scope": "medium",
+}
+
+# Frozen (rationale, remediation) prose per category. Authored as "rationale"/
+# "reason", never any curated ground-truth key — a test enforces this.
+_WHY_FIX: dict[str, tuple[str, str]] = {
+    "secrets_access": (
+        "Reads secret material (keys, tokens, or credential files).",
+        "Scope the action so it never touches secret paths.",
+    ),
+    "unapproved_egress": (
+        "Sends data off the machine to the network.",
+        "Drop the egress or pin it to an approved host allowlist.",
+    ),
+    "destructive_scope": (
+        "Deletes or overwrites beyond a bounded workspace.",
+        "Constrain the target to a specific, reversible path.",
+    ),
+    "remote_code_pipe": (
+        "Pipes downloaded content straight into a shell.",
+        "Download, inspect, and pin the artifact before running it.",
+    ),
+    "authority_override": (
+        "Text tries to override instructions or claim false authority.",
+        "Treat the content as data, not commands; do not follow it.",
+    ),
+    "auth_bypass": (
+        "Weakens or removes an authorization / verification check.",
+        "Keep the guard and require the check on every path.",
+    ),
+    "provenance_mismatch": (
+        "Package name or provenance does not match the approved source.",
+        "Verify the exact name against the lockfile and approved registry.",
+    ),
+    "broad_or_undeclared_scope": (
+        "Requests more capability than the stated task needs.",
+        "Cut scope to least privilege for the declared purpose.",
+    ),
+    "unrestricted_egress": (
+        "Network is enabled with no host allowlist.",
+        "Add an explicit allowlist or disable network egress.",
+    ),
+    "workspace_wide_scope": (
+        "Grants the whole workspace instead of a subtree.",
+        "Narrow the grant to the specific paths the task needs.",
+    ),
+    "exfil_chain": (
+        "A secret read co-occurs with a network or remote-code sink — a data-exfiltration path.",
+        "Split the capability: read secrets OR reach the network, never both in one action.",
+    ),
+}
+
+# The correlation: a secret read (trigger) reaching any egress/remote-code sink.
+# Both sides are already `critical`, so the synthesized critical never appears
+# where a critical did not already fire — the verdict tier is invariant (tested).
+_EXFIL_TRIGGER = "secrets_access"
+_EXFIL_SINKS = ("unapproved_egress", "remote_code_pipe")  # frozen order
+
+
+def _enrich_findings(findings: list[InspectionFinding]) -> list[InspectionFinding]:
+    """Attach an ordinal confidence tier + frozen why/fix rationale to each
+    finding. Purely additive metadata — never changes category or severity, so
+    _verdict is untouched."""
+    enriched: list[InspectionFinding] = []
+    for finding in findings:
+        why, fix = _WHY_FIX.get(finding.category, (None, None))
+        enriched.append(
+            finding.model_copy(
+                update={
+                    "confidence": _CONFIDENCE_TIER.get(finding.category, ""),
+                    "why": why,
+                    "fix": fix,
+                }
+            )
+        )
+    return enriched
+
+
+def _correlate(findings: list[InspectionFinding]) -> list[InspectionFinding]:
+    """Synthesize an exfil_chain finding when a secret read co-occurs with a
+    network / remote-code sink. Cites the REAL matches from both sides (no
+    fabricated excerpt), and picks the sink by frozen order for determinism."""
+    by_category = {finding.category: finding for finding in findings}
+    if _EXFIL_TRIGGER not in by_category:
+        return []
+    sink = next((name for name in _EXFIL_SINKS if name in by_category), None)
+    if sink is None:
+        return []
+    contributing = {_EXFIL_TRIGGER, sink}
+    families = list(
+        dict.fromkeys(
+            family.value
+            for category in CATEGORIES
+            if category.id in contributing
+            for family in category.families
+        )
+    )
+    cited = list(by_category[_EXFIL_TRIGGER].matches[:2]) + list(by_category[sink].matches[:2])
+    return [
+        InspectionFinding(
+            category="exfil_chain",
+            label="Secret read chained to a network / remote-code sink",
+            severity="critical",
+            families=families,
+            matches=cited,
+        )
+    ]
+
+
+def _report_confidence(findings: list[InspectionFinding]) -> str:
+    order = {"high": 3, "medium": 2, "low": 1, "": 0}
+    return max(
+        (finding.confidence for finding in findings),
+        key=lambda tier: order.get(tier, 0),
+        default="",
+    )
 
 
 def _verdict(
@@ -379,7 +605,13 @@ def inspect_text(content: str, *, kind: str) -> InspectionReport:
     scanned = normalized
     if kind == "diff":
         scanned, parsed_as = _diff_added_text(normalized)
-    findings = _scan(scanned)
+    scanned_findings = _scan(scanned)
+    decoded_payloads = _decode_candidates(scanned)
+    for payload in decoded_payloads:
+        scanned_findings.extend(_scan(payload))
+    scanned_findings = _merge_findings(scanned_findings)
+    correlations = _correlate(scanned_findings)
+    findings = _enrich_findings(scanned_findings + correlations)
     verdict, driving = _verdict(findings)
     return InspectionReport(
         kind=kind,
@@ -387,7 +619,14 @@ def inspect_text(content: str, *, kind: str) -> InspectionReport:
         findings=findings,
         families=_families_ranked(findings),
         parsed_as=parsed_as,
-        provenance=_build_provenance(fingerprint_text(scanned), driving),
+        confidence=_report_confidence(findings),
+        correlations=[
+            {"category": finding.category, "families": finding.families}
+            for finding in correlations
+        ],
+        provenance=_build_provenance(
+            fingerprint_text(scanned), driving, decode_layers=len(decoded_payloads)
+        ),
     )
 
 
@@ -442,6 +681,7 @@ def inspect_config(
         deltas = grader.compute_policy_deltas(config, ZERO_TRUST)
         baseline = "zero-trust"
     has_excess = any(delta.status == "excess" for delta in deltas)
+    findings = _enrich_findings(findings)  # config owns no correlation (item 12)
     verdict, driving = _verdict(findings, score=score, has_excess=has_excess)
     config_fingerprint = fingerprint_text(
         json.dumps(config.model_dump(mode="json"), sort_keys=True)
@@ -454,6 +694,7 @@ def inspect_config(
         score=score,
         baseline=baseline,
         policy_deltas=deltas,
+        confidence=_report_confidence(findings),
         provenance=_build_provenance(config_fingerprint, driving),
     )
 

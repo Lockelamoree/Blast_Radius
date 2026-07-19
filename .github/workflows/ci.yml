@@ -40,7 +40,8 @@ jobs:
           wheel=glob.glob('dist/*.whl')[0];
           names=set(zipfile.ZipFile(wheel).namelist());
           required={'blast_radius/data/scenarios.json','blast_radius/data/templates.json',
-          'blast_radius/data/questions.json','blast_radius/static/app.js',
+          'blast_radius/data/questions.json','blast_radius/data/detection_corpus.jsonl',
+          'blast_radius/data/detection_eval_baseline.json','blast_radius/static/app.js',
           'blast_radius/static/styles.css','blast_radius/static/improvements.css',
           'blast_radius/static/integrity-check.js','blast_radius/templates/index.html'};
           missing=sorted(required-names);
@@ -56,3 +57,5 @@ jobs:
             "from blast_radius.main import app; assert app.title == 'Blast Radius'"
           "$RUNNER_TEMP/wheel-smoke/bin/blastradius" verify --bank
           printf 'pytest -q' | "$RUNNER_TEMP/wheel-smoke/bin/blastradius" check --kind command - --fail-on never
+          "$RUNNER_TEMP/wheel-smoke/bin/blastradius" eval-detection --json > /dev/null
+          "$RUNNER_TEMP/wheel-smoke/bin/blastradius" eval-detection --check-baseline

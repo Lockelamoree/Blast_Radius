@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import re
 import time
 from collections import deque
 from datetime import UTC, datetime
@@ -13,16 +14,24 @@ from threading import Lock
 from typing import Annotated, Literal
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from blast_radius.auth import ACCESS_COOKIE, verify_token
+from blast_radius.auth import (
+    ACCESS_COOKIE,
+    UID_COOKIE,
+    AttemptLimiter,
+    mint_uid_token,
+    resolve_uid,
+    verify_token,
+)
 from blast_radius.config import Settings
 from blast_radius.engine import TrustEngine, inspector
 from blast_radius.engine.grader import classify_oversight_bias
 from blast_radius.engine.openai_adapter import SessionLLMBudget
 from blast_radius.models import (
     COMPETENCY_LABELS,
+    NICKNAME_PATTERN,
     AssessmentForm,
     BlastRadiusConfig,
     CoachReply,
@@ -34,6 +43,7 @@ from blast_radius.models import (
     GenerationStatus,
     InspectionReport,
     LearnerProgress,
+    PetConfig,
     PlayerDecision,
     RoundSummary,
     Scenario,
@@ -41,9 +51,15 @@ from blast_radius.models import (
     SessionState,
     SessionSummary,
     ScenarioProvenance,
+    UserProfile,
     competency_for_family,
+    level_for_score,
 )
 from blast_radius.storage import SessionStore
+
+# Cumulative-scoring points per graded round. Deterministic and honest — points
+# come only from rounds the player actually answered and the gate graded.
+VERDICT_POINTS = {"correct": 10, "partial": 4, "wrong": 1}
 
 
 class CreateSessionRequest(BaseModel):
@@ -116,6 +132,30 @@ class RetryRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     scenario_id: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]{2,80}$")
     reasoning_text: str = Field(min_length=8, max_length=500)
+
+
+class SetNicknameRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    # Blank / omitted clears the nickname back to anonymous; a present value must
+    # match the same grammar as the per-session operator handle.
+    nickname: str | None = Field(default=None, max_length=40)
+
+    @field_validator("nickname")
+    @classmethod
+    def valid_or_blank(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        if not value:
+            return None
+        if not re.fullmatch(NICKNAME_PATTERN, value):
+            raise ValueError("nickname must be 2–40 letters, numbers, spaces, or . _ -")
+        return value
+
+
+class AdoptRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    token: str = Field(min_length=8, max_length=512)
 
 
 logger = logging.getLogger(__name__)
@@ -246,7 +286,27 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
     team_summary_limiter = SlidingWindowLimiter(
         limit=settings.team_summary_limit_per_minute, window_seconds=60
     )
+    me_limiter = SlidingWindowLimiter(
+        limit=settings.me_limit_per_minute, window_seconds=60
+    )
+    # Adopting another device's token is a signed-token guess when auth is on;
+    # throttle it the same way we throttle access-code guessing.
+    adopt_limiter = AttemptLimiter(
+        max_attempts=settings.adopt_limit_per_hour, window_seconds=60 * 60
+    )
     session_mutations = SessionMutationLocks()
+
+    uid_cookie_max_age = settings.auth_cookie_ttl_days * 86400
+    # Mark the cookie Secure only when the gate is on (prod is fronted by HTTPS
+    # Caddy). An ungated local/dev instance runs over plain HTTP, where a Secure
+    # cookie would be dropped — breaking identity persistence and the tests.
+    _uid_cookie_kwargs = dict(
+        max_age=uid_cookie_max_age,
+        httponly=True,
+        secure=settings.auth_cookie_secure and settings.auth_enabled,
+        samesite="lax",
+        path="/",
+    )
 
     learn_modules = _load_content_list(engine.bank.data_dir / "learn.json")
     toolkit_cards = _load_content_list(engine.bank.data_dir / "toolkit.json")
@@ -273,6 +333,45 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
             return
         if request_role(request) != "developer":
             raise HTTPException(status_code=403, detail="Developer access required.")
+
+    def request_uid(request: Request) -> str | None:
+        """Resolve the persistent-user token from the br_uid cookie, or None."""
+        return resolve_uid(
+            settings.auth_secret,
+            request.cookies.get(UID_COOKIE),
+            max_age_seconds=uid_cookie_max_age,
+        )
+
+    def ensure_uid(request: Request, response: Response) -> str:
+        """Return the caller's uid, minting + setting the cookie if absent so a
+        first-time visitor becomes a persistent user transparently."""
+        uid = request_uid(request)
+        if uid is None:
+            uid = mint_uid_token(settings.auth_secret)
+            response.set_cookie(UID_COOKIE, uid, **_uid_cookie_kwargs)
+        return uid
+
+    def _profile_payload(uid: str) -> dict:
+        """Assemble the public profile for ``uid`` from the users row plus the
+        leaderboard aggregation (so score/level/rank stay consistent everywhere)."""
+        record = store.get_user(uid)
+        board = store.leaderboard()
+        row = next((r for r in board if r["user_id"] == uid), None)
+        rank = next((i + 1 for i, r in enumerate(board) if r["user_id"] == uid), None)
+        score = row["score"] if row else 0
+        profile = UserProfile(
+            uid=uid,
+            nickname=record.nickname if record else None,
+            score=score,
+            level=level_for_score(score),
+            rank=rank,
+            sessions=row["sessions"] if row else 0,
+            best_delta=row["best_delta"] if row else None,
+            families_cleared=row["families_cleared"] if row else 0,
+            pet=record.pet if record else PetConfig(),
+            token_for_copy=uid,
+        )
+        return profile.model_dump(mode="json")
 
     def limit_round_request(request: Request, session_id: str) -> None:
         round_ip_limiter.check(f"round-ip:{client_host(request)}")
@@ -372,6 +471,7 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
         families_cleared = len(
             {grade.family for grade in state.grades if grade.action_correct and grade.family}
         )
+        score = sum(VERDICT_POINTS.get(grade.verdict, 0) for grade in state.grades)
         return SessionSummary(
             session_id=state.id,
             finished_at=datetime.now(UTC),
@@ -387,6 +487,7 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
             weakest=weakest.value,
             competency_json=json.dumps(state.competency),
             finished_early=finished_early,
+            score=score,
         )
 
     def reorder_demo_suffix(state: SessionState, start: int) -> None:
@@ -479,6 +580,25 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
                     "No model baseline has been generated yet. Run "
                     "`blastradius eval-model` with a GPT-5.6 key to produce one; the "
                     "model is graded by the same gate a human is."
+                ),
+            }
+        report = json.loads(baseline.read_text(encoding="utf-8"))
+        return {"available": True, "report": report}
+
+    @router.get("/eval/detection")
+    def eval_detection(request: Request) -> dict:
+        """The committed detection scorecard: the deterministic screen scored on a
+        fixed labeled corpus of malicious and benign artifacts. Read-only; the
+        payload keeps its honesty note, and the corpus deliberately includes
+        documented blind spots. Regenerate offline via `blastradius eval-detection`."""
+        limiter.check(f"eval:{client_host(request)}")
+        baseline = engine.bank.data_dir / "detection_eval_baseline.json"
+        if not baseline.exists():
+            return {
+                "available": False,
+                "note": (
+                    "No detection baseline has been generated yet. Run "
+                    "`blastradius eval-detection --out` (offline, no key) to produce one."
                 ),
             }
         report = json.loads(baseline.read_text(encoding="utf-8"))
@@ -586,9 +706,81 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
             "180-minute session TTL)",
         }
 
+    @router.get("/me")
+    def me(request: Request, response: Response) -> dict:
+        """Return (and, on first visit, establish) the caller's persistent profile.
+        Minting the br_uid cookie here means identity is created transparently the
+        moment the app loads, with no sign-up step."""
+        me_limiter.check(f"me:{client_host(request)}")
+        uid = ensure_uid(request, response)
+        return _profile_payload(uid)
+
+    @router.post("/me/nickname")
+    def set_nickname(
+        payload: SetNicknameRequest, request: Request, response: Response
+    ) -> dict:
+        me_limiter.check(f"me:{client_host(request)}")
+        uid = ensure_uid(request, response)
+        store.upsert_user(uid, nickname=payload.nickname)
+        return _profile_payload(uid)
+
+    @router.put("/me/pet")
+    def set_pet(payload: PetConfig, request: Request, response: Response) -> dict:
+        """Persist a custom pet. PetConfig's closed enums reject any unknown
+        shape/palette/face/accessory/trait with a 422 before we store anything."""
+        me_limiter.check(f"me:{client_host(request)}")
+        uid = ensure_uid(request, response)
+        store.upsert_user(uid, pet_json=payload.model_dump_json())
+        return {"pet": payload.model_dump(mode="json")}
+
+    @router.post("/me/adopt")
+    def adopt(payload: AdoptRequest, request: Request, response: Response) -> dict:
+        """Re-point this browser at an existing user by pasting their token, so a
+        profile can follow a person across devices. Signing makes the token
+        unforgeable when the gate is on; guessing is rate-limited regardless."""
+        key = f"adopt:{client_host(request)}"
+        if adopt_limiter.blocked(key):
+            raise HTTPException(
+                status_code=429, detail="Too many attempts. Wait a few minutes."
+            )
+        candidate = resolve_uid(
+            settings.auth_secret, payload.token, max_age_seconds=uid_cookie_max_age
+        )
+        if candidate is None:
+            adopt_limiter.record(key)
+            raise HTTPException(
+                status_code=401, detail="That recovery token is not valid."
+            )
+        response.set_cookie(UID_COOKIE, payload.token, **_uid_cookie_kwargs)
+        return _profile_payload(candidate)
+
+    @router.get("/leaderboard")
+    def leaderboard(request: Request) -> dict:
+        """Public ranked board of persistent users. Open to any code-holder (the
+        access gate already fronts the whole app) — distinct from the
+        developer-only team board above."""
+        me_limiter.check(f"lb:{client_host(request)}")
+        me_uid = request_uid(request)
+        rows = store.leaderboard()
+        board = [
+            {
+                "rank": index + 1,
+                "nickname": row["nickname"] or "anonymous",
+                "score": row["score"],
+                "level": row["level"],
+                "sessions": row["sessions"],
+                "is_you": row["user_id"] == me_uid,
+            }
+            for index, row in enumerate(rows)
+        ]
+        return {"leaderboard": board}
+
     @router.post("/sessions", status_code=status.HTTP_201_CREATED)
-    def create_session(payload: CreateSessionRequest, request: Request) -> dict:
+    def create_session(
+        payload: CreateSessionRequest, request: Request, response: Response
+    ) -> dict:
         session_create_limiter.check(f"session-create:{client_host(request)}")
+        uid = ensure_uid(request, response)
         session_id = str(uuid4())
         if payload.mode == "drill":
             # One bank round, no assessments; seeded per-day per-client so a
@@ -604,10 +796,18 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
             scenario_order = [scenario.id]
         else:
             scenario_order = engine.bank.demo_order(seed=session_id)
+        # Fall back to the user's saved nickname so a returning player is
+        # attributed on the team board without re-typing it each run; an explicit
+        # per-session handle still wins.
+        operator_handle = payload.operator_handle
+        if operator_handle is None:
+            record = store.get_user(uid)
+            if record and record.nickname:
+                operator_handle = record.nickname
         state = SessionState(
             id=session_id,
             mode=payload.mode,
-            operator_handle=payload.operator_handle,
+            operator_handle=operator_handle,
             scenario_order=scenario_order,
         )
         store.save(state)
@@ -1035,7 +1235,7 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
                 payload.answers,
             )
             store.save(state)
-            store.record_summary(summarize(state))
+            store.record_summary(summarize(state), user_id=request_uid(request))
             return {
                 "score": state.posttest_score,
                 "total": engine.bank.assessment_size,
@@ -1065,7 +1265,7 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
             state.active_provenance = None
             state.active_generation_status = None
             store.save(state)
-            store.record_summary(summarize(state))
+            store.record_summary(summarize(state), user_id=request_uid(request))
             return {"finished_early": True, "rounds_played": len(state.grades)}
 
     @router.get("/sessions/{session_id}/results", response_model=LearnerProgress)
