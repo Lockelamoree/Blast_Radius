@@ -60,3 +60,29 @@ jobs:
           "$RUNNER_TEMP/wheel-smoke/bin/blastradius" eval-detection --json > /dev/null
           "$RUNNER_TEMP/wheel-smoke/bin/blastradius" eval-detection --check-baseline
           "$RUNNER_TEMP/wheel-smoke/bin/blastradius" fuzz-inspector --seed 7 --iterations 20 --json > /dev/null
+
+  action-smoke:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exercise the checked-out composite Action
+        id: blast-radius
+        uses: ./
+        with:
+          diff-base: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || 'HEAD^' }}
+          fail-on: never
+      - name: Assert Action outputs
+        shell: bash
+        env:
+          VERDICT: ${{ steps.blast-radius.outputs.verdict }}
+          CRITICAL: ${{ steps.blast-radius.outputs.critical }}
+          CAUTION: ${{ steps.blast-radius.outputs.caution }}
+        run: |
+          test -n "$VERDICT"
+          [[ "$CRITICAL" =~ ^[0-9]+$ ]]
+          [[ "$CAUTION" =~ ^[0-9]+$ ]]

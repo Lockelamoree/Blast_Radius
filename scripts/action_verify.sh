@@ -19,16 +19,14 @@ summary() {
 }
 
 if [ -n "${scenarios}" ]; then
-  # Word-splitting is intended: the glob may expand to several files.
-  # shellcheck disable=SC2086
-  files=$(ls ${scenarios} 2>/dev/null || true)
-  if [ -z "${files}" ]; then
+  mapfile -t files < <(compgen -G "${scenarios}" || true)
+  if [ "${#files[@]}" -eq 0 ]; then
     echo "No scenario files matched: ${scenarios}"
     summary "## Blast Radius scenarios"
-    summary "- No files matched \`${scenarios}\`"
+    summary "- ❌ No files matched \`${scenarios}\`"
+    status=1
   else
-    # shellcheck disable=SC2086
-    if blastradius verify ${files}; then
+    if blastradius verify "${files[@]}"; then
       summary "## Blast Radius scenarios"
       summary "- ✅ Every draft passes the production gate"
     else
@@ -41,10 +39,17 @@ fi
 
 if [ -n "${diff_base}" ]; then
   echo "Screening diff against ${diff_base}"
-  # Capture the JSON report (stdout) while honoring the fail-on exit code, then
-  # render a summary + outputs. The screen's exit status still governs the build.
-  report="$(git diff "${diff_base}...HEAD" | blastradius check --kind diff - --json --fail-on "${fail_on}")" || status=1
-  printf '%s' "${report}" | python3 "${here}/scripts/action_summary.py" || true
+  if ! git rev-parse --verify --quiet --end-of-options "${diff_base}^{commit}" >/dev/null; then
+    echo "Diff base is not available in this checkout: ${diff_base}"
+    summary "## Blast Radius diff screen"
+    summary "- ❌ Diff base \`${diff_base}\` is not available. Use \`actions/checkout\` with \`fetch-depth: 0\`."
+    status=1
+  else
+    # Capture the JSON report (stdout) while honoring the fail-on exit code, then
+    # render a summary + outputs. The screen's exit status still governs the build.
+    report="$(git diff "${diff_base}...HEAD" -- | blastradius check --kind diff - --json --fail-on "${fail_on}")" || status=1
+    printf '%s' "${report}" | python "${here}/scripts/action_summary.py" || true
+  fi
 fi
 
 exit "${status}"

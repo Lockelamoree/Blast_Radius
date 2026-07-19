@@ -1,9 +1,13 @@
 import os
 import re
+import shutil
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
+BASH = shutil.which("bash")
 
 
 def test_action_yml_is_a_composite_action() -> None:
@@ -26,6 +30,8 @@ def test_action_is_marketplace_ready() -> None:
     match = re.search(r'^description:\s*"(.+)"\s*$', action, re.M)
     assert match, "description must be a single double-quoted line"
     assert len(match.group(1)) < 125
+    assert 'python-version: "3.13"' in action
+    assert 'run: python -m pip install "${GITHUB_ACTION_PATH}"' in action
 
 
 def test_action_verify_script_is_strict_and_calls_the_cli() -> None:
@@ -37,6 +43,9 @@ def test_action_verify_script_is_strict_and_calls_the_cli() -> None:
     # The screen feeds a readable step summary and exposes step outputs.
     assert "action_summary.py" in script
     assert "--json" in script
+    assert 'git diff "${diff_base}...HEAD" --' in script
+    assert "git rev-parse --verify --quiet --end-of-options" in script
+    assert 'blastradius verify "${files[@]}"' in script
 
 
 def test_action_exposes_screen_outputs() -> None:
@@ -92,3 +101,56 @@ def test_ci_runs_the_action_script_syntax_check_and_cli_smoke() -> None:
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     assert "scripts/action_verify.sh" in ci
     assert "blastradius" in ci and "verify --bank" in ci
+    assert "uses: ./" in ci
+    assert "fetch-depth: 0" in ci
+    assert "persist-credentials: false" in ci
+
+
+@pytest.mark.skipif(BASH is None, reason="requires bash")
+def test_action_fails_when_configured_scenario_glob_matches_nothing(tmp_path) -> None:
+    import subprocess
+
+    summary = tmp_path / "summary.md"
+    result = subprocess.run(
+        [BASH, str(ROOT / "scripts" / "action_verify.sh")],
+        cwd=ROOT,
+        env={
+            **os.environ,
+            "GITHUB_ACTION_PATH": str(ROOT),
+            "GITHUB_STEP_SUMMARY": str(summary),
+            "BR_SCENARIOS": "definitely-missing-scenarios/*.json",
+            "BR_DIFF_BASE": "",
+            "BR_FAIL_ON": "never",
+        },
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 1
+    assert "No scenario files matched" in result.stdout
+    assert "No files matched" in summary.read_text(encoding="utf-8")
+
+
+@pytest.mark.skipif(BASH is None, reason="requires bash")
+def test_action_fails_when_diff_base_is_not_available(tmp_path) -> None:
+    import subprocess
+
+    summary = tmp_path / "summary.md"
+    result = subprocess.run(
+        [BASH, str(ROOT / "scripts" / "action_verify.sh")],
+        cwd=ROOT,
+        env={
+            **os.environ,
+            "GITHUB_ACTION_PATH": str(ROOT),
+            "GITHUB_STEP_SUMMARY": str(summary),
+            "BR_SCENARIOS": "",
+            "BR_DIFF_BASE": "refs/heads/definitely-missing",
+            "BR_FAIL_ON": "never",
+        },
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 1
+    assert "Diff base is not available" in result.stdout
+    assert "fetch-depth: 0" in summary.read_text(encoding="utf-8")
