@@ -410,6 +410,26 @@ def test_landing_proof_card_cites_the_committed_receipt() -> None:
     assert "evidence/" + evidence[0].name in template
 
 
+def test_integrity_check_has_its_own_tab() -> None:
+    root = Path(__file__).parents[1]
+    template = (root / "blast_radius" / "templates" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    resources = (root / "blast_radius" / "static" / "resources.js").read_text(
+        encoding="utf-8"
+    )
+    # The block moved off the hero into a dedicated tab reachable from the landing.
+    assert 'id="screen-integrity"' in template
+    assert 'data-open="integrity"' in template
+    assert "show('integrity')" in resources
+    # The interactive demo and the "Not just theatre" proof travel together.
+    assert 'class="integrity-check"' in template
+    assert 'class="integrity-proof"' in template
+    assert 'id="gate-catch"' in template
+    # Secondary detail is tucked into accessible tooltips to keep the tab clean.
+    assert 'class="br-tip"' in template
+
+
 def test_landing_grading_pill_and_revision_are_wired() -> None:
     root = Path(__file__).parents[1]
     template = (root / "blast_radius" / "templates" / "index.html").read_text(

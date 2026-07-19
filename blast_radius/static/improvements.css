@@ -262,6 +262,65 @@
   text-decoration: underline;
 }
 
+/* The integrity block now lives on its own tab (screen-integrity) instead of the
+   hero, so relax the hero-tuned width/top-margin and let it breathe full-width. */
+.resource-screen .integrity-check {
+  margin-top: 4px;
+  max-width: 760px;
+}
+
+/* A hover/focus tooltip anchored near the right edge would otherwise widen the
+   page on narrow screens; clip the tab's own x-overflow (tooltips pop upward, so
+   y stays visible) instead of letting the whole page scroll sideways. */
+#screen-integrity {
+  overflow-x: clip;
+}
+
+/* Landing teaser that points at the integrity tab — quiet, one line, no card. */
+.integrity-teaser {
+  margin-top: 24px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Reusable hover/focus tooltip. Text lives in aria-label so screen readers get
+   the full explanation and the visible surface stays clean. */
+.br-tip {
+  position: relative;
+  border-bottom: 1px dotted var(--muted);
+  cursor: help;
+  outline: none;
+}
+
+.br-tip::after {
+  content: attr(aria-label);
+  position: absolute;
+  left: 0;
+  bottom: 130%;
+  z-index: 20;
+  width: max-content;
+  max-width: min(260px, calc(100vw - 32px));
+  padding: 8px 10px;
+  background: #0d0f0c;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--ink);
+  font: 11px/1.45 var(--sans);
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: normal;
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition: opacity .12s ease, transform .12s ease;
+}
+
+.br-tip:hover::after,
+.br-tip:focus-visible::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .shareable-summary {
   display: flex;
   flex-direction: column;
