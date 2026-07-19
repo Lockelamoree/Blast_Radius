@@ -1,7 +1,8 @@
 # Blast Radius — final Devpost copy
 
-> Paste-ready as of 2026-07-19. The only unfinished field is the public video URL,
-> which must be added after the final live capture.
+> Paste-ready technical copy as of 2026-07-19. Human capture remains: replace the
+> staging gallery, add the public video URL, and keep named learning impact as
+> "Not yet measured" unless a participant consents.
 
 ## Project name
 
@@ -14,7 +15,7 @@
 ## Elevator pitch
 
 Blast Radius turns the hardest part of supervising a coding agent into a playable reflex.
-Its **20 receipt-linked scenarios** and **421-test verification suite** teach developers to
+Its **20 receipt-linked scenarios** and **434-test verification suite** teach developers to
 approve, sandbox, or reject proposed commands, dependencies, tool manifests, diffs, retrieved
 instructions, and marketplace skills—and to prove the call with evidence.
 
@@ -104,9 +105,11 @@ These are corpus results, not a real-world safety claim.
 
 ## Verification proof
 
-The hosted health check reports revision
-`9b5e92efbd7d2d1ca023f0ead2b545c50cddc452`, 20 scenarios, live generation available,
-live reasoning grading, and critic model `gpt-5.6-sol`.
+The committed live-grade proof was captured at revision
+`9b5e92efbd7d2d1ca023f0ead2b545c50cddc452`, with 20 scenarios, live generation available,
+live reasoning grading, and critic model `gpt-5.6-sol`. That historical revision remains in the
+receipt rather than being rewritten. Before final screenshots, run the submission preflight
+against `/healthz` to prove that the newly deployed revision matches the pushed commit.
 
 A fresh hosted round produced provider response
 `resp_024208198fc0ff3c016a5cbcdbd3708192887a3ae615e727a1`. The committed receipt embeds that

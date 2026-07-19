@@ -1,7 +1,7 @@
 # Blast Radius
 
 **Blast Radius is a browser game for practicing safe approval decisions around AI coding
-agents, backed by 20 receipt-linked scenarios and 421 automated tests.** Inspect a proposed
+agents, backed by 20 receipt-linked scenarios and 434 automated tests.** Inspect a proposed
 command, dependency, tool manifest, diff, retrieved instruction, or marketplace skill; choose
 **approve**, **sandbox**, or **reject**; then name the evidence tell. The verdict scores the
 action, tell coverage, and—when applicable—the exact sandbox policy, with direct evidence for
@@ -153,7 +153,12 @@ and the categories — never the raw command, excerpts, or any secret) to a loca
 **GitHub Action** — gate-verify scenario drafts and screen a PR diff, no secrets required:
 
 ```yaml
-- uses: Lockelamoree/Blast_Radius@v1
+- uses: actions/checkout@v4
+  with:
+    fetch-depth: 0
+    persist-credentials: false
+- id: blast-radius
+  uses: Lockelamoree/Blast_Radius@v1
   with:
     scenarios: "scenarios/*.json"
     diff-base: ${{ github.event.pull_request.base.sha }}
@@ -269,13 +274,16 @@ specific file with `blastradius check --rules path/to/rules.toml`, or ignore rul
 .\.venv\Scripts\python -m build --wheel
 ```
 
-Current baseline: **409 tests passed** on 2026-07-19. Treat that count as a dated snapshot;
-new regression coverage may increase it.
+Current baseline: **434 tests collected** on 2026-07-19. The local Windows run skips the two
+Bash-runtime Action checks; the Ubuntu Action smoke job exercises them in CI.
 
 Before submission, verify every verdict receipt points directly to a healthy source:
 
 ```powershell
 python scripts/check_evidence_links.py
+python scripts/submission_preflight.py
+# After deployment, require the hosted revision to match this checkout:
+python scripts/submission_preflight.py --strict --health-url https://blastradius.max-gutowski.de/healthz
 ```
 
 The link checker is intentionally standalone—not part of pytest or CI—because it needs the
@@ -487,7 +495,7 @@ verify it against immutable truth, then expose direct evidence. Concrete contrib
   than maintaining a second checker.
 - Adversarial regression tests for truth drift, prompt injection, unsafe sandbox scope,
   duplicate session mutation, model failure, receipt safety, and deterministic artifact screening.
-- CI that runs Ruff, the 409-test suite, the 20-scenario verifier, wheel construction, and
+- CI that runs Ruff, the 434-test suite, the 20-scenario verifier, wheel construction, and
   packaged-resource checks on supported Python versions.
 
 The visible merge at `494a258` reconciles parallel Codex workstreams after the integrity-tab
