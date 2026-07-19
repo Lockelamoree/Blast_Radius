@@ -166,10 +166,11 @@ and tighten once you trust it. The Action sets up Python itself and needs no sec
 a per-run **step summary** (verdict + matched flags) and exposes `verdict`, `critical`, and
 `caution` step outputs for downstream steps.
 
-**MCP server** — let an MCP-aware agent self-check its own actions. Install the extra and register it:
+**MCP server** — let an MCP-aware agent self-check its own actions. From a repository
+checkout, install the extra and register it. The package is not yet published on PyPI:
 
 ```bash
-pip install "blast-radius[mcp]"
+python -m pip install ".[mcp]"
 ```
 
 ```json

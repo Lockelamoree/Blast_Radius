@@ -1,7 +1,8 @@
 {
   "mcpServers": {
     "blast-radius": {
-      "command": "blastradius-mcp"
+      "command": "python",
+      "args": ["-m", "blast_radius.mcp_server"]
     }
   }
 }

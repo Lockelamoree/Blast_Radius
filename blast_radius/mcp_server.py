@@ -1,7 +1,7 @@
 """Optional MCP server exposing Blast Radius's deterministic tools to Codex and
 other MCP-aware coding agents. Install the extra to use it:
 
-    pip install "blast-radius[mcp]"
+    python -m pip install ".[mcp]"
 
 Register in an agent via .mcp.json:
 
@@ -23,6 +23,16 @@ from blast_radius.engine.gate import CorrectnessGate
 from blast_radius.models import BlastRadiusConfig, Scenario
 
 _DATA_DIR = Path(__file__).resolve().parent / "data"
+_MAX_INPUT_CHARS = 64_000
+
+
+def _input_too_large(**values: str) -> dict | None:
+    for name, value in values.items():
+        if len(value) > _MAX_INPUT_CHARS:
+            return {
+                "error": f"{name} exceeds the {_MAX_INPUT_CHARS}-character MCP limit"
+            }
+    return None
 
 
 def build_server():
@@ -42,6 +52,13 @@ def build_server():
     ) -> dict:
         """Deterministically screen a real command, diff, or sandbox config for
         known red-flag patterns. No model runs; it cannot prove safety."""
+        too_large = _input_too_large(
+            content=content,
+            config_json=config_json,
+            expected_json=expected_json,
+        )
+        if too_large:
+            return too_large
         try:
             if kind == "config":
                 config = BlastRadiusConfig.model_validate_json(config_json)
@@ -65,6 +82,9 @@ def build_server():
     def verify_scenario(scenario_json: str) -> dict:
         """Run the production CorrectnessGate against an author's draft scenario
         (JSON). Returns {passed, reasons, scenario_id}."""
+        too_large = _input_too_large(scenario_json=scenario_json)
+        if too_large:
+            return too_large
         try:
             scenario = Scenario.model_validate_json(scenario_json)
         except Exception as error:  # noqa: BLE001
@@ -98,8 +118,8 @@ def main() -> int:
         server = build_server()
     except ImportError:
         print(
-            "The MCP extra is not installed. Install it with: "
-            'pip install "blast-radius[mcp]"',
+            "The MCP extra is not installed. From the Blast Radius repository, run: "
+            'python -m pip install ".[mcp]"',
             file=sys.stderr,
         )
         return 2

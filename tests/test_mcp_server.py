@@ -61,6 +61,15 @@ def test_check_artifact_refuses_bank_drill_content() -> None:
     assert "error" in result
 
 
+def test_mcp_tools_reject_oversized_inputs() -> None:
+    server = mcp_server.build_server()
+    check = server._tool_manager.get_tool("check_artifact").fn
+    verify = server._tool_manager.get_tool("verify_scenario").fn
+    oversized = "x" * (mcp_server._MAX_INPUT_CHARS + 1)
+    assert "64000-character MCP limit" in check(kind="command", content=oversized)["error"]
+    assert "64000-character MCP limit" in verify(scenario_json=oversized)["error"]
+
+
 def test_main_without_mcp_extra_returns_two(monkeypatch, capsys) -> None:
     def _raise() -> None:
         raise ImportError("no mcp")

@@ -9,6 +9,15 @@ description = "A verification game for safely operating AI coding agents"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
+authors = [{ name = "Lockelamoree" }]
+keywords = ["agent-security", "guardrail", "mcp", "sandbox"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Topic :: Software Development :: Quality Assurance",
+]
 dependencies = [
   "fastapi>=0.116,<1",
   "jinja2>=3.1,<4",
@@ -33,6 +42,11 @@ dev = [
   "pytest-asyncio>=1.1,<2",
   "ruff>=0.12,<1",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Lockelamoree/Blast_Radius"
+Repository = "https://github.com/Lockelamoree/Blast_Radius"
+Issues = "https://github.com/Lockelamoree/Blast_Radius/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["blast_radius"]

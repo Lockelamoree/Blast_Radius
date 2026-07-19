@@ -3,16 +3,30 @@
 from __future__ import annotations
 
 import json
-import shutil
+import importlib.util
+import sys
 
 
 def main() -> int:
-    commands = {
-        name: shutil.which(name)
-        for name in ("blastradius", "blastradius-mcp")
+    modules = {
+        name: importlib.util.find_spec(name) is not None
+        for name in ("blast_radius", "mcp")
     }
-    print(json.dumps({"ready": all(commands.values()), "commands": commands}, indent=2))
-    return 0 if all(commands.values()) else 1
+    ready = all(modules.values())
+    print(
+        json.dumps(
+            {
+                "ready": ready,
+                "modules": modules,
+                "launch": [sys.executable, "-m", "blast_radius.mcp_server"],
+                "remediation": None
+                if ready
+                else 'From the Blast Radius repository root, run: python -m pip install ".[mcp]"',
+            },
+            indent=2,
+        )
+    )
+    return 0 if ready else 1
 
 
 if __name__ == "__main__":

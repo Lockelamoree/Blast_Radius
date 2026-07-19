@@ -32,15 +32,15 @@ commands.
 If MCP is unavailable but the `blastradius` executable is installed, run one of:
 
 ```text
-blastradius check --kind command --json "<command>"
-blastradius check --diff <path-to-diff> --json
-blastradius check --config <policy.json> --json
+python -m blast_radius.cli check --kind command --json "<command>"
+python -m blast_radius.cli check --diff <path-to-diff> --json
+python -m blast_radius.cli check --config <policy.json> --json
 ```
 
 When neither interface is installed, explain that the local prerequisite is:
 
 ```text
-pip install "blast-radius[mcp]"
+From the Blast Radius repository root: python -m pip install ".[mcp]"
 ```
 
 Do not install packages without the user's authorization.

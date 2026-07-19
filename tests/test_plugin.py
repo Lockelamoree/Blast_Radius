@@ -28,9 +28,23 @@ def test_blast_radius_plugin_and_marketplace_are_publishable() -> None:
     }
 
 
-def test_plugin_mcp_registration_uses_packaged_entry_point() -> None:
+def test_plugin_mcp_registration_uses_path_independent_module_entry_point() -> None:
     config = json.loads((PLUGIN / ".mcp.json").read_text(encoding="utf-8"))
-    assert config["mcpServers"]["blast-radius"]["command"] == "blastradius-mcp"
+    server = config["mcpServers"]["blast-radius"]
+    assert server == {
+        "command": "python",
+        "args": ["-m", "blast_radius.mcp_server"],
+    }
+
+
+def test_plugin_install_docs_use_the_repository_source() -> None:
+    readme = (PLUGIN / "README.md").read_text(encoding="utf-8")
+    skill = (PLUGIN / "skills" / "screen-agent-artifacts" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    assert 'python -m pip install ".[mcp]"' in readme
+    assert 'python -m pip install ".[mcp]"' in skill
+    assert 'pip install "blast-radius[mcp]"' not in readme
 
 
 def _strings(value):
