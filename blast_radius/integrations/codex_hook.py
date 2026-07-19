@@ -1,4 +1,4 @@
-"""Codex CLI (and Claude Code) ``PreToolUse`` supervisor hook.
+"""Codex CLI ``PreToolUse`` supervisor hook.
 
 Runs the Blast Radius deterministic red-flag inspector on every proposed Bash
 command and DENIES the ones that trip a known agent-security red flag — the same
@@ -10,7 +10,7 @@ fails **open** (allows, with a note on stderr) whenever screening cannot run, so
 a broken guardrail never bricks the agent.
 
 Reads the PreToolUse event JSON on stdin and emits the ``hookSpecificOutput``
-decision on stdout, per the Codex/Claude-Code hook protocol.
+decision on stdout, per the Codex hook protocol.
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-# Blast Radius supervisor hook (Codex CLI / Claude Code)
+# Blast Radius supervisor hook (Codex CLI)
 
 Turn the game into a guardrail. This is a `PreToolUse` hook that runs the Blast
 Radius deterministic red-flag inspector on **every Bash command your agent
@@ -30,18 +30,6 @@ type = "command"
 command = "blastradius-supervise"
 timeout = 20
 statusMessage = "Blast Radius screening the command"
-```
-
-**Claude Code** — the hook protocol is identical; add to `.claude/settings.json`:
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      { "matcher": "Bash", "hooks": [{ "type": "command", "command": "blastradius-supervise" }] }
-    ]
-  }
-}
 ```
 
 ## Behavior

@@ -102,6 +102,14 @@ def test_eval_detection_human_table_leads_with_disclaimer(capsys) -> None:
     assert "verdict confusion" in out
 
 
+def test_fuzz_inspector_subcommand_runs_offline(capsys) -> None:
+    assert cli.main(["fuzz-inspector", "--seed", "7", "--iterations", "8", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["graded_by"] == "deterministic"
+    assert payload["seed"] == 7
+    assert payload["iterations"] == 8
+
+
 def _stdin(text: str):
     import io
 

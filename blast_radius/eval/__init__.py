@@ -22,17 +22,29 @@ from blast_radius.eval.model_eval import (
     evaluate_model,
     player_view,
 )
+from blast_radius.eval.inspector_fuzz import (
+    FuzzFinding,
+    FuzzReport,
+    Mutation,
+    candidate_rule_stub,
+    fuzz_inspector,
+)
 
 __all__ = [
     "DETECTION_NOTE",
     "CorpusSample",
     "DetectionEvalReport",
+    "FuzzFinding",
+    "FuzzReport",
     "ModelChoice",
     "ModelEvalReport",
+    "Mutation",
     "SampleResult",
     "ScenarioEval",
     "evaluate_detection",
     "evaluate_model",
+    "candidate_rule_stub",
+    "fuzz_inspector",
     "load_corpus",
     "player_view",
 ]

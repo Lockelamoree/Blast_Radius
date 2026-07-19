@@ -380,6 +380,29 @@ def _cmd_eval_detection(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_fuzz_inspector(args: argparse.Namespace) -> int:
+    """Run seeded, semantics-preserving mutations against the offline screen."""
+
+    from blast_radius.eval import fuzz_inspector
+
+    report = fuzz_inspector(seed=args.seed, iterations=args.iterations)
+    if args.json:
+        print(json.dumps(report.to_dict(), indent=2))
+    else:
+        print(
+            f"deterministic inspector fuzz: seed={report.seed} "
+            f"iterations={report.iterations} escapes={len(report.escapes)}"
+        )
+        for finding in report.escapes:
+            print(
+                f"  - {finding.mutation}: {finding.original_verdict} -> "
+                f"{finding.mutated_verdict}"
+            )
+            print(f"    {finding.candidate_rule}")
+        print(report.note)
+    return 1 if args.fail_on_escape and report.escapes else 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="blastradius",
@@ -447,6 +470,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     detect = sub.add_parser(
         "eval-detection",
+        aliases=["eval-inspector"],
         help="score the deterministic screen against the labeled corpus (offline, no key)",
     )
     detect.add_argument("--corpus", help="corpus path (default: packaged detection_corpus.jsonl)")
@@ -464,6 +488,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="exit 1 if metrics regress below the committed baseline",
     )
     detect.set_defaults(func=_cmd_eval_detection)
+
+    fuzz = sub.add_parser(
+        "fuzz-inspector",
+        help="mutate known risky artifacts and report detector escapes (offline, seeded)",
+    )
+    fuzz.add_argument("--seed", type=int, default=0)
+    fuzz.add_argument("--iterations", type=int, default=100)
+    fuzz.add_argument("--json", action="store_true", help="emit the full JSON report")
+    fuzz.add_argument(
+        "--fail-on-escape",
+        action="store_true",
+        help="exit 1 when a mutation downgrades a flagged artifact to looks-scoped",
+    )
+    fuzz.set_defaults(func=_cmd_fuzz_inspector)
     return parser
 
 

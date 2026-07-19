@@ -1,5 +1,5 @@
-"""Optional MCP server exposing Blast Radius's deterministic tools to an
-MCP-aware coding agent (Claude Code, Codex). Install the extra to use it:
+"""Optional MCP server exposing Blast Radius's deterministic tools to Codex and
+other MCP-aware coding agents. Install the extra to use it:
 
     pip install "blast-radius[mcp]"
 

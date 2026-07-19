@@ -23,7 +23,7 @@ import unicodedata
 from dataclasses import dataclass, field
 
 from blast_radius.engine import custom_rules, grader
-from blast_radius.engine.gate import _GENERATED_PRESENTATION_BLOCKLIST
+from blast_radius.engine.gate import _GENERATED_PRESENTATION_BLOCKLIST, _canonicalize
 from blast_radius.models import (
     BlastRadiusConfig,
     CustomRulesConfig,
@@ -36,8 +36,9 @@ from blast_radius.models import (
 
 # Bumped whenever the deterministic screen's behaviour changes. Recorded in every
 # InspectionProvenance so a verdict can be tied to the exact engine that produced it.
-# 1.1.0: broadened egress/secret/destructive coverage + bounded base64/hex decode pass.
-ENGINE_VERSION = "1.1.0"
+# 1.2.0: canonicalized authority screening, removed-guard diff detection,
+# dependency provenance checks, and config capability-combination findings.
+ENGINE_VERSION = "1.2.0"
 
 _MAX_MATCHES_PER_CATEGORY = 6
 _EXCERPT_RADIUS = 40
@@ -250,6 +251,15 @@ CATEGORIES: tuple[CategorySpec, ...] = (
         families=(_F.OVERSCOPED_TOOL, _F.SKILL_MARKETPLACE),
         keywords=("unrestricted", "undeclared", "unbounded"),
     ),
+    # Removed guards are scanned only from deleted lines in a real unified-diff
+    # hunk. Keeping the category in this frozen table makes its identity part of
+    # the provenance hash without allowing ordinary added text to trigger it.
+    CategorySpec(
+        id="removed_guard",
+        label="Removes an authorization or verification guard",
+        severity="critical",
+        families=(_F.MALICIOUS_DIFF,),
+    ),
 )
 
 
@@ -303,21 +313,42 @@ def _normalize(text: str) -> str:
     return text.replace("\r\n", "\n").replace("\r", "\n")
 
 
-def _diff_added_text(content: str) -> tuple[str, str]:
-    """Return (scanned_text, parsed_as). For a unified diff, scan only added
-    lines (``+`` but not ``+++``); otherwise treat it as plain text."""
+def _diff_split(content: str) -> tuple[str, str, str]:
+    """Return ``(added, removed, parsed_as)`` for a diff-like payload.
+
+    Existing callers keep added-lines-only screening for header-style diffs.
+    Removed lines are exposed only when a real ``@@`` hunk header exists, so PR
+    prose and changelogs cannot activate the removed-guard detector.
+    """
     lines = content.split("\n")
     looks_like_diff = any(
         line.startswith(("+++", "---", "@@", "diff ")) for line in lines
     )
     if not looks_like_diff:
-        return content, "plain-text"
+        return content, "", "plain-text"
     added = [
         line[1:]
         for line in lines
         if line.startswith("+") and not line.startswith("+++")
     ]
-    return "\n".join(added), "unified-diff"
+    has_hunk = any(line.startswith("@@") for line in lines)
+    removed = (
+        [
+            line[1:]
+            for line in lines
+            if line.startswith("-") and not line.startswith("---")
+        ]
+        if has_hunk
+        else []
+    )
+    return "\n".join(added), "\n".join(removed), "unified-diff"
+
+
+def _diff_added_text(content: str) -> tuple[str, str]:
+    """Backward-compatible shim returning ``(added, parsed_as)``."""
+
+    added, _, parsed_as = _diff_split(content)
+    return added, parsed_as
 
 
 def _excerpt(haystack: str, start: int, end: int) -> str:
@@ -381,26 +412,35 @@ def _apply_allowlist(
 def _scan(
     scanned: str, categories: tuple[CategorySpec, ...] = CATEGORIES
 ) -> list[InspectionFinding]:
-    tokens = grader.tokenize(scanned)
-    lower = scanned.lower()
     findings: list[InspectionFinding] = []
     for category in categories:
+        category_text = _canonicalize(scanned) if category.id == "authority_override" else scanned
+        tokens = grader.tokenize(category_text)
+        lower = category_text.lower()
         seen: set[str] = set()
         matches: list[InspectionMatch] = []
         for keyword in category.keywords:
             if grader.keyword_matches(keyword, tokens) and keyword not in seen:
                 seen.add(keyword)
-                excerpt = _locate(lower, scanned, keyword) or keyword
+                excerpt = _locate(lower, category_text, keyword) or keyword
+                if category_text != scanned:
+                    excerpt = f"{excerpt} (normalized from: {_excerpt(scanned, 0, len(scanned))})"
                 matches.append(InspectionMatch(matched=keyword, excerpt=excerpt))
         for pattern in category.patterns:
-            for hit in pattern.finditer(scanned):
+            for hit in pattern.finditer(category_text):
                 token = hit.group(0).strip()
                 if token and token not in seen:
                     seen.add(token)
+                    excerpt = _excerpt(category_text, hit.start(), hit.end())
+                    if category_text != scanned:
+                        excerpt = (
+                            f"{excerpt} (normalized from: "
+                            f"{_excerpt(scanned, 0, len(scanned))})"
+                        )
                     matches.append(
                         InspectionMatch(
                             matched=token,
-                            excerpt=_excerpt(scanned, hit.start(), hit.end()),
+                            excerpt=excerpt,
                         )
                     )
                 if len(matches) >= _MAX_MATCHES_PER_CATEGORY:
@@ -418,6 +458,170 @@ def _scan(
                 )
             )
     return findings
+
+
+_GUARD_REMOVAL_PATTERNS: tuple[re.Pattern[str], ...] = (
+    _p(r"\b(?:is_|has_)?authenticated\b"),
+    _p(r"\b(?:is_|has_)?authori[sz]ed\b"),
+    _p(r"\b(?:check|require|verify|enforce)_(?:auth|permission|access|role)\b"),
+    _p(r"\b(?:permission|access|role)_required\b"),
+    _p(r"\b(?:deny|forbid|forbidden|unauthori[sz]ed)\b"),
+)
+
+
+def _normalized_diff_line(line: str) -> str:
+    return " ".join(line.split())
+
+
+def _scan_removed_guards(removed: str, added: str) -> list[InspectionFinding]:
+    """Flag deleted guard lines unless that exact normalized line was re-added.
+
+    Cross-file moves are intentionally out of scope. Regex-only suppression is
+    avoided because an added comment mentioning a guard must not hide a deletion.
+    """
+
+    if not removed:
+        return []
+    added_lines = {_normalized_diff_line(line) for line in added.splitlines() if line.strip()}
+    matches: list[InspectionMatch] = []
+    seen: set[str] = set()
+    for line in removed.splitlines():
+        stripped = line.strip()
+        normalized = _normalized_diff_line(line)
+        if not stripped or stripped.startswith(("#", "//", "/*", "*")):
+            continue
+        if normalized in added_lines:
+            continue
+        for pattern in _GUARD_REMOVAL_PATTERNS:
+            hit = pattern.search(line)
+            if hit and normalized not in seen:
+                seen.add(normalized)
+                matches.append(InspectionMatch(matched=hit.group(0), excerpt=stripped))
+                break
+        if len(matches) >= _MAX_MATCHES_PER_CATEGORY:
+            break
+    if not matches:
+        return []
+    return [
+        InspectionFinding(
+            category="removed_guard",
+            label="Removes an authorization or verification guard",
+            severity="critical",
+            families=[ScenarioFamily.MALICIOUS_DIFF.value],
+            matches=matches,
+        )
+    ]
+
+
+KNOWN_PACKAGES: frozenset[str] = frozenset(
+    {
+        "aiohttp",
+        "black",
+        "boto3",
+        "django",
+        "fastapi",
+        "flask",
+        "httpx",
+        "jinja2",
+        "mypy",
+        "numpy",
+        "openai",
+        "pandas",
+        "pillow",
+        "pydantic",
+        "pytest",
+        "requests",
+        "ruff",
+        "scipy",
+        "sqlalchemy",
+        "starlette",
+        "torch",
+        "transformers",
+        "uvicorn",
+    }
+)
+_PIP_INSTALL = re.compile(r"\b(?:python\s+-m\s+)?pip\s+install\s+([^\n;&|]+)", re.IGNORECASE)
+_INSTALL_HOOKS = (
+    _p(r"[\"']?(?:preinstall|postinstall|prepare)[\"']?\s*[:=]"),
+    _p(r"\bsetup\.py\s+(?:install|develop)\b"),
+)
+
+
+def _damerau_levenshtein(left: str, right: str) -> int:
+    """Small, deterministic optimal-string-alignment distance (inputs bounded)."""
+
+    left, right = left[:40], right[:40]
+    rows = len(left) + 1
+    cols = len(right) + 1
+    table = [[0] * cols for _ in range(rows)]
+    for index in range(rows):
+        table[index][0] = index
+    for index in range(cols):
+        table[0][index] = index
+    for row in range(1, rows):
+        for col in range(1, cols):
+            cost = 0 if left[row - 1] == right[col - 1] else 1
+            table[row][col] = min(
+                table[row - 1][col] + 1,
+                table[row][col - 1] + 1,
+                table[row - 1][col - 1] + cost,
+            )
+            if (
+                row > 1
+                and col > 1
+                and left[row - 1] == right[col - 2]
+                and left[row - 2] == right[col - 1]
+            ):
+                table[row][col] = min(table[row][col], table[row - 2][col - 2] + cost)
+    return table[-1][-1]
+
+
+def _dependency_findings(scanned: str) -> list[InspectionFinding]:
+    matches: list[InspectionMatch] = []
+    benign_near_names = {"boto", "pyaml"}
+    for command in _PIP_INSTALL.finditer(scanned):
+        for raw_name in command.group(1).split():
+            name = re.split(r"[<>=!~\[]", raw_name, maxsplit=1)[0].strip("'\"").lower()
+            if (
+                not name
+                or name.startswith(("-", "git+", "http://", "https://", ".", "/"))
+                or name in KNOWN_PACKAGES
+                or name in benign_near_names
+                or len(name) < 4
+            ):
+                continue
+            ranked = sorted(
+                ((_damerau_levenshtein(name, known), known) for known in KNOWN_PACKAGES),
+                key=lambda item: (item[0], item[1]),
+            )
+            distance, known = ranked[0]
+            limit = 1 if len(name) < 8 else 2
+            if distance <= limit:
+                matches.append(
+                    InspectionMatch(
+                        matched=name,
+                        excerpt=f"{name} is distance {distance} from known package {known}",
+                    )
+                )
+    for pattern in _INSTALL_HOOKS:
+        for hit in pattern.finditer(scanned):
+            matches.append(
+                InspectionMatch(
+                    matched=hit.group(0).strip(),
+                    excerpt=_excerpt(scanned, hit.start(), hit.end()),
+                )
+            )
+    if not matches:
+        return []
+    return [
+        InspectionFinding(
+            category="provenance_mismatch",
+            label="Dependency provenance does not check out",
+            severity="caution",
+            families=[ScenarioFamily.POISONED_DEPENDENCY.value],
+            matches=matches[:_MAX_MATCHES_PER_CATEGORY],
+        )
+    ]
 
 
 # --- bounded obfuscation decode (item: base64/hex payloads) ------------------
@@ -502,11 +706,14 @@ _CONFIDENCE_TIER: dict[str, str] = {
     "remote_code_pipe": "high",
     "authority_override": "high",
     "auth_bypass": "high",
+    "removed_guard": "high",
     "exfil_chain": "high",
     "provenance_mismatch": "medium",
     "broad_or_undeclared_scope": "medium",
     "unrestricted_egress": "medium",
     "workspace_wide_scope": "medium",
+    "config_exfil_combination": "medium",
+    "config_ci_write": "medium",
 }
 
 # Frozen (rationale, remediation) prose per category. Authored as "rationale"/
@@ -536,6 +743,10 @@ _WHY_FIX: dict[str, tuple[str, str]] = {
         "Weakens or removes an authorization / verification check.",
         "Keep the guard and require the check on every path.",
     ),
+    "removed_guard": (
+        "Deletes an authorization or verification guard from a real diff hunk.",
+        "Restore the guard or move the identical check within the same change.",
+    ),
     "provenance_mismatch": (
         "Package name or provenance does not match the approved source.",
         "Verify the exact name against the lockfile and approved registry.",
@@ -551,6 +762,14 @@ _WHY_FIX: dict[str, tuple[str, str]] = {
     "workspace_wide_scope": (
         "Grants the whole workspace instead of a subtree.",
         "Narrow the grant to the specific paths the task needs.",
+    ),
+    "config_exfil_combination": (
+        "Combines readable secret material with network access.",
+        "Remove the secret read or disable network access for this task.",
+    ),
+    "config_ci_write": (
+        "Allows writes into continuous-integration or pipeline configuration.",
+        "Remove CI configuration from writable paths unless the task explicitly requires it.",
     ),
     "exfil_chain": (
         "A secret read co-occurs with a network or remote-code sink — a data-exfiltration path.",
@@ -654,10 +873,14 @@ def inspect_text(
     normalized = _normalize(content)
     parsed_as: str | None = None
     scanned = normalized
+    removed = ""
     if kind == "diff":
-        scanned, parsed_as = _diff_added_text(normalized)
+        scanned, removed, parsed_as = _diff_split(normalized)
     categories = CATEGORIES + _custom_categories(custom)
     scanned_findings = _scan(scanned, categories)
+    scanned_findings.extend(_dependency_findings(scanned))
+    if kind == "diff":
+        scanned_findings.extend(_scan_removed_guards(removed, scanned))
     decoded_payloads = _decode_candidates(scanned)
     for payload in decoded_payloads:
         scanned_findings.extend(_scan(payload, categories))
@@ -687,6 +910,17 @@ def inspect_text(
 
 
 ZERO_TRUST = BlastRadiusConfig()
+
+_SECRET_PATH_SEGMENTS = frozenset(
+    {".ssh", ".aws", ".env", "secrets", "credentials", ".netrc", "id_rsa"}
+)
+_CI_WRITE_SEGMENTS = frozenset(
+    {".github", ".gitlab-ci", "ci", ".circleci", "jenkinsfile", "buildkite"}
+)
+
+
+def _path_segments(path: str) -> set[str]:
+    return {segment.casefold() for segment in path.replace("\\", "/").split("/") if segment}
 
 
 def inspect_config(
@@ -728,6 +962,46 @@ def inspect_config(
                 families=[ScenarioFamily.OVERSCOPED_TOOL.value],
                 matches=[
                     InspectionMatch(matched=dimension, excerpt=f"{dimension} includes /workspace"),
+                ],
+            )
+        )
+    secret_reads = [
+        path
+        for path in config.readable_paths
+        if _path_segments(path) & _SECRET_PATH_SEGMENTS
+    ]
+    if secret_reads and config.network_enabled:
+        findings.append(
+            InspectionFinding(
+                category="config_exfil_combination",
+                label="Secret-readable path combined with network access",
+                severity="caution",
+                families=[ScenarioFamily.OVERSCOPED_TOOL.value],
+                matches=[
+                    InspectionMatch(
+                        matched=secret_reads[0],
+                        excerpt=f"readable secret path plus network_enabled=true: {secret_reads[0]}",
+                    )
+                ],
+            )
+        )
+    ci_writes = [
+        path
+        for path in config.writable_paths
+        if _path_segments(path) & _CI_WRITE_SEGMENTS
+    ]
+    if ci_writes:
+        findings.append(
+            InspectionFinding(
+                category="config_ci_write",
+                label="Writes into CI or pipeline configuration",
+                severity="caution",
+                families=[ScenarioFamily.MALICIOUS_DIFF.value],
+                matches=[
+                    InspectionMatch(
+                        matched=ci_writes[0],
+                        excerpt=f"writable_paths includes CI configuration: {ci_writes[0]}",
+                    )
                 ],
             )
         )
@@ -774,10 +1048,12 @@ def bank_artifact_fingerprints(bank) -> frozenset[str]:
     fingerprints: set[str] = set()
     for scenario in bank.scenarios.values():
         for artifact in scenario.presentation.artifacts:
-            digest = hashlib.sha256(
-                _normalize_artifact(artifact.content).encode("utf-8")
-            ).hexdigest()
-            fingerprints.add(digest)
+            fingerprints.add(fingerprint_text(artifact.content))
+            added, removed, parsed_as = _diff_split(_normalize(artifact.content))
+            if parsed_as == "unified-diff":
+                fingerprints.add(fingerprint_text(added))
+                if removed:
+                    fingerprints.add(fingerprint_text(removed))
     return frozenset(fingerprints)
 
 
@@ -792,6 +1068,8 @@ def guard_fingerprints(content: str, kind: str) -> set[str]:
     not just the raw payload."""
     prints = {fingerprint_text(content)}
     if kind == "diff":
-        added, _ = _diff_added_text(_normalize(content))
+        added, removed, _ = _diff_split(_normalize(content))
         prints.add(fingerprint_text(added))
+        if removed:
+            prints.add(fingerprint_text(removed))
     return prints

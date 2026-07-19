@@ -59,3 +59,4 @@ jobs:
           printf 'pytest -q' | "$RUNNER_TEMP/wheel-smoke/bin/blastradius" check --kind command - --fail-on never
           "$RUNNER_TEMP/wheel-smoke/bin/blastradius" eval-detection --json > /dev/null
           "$RUNNER_TEMP/wheel-smoke/bin/blastradius" eval-detection --check-baseline
+          "$RUNNER_TEMP/wheel-smoke/bin/blastradius" fuzz-inspector --seed 7 --iterations 20 --json > /dev/null

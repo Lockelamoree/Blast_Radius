@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from blast_radius.engine.bank import ScenarioBank
 from blast_radius.models import Action, GateResult, Scenario
 
@@ -32,6 +33,77 @@ _ANSWER_LEAK_PATTERNS = (
         re.IGNORECASE,
     ),
 )
+
+# Canonicalization is intentionally narrow. It is used only for bounded
+# grader-directed and answer-leak checks; URL and tell-support checks continue
+# to inspect literal text so a normalization step can never invent evidence.
+_STRIP_CODEPOINTS = frozenset(
+    {
+        "\u00ad",  # soft hyphen
+        "\u200b",
+        "\u200c",
+        "\u200d",
+        "\u200e",
+        "\u200f",
+        "\u202a",
+        "\u202b",
+        "\u202c",
+        "\u202d",
+        "\u202e",
+        "\u2060",
+        "\u2066",
+        "\u2067",
+        "\u2068",
+        "\u2069",
+        "\ufeff",
+    }
+)
+_HOMOGLYPH_MAP = str.maketrans(
+    {
+        # A deliberately small set of Cyrillic look-alikes needed by the scan
+        # vocabulary. Mapping happens only inside mixed ASCII/non-ASCII tokens.
+        "\u0405": "S",
+        "\u0455": "s",
+        "\u0410": "A",
+        "\u0430": "a",
+        "\u0415": "E",
+        "\u0435": "e",
+        "\u0406": "I",
+        "\u0456": "i",
+        "\u041e": "O",
+        "\u043e": "o",
+        "\u0420": "P",
+        "\u0440": "p",
+        "\u0421": "C",
+        "\u0441": "c",
+        "\u0425": "X",
+        "\u0445": "x",
+        "\u0423": "Y",
+        "\u0443": "y",
+    }
+)
+_CANONICAL_TOKEN = re.compile(r"\w+", re.UNICODE)
+
+
+def _canonicalize(text: str) -> str:
+    """Return a deterministic, idempotent form for injection/leak screening.
+
+    NFKC and invisible-control stripping apply globally. Confusable folding is
+    limited to mixed-script tokens, leaving ordinary Cyrillic words untouched.
+    """
+
+    folded = unicodedata.normalize("NFKC", text)
+    folded = "".join(character for character in folded if character not in _STRIP_CODEPOINTS)
+
+    def fold_mixed_token(match: re.Match[str]) -> str:
+        token = match.group(0)
+        has_ascii_letter = any(character.isascii() and character.isalpha() for character in token)
+        has_mapped_non_ascii = any(
+            not character.isascii() and ord(character) in _HOMOGLYPH_MAP for character in token
+        )
+        return token.translate(_HOMOGLYPH_MAP) if has_ascii_letter and has_mapped_non_ascii else token
+
+    return _CANONICAL_TOKEN.sub(fold_mixed_token, folded)
 
 
 class CorrectnessGate:
@@ -104,9 +176,13 @@ class CorrectnessGate:
             + [artifact.title for artifact in candidate.artifacts]
             + [artifact.content for artifact in candidate.artifacts]
         )
-        if any(pattern.search(presentation_text) for pattern in _GENERATED_PRESENTATION_BLOCKLIST):
+        canonical_presentation = _canonicalize(presentation_text)
+        if any(
+            pattern.search(canonical_presentation)
+            for pattern in _GENERATED_PRESENTATION_BLOCKLIST
+        ):
             reasons.append("generated presentation contains grader-directed instructions")
-        if any(pattern.search(presentation_text) for pattern in _ANSWER_LEAK_PATTERNS):
+        if any(pattern.search(canonical_presentation) for pattern in _ANSWER_LEAK_PATTERNS):
             reasons.append("generated presentation reveals the expected action")
 
         trusted_text = "\n".join(

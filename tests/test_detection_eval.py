@@ -21,6 +21,8 @@ _KNOWN_CATEGORIES = {c.id for c in inspector.CATEGORIES} | {
     "exfil_chain",
     "unrestricted_egress",
     "workspace_wide_scope",
+    "config_exfil_combination",
+    "config_ci_write",
 }
 _VERDICTS = {"looks-scoped", "sandbox-recommended", "reject-recommended"}
 

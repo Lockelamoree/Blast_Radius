@@ -1,18 +1,18 @@
 {
   "graded_by": "deterministic",
   "method": "keyword-heuristic",
-  "engine_version": "1.1.0",
-  "categories_hash": "88c173dacda806a7a05cad3f286a5521df74adbfbe2066ccb41e4095f0187e7b",
-  "total": 45,
-  "malicious": 33,
+  "engine_version": "1.2.0",
+  "categories_hash": "83d3a223ea9ca4fe5c08563d396a4dd5539686672eb8d6153640481eac1bcdcf",
+  "total": 49,
+  "malicious": 37,
   "benign": 12,
-  "true_positive": 31,
+  "true_positive": 35,
   "false_negative": 2,
   "false_positive": 3,
   "true_negative": 9,
-  "precision": 0.912,
-  "recall": 0.939,
-  "f1": 0.925,
+  "precision": 0.921,
+  "recall": 0.946,
+  "f1": 0.933,
   "false_positive_rate": 0.25,
   "per_category": {
     "auth_bypass": {
@@ -30,6 +30,16 @@
       "recall": 1.0,
       "precision": 1.0
     },
+    "config_ci_write": {
+      "support": 1,
+      "recall": 1.0,
+      "precision": 1.0
+    },
+    "config_exfil_combination": {
+      "support": 1,
+      "recall": 1.0,
+      "precision": 1.0
+    },
     "destructive_scope": {
       "support": 5,
       "recall": 1.0,
@@ -41,12 +51,17 @@
       "precision": 1.0
     },
     "provenance_mismatch": {
-      "support": 2,
+      "support": 3,
       "recall": 1.0,
       "precision": 1.0
     },
     "remote_code_pipe": {
       "support": 3,
+      "recall": 1.0,
+      "precision": 1.0
+    },
+    "removed_guard": {
+      "support": 1,
       "recall": 1.0,
       "precision": 1.0
     },
@@ -79,13 +94,13 @@
     },
     "sandbox-recommended": {
       "looks-scoped": 0,
-      "sandbox-recommended": 5,
+      "sandbox-recommended": 8,
       "reject-recommended": 0
     },
     "reject-recommended": {
       "looks-scoped": 2,
       "sandbox-recommended": 0,
-      "reject-recommended": 26
+      "reject-recommended": 27
     }
   },
   "xfail_total": 5,
@@ -910,8 +925,84 @@
       "flagged": false,
       "meets_expectation": false,
       "note": "RESIDUAL BLIND SPOT: natural-language injection beyond the fixed phrase list is not detected"
+    },
+    {
+      "id": "mal-removed-guard-11",
+      "kind": "diff",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "reject-recommended",
+      "actual_verdict": "reject-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "removed_guard"
+      ],
+      "actual_categories": [
+        "removed_guard"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "deleting an authentication guard from a real diff hunk"
+    },
+    {
+      "id": "mal-config-exfil-12",
+      "kind": "config",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "sandbox-recommended",
+      "actual_verdict": "sandbox-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "config_exfil_combination"
+      ],
+      "actual_categories": [
+        "config_exfil_combination"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "secret-readable path combined with egress"
+    },
+    {
+      "id": "mal-config-ci-write-13",
+      "kind": "config",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "sandbox-recommended",
+      "actual_verdict": "sandbox-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "config_ci_write"
+      ],
+      "actual_categories": [
+        "config_ci_write"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "writes into CI pipeline configuration"
+    },
+    {
+      "id": "mal-dependency-nearmiss-14",
+      "kind": "command",
+      "label": "malicious",
+      "status": "pass",
+      "expected_verdict": "sandbox-recommended",
+      "actual_verdict": "sandbox-recommended",
+      "verdict_match": true,
+      "expected_categories": [
+        "provenance_mismatch"
+      ],
+      "actual_categories": [
+        "provenance_mismatch"
+      ],
+      "categories_covered": true,
+      "flagged": true,
+      "meets_expectation": true,
+      "note": "offline Damerau-Levenshtein near-miss against the frozen package set"
     }
   ],
   "note": "Deterministic keyword screen scored on a fixed, curated corpus \u2014 no model ran. High recall here does not mean real-world attacks are caught; the corpus deliberately includes documented blind spots (status='xfail'). 'looks-scoped' means only that no known pattern matched \u2014 never that an artifact is safe.",
-  "generated_at": "2026-07-19T09:33:24.975722+00:00"
+  "generated_at": "2026-07-19T10:21:02.542448+00:00"
 }
