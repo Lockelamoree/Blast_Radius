@@ -14,7 +14,7 @@
 ## Elevator pitch
 
 Blast Radius turns the hardest part of supervising a coding agent into a playable reflex.
-Its **20 receipt-linked scenarios** and **409-test verification suite** teach developers to
+Its **20 receipt-linked scenarios** and **421-test verification suite** teach developers to
 approve, sandbox, or reject proposed commands, dependencies, tool manifests, diffs, retrieved
 instructions, and marketplace skills—and to prove the call with evidence.
 
@@ -47,14 +47,17 @@ change.
 
 The same verification engine also powers:
 
+- a primary **60-second verified incident** with no signup or assessment, while the full run keeps
+  the existing pre/post measurement;
 - a visible “it caught its own mistake” demo that plants two defects and shows both gate reasons;
 - `/screen`, where a developer can paste a real command, diff, or sandbox policy for a
-  deterministic, offline, model-free red-flag screen;
+  deterministic, offline, model-free red-flag screen, inspect fixes, and download its JSON receipt;
 - an offline CLI, MCP server, GitHub Action, Codex plugin, and Codex `PreToolUse` supervisor hook;
 - a daily one-round drill, coached retry, local practice history, exportable guardrails, and
   offline detection/model evaluation;
-- pseudonymous learner profiles with optional nickname, recoverable token, custom Blastling,
-  score/level progression, and a scores-only public leaderboard;
+- pseudonymous learner profiles with optional nickname, recoverable token, a draggable and
+  keyboard-movable Blastling whose position stays device-local, score/level progression, and a
+  scores-only public leaderboard;
 - developer-only team and scenario-authoring views.
 
 The product never executes the commands or code it shows.
@@ -74,6 +77,12 @@ The architecture is a simple loop with receipts:
 3. Run the deterministic gate and a separate Sol consistency review.
 4. Let the operator decide.
 5. Grade against immutable truth and return direct evidence.
+
+The product entry points are deliberately simple: **Learn** the six families, **Screen** a real
+artifact, or **Integrate** the deterministic gate through the CLI, MCP, GitHub Action, Codex hook,
+or a `.blastradius.toml` team policy. Each grade includes a SHA-256 fingerprint of the public
+scenario presentation and the real deterministic gate result; grade, screen, and learning receipts
+are downloadable without hidden ground-truth keys.
 
 The browser never receives answer keys before grading. Ground truth, safe policies, and receipt
 sources stay server-side. Per-session locks serialize duplicate mutations. Provider attempts

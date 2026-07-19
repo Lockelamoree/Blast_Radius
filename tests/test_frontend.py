@@ -282,6 +282,30 @@ def test_codex_pet_is_wired_and_client_only() -> None:
     assert 'data-state="thinking"' in pet_css
     assert 'data-state="done"' in pet_css
     assert 'data-state="hurt"' in pet_css
+    assert 'data-idle="blink"' in pet_css
+    assert 'data-idle="scan"' in pet_css
+
+    # Movement is an explicit, accessible control. Position stays in pet-local
+    # schema v2 and is saved only at the end of a pointer gesture.
+    assert 'move.setAttribute("aria-label", "Move Blastling")' in pet
+    assert "setPointerCapture" in pet
+    assert 'event.key === "Home"' in pet
+    assert 'event.key === "Escape"' in pet
+    assert "event.shiftKey ? 48 : 16" in pet
+    assert "VIEWPORT_MARGIN = 12" in pet
+    assert "visualViewport" in pet
+    assert "schema: 2" in pet
+    assert "parsed.schema === 2" in pet
+    assert "normalizePosition" in pet
+    assert "window.persistPet(pet.config)" in pet
+    assert "window.persistPet(pet.position)" not in pet
+    assert "saveCurrentPosition();" in pet
+    assert pet.index("function continueMove") < pet.index("function endMove")
+    continue_move = pet[pet.index("function continueMove") : pet.index("function endMove")]
+    assert "safeSave" not in continue_move
+    assert ".pet-move" in pet_css and "touch-action:none" in pet_css
+    assert 'data-dragging="true"' in pet_css
+    assert 'data-settling="true"' in pet_css
 
     # The visual customiser stays inside short and narrow viewports.
     assert "max-height:calc(100dvh - 72px)" in pet_css
@@ -663,9 +687,11 @@ def test_operator_handle_input_is_optional_and_honest() -> None:
 def test_daily_drill_flow_is_wired() -> None:
     src = _frontend_sources()
     assert 'id="start-drill"' in src["template"]
-    assert "90-second daily drill" in src["template"]
+    assert "Try one verified incident" in src["template"]
+    assert "60 sec" in src["template"]
     assert 'id="screen-drill-result"' in src["template"]
     assert "mode:'drill'" in src["app"]
+    assert "startDrill('dangerous_command')" in src["app"]
     assert "client_key" in src["app"]
     assert "window.startDrill" in src["app"]
     # Drill start must not route through the pretest screen (pinned count == 2).
@@ -734,6 +760,10 @@ def test_byo_screen_page_is_wired_and_client_only() -> None:
     assert 'id="screen-input"' in screen_html
     assert 'id="screen-run"' in screen_html
     assert 'id="screen-result"' in screen_html
+    assert 'id="screen-example-select"' in screen_html
+    assert 'id="screen-copy-receipt"' in screen_html
+    assert 'id="screen-download-receipt"' in screen_html
+    assert 'id="screen-clear"' in screen_html
     # Self-contained: posts to the already-built deterministic screen, and never
     # injects markup from pasted text.
     assert "/api/check" in screen_js
@@ -743,6 +773,15 @@ def test_byo_screen_page_is_wired_and_client_only() -> None:
     # is visible in the browser.
     assert "provenance" in screen_js
     assert "DETERMINISTIC RECEIPT" in screen_js
+    assert screen_js.count("id: 'scoped'") == 3
+    assert screen_js.count("id: 'caution'") == 3
+    assert "Copy fix" in screen_js
+    assert "document.createElement('details')" in screen_js
+    assert "Practice this pattern" in screen_js
+    assert "blast-radius-screen-${fingerprint}.json" in screen_js
+    assert "No known red-flag pattern matched. This is not a proof of safety." in screen_js
+    assert "petEmit('screen-result', { verdict: report.verdict, families })" in screen_js
+    assert "/static/pet.css?v=" in screen_html and "/static/pet.js?v=" in screen_html
 
 
 def test_round_one_primer_is_wired() -> None:
@@ -768,7 +807,66 @@ def test_landing_groups_secondary_calls_to_action() -> None:
     assert "More ways to play" in src["template"]
     assert ".secondary-actions" in src["css"]
     # The primary CTA stays first; proof strip still precedes the actions.
-    assert src["template"].index('data-start="demo"') < src["template"].index('class="secondary-actions"')
+    assert src["template"].index('id="start-drill"') < src["template"].index('class="secondary-actions"')
+    assert src["template"].index('class="secondary-actions"') < src["template"].index('data-start="demo"')
+    assert "Measure my approval reflex" in src["template"]
+    assert "Progress &amp; leaderboard" in src["template"]
+
+
+def test_learn_screen_integrate_navigation_and_deep_links_are_allowlisted() -> None:
+    src = _frontend_sources()
+    root = Path(__file__).parents[1]
+    resources = (root / "blast_radius" / "static" / "resources.js").read_text(
+        encoding="utf-8"
+    )
+    assert "Learn" in src["template"]
+    assert 'href="/screen"' in src["template"]
+    assert "Integrate" in src["template"]
+    for integration in ("CLI", "MCP", "GitHub Action", "Codex hook", "Team policy"):
+        assert f"<h3>{integration}</h3>" in src["template"]
+    assert "data-copy-integration" in src["template"]
+    assert "Copy is unavailable in this browser." in resources
+    assert "RESOURCE_FAMILIES = new Set" in resources
+    assert "view !== 'learn' || !RESOURCE_FAMILIES.has(family)" in resources
+    assert "applyResourceDeepLink" in resources
+    deep_link = resources[resources.index("function applyResourceDeepLink") :]
+    assert "Open field guide" in deep_link
+    assert "ensureResource('learn')" in deep_link
+    assert "/api/sessions" not in deep_link
+
+
+def test_progressive_debrief_verification_and_learning_receipts_are_wired() -> None:
+    src = _frontend_sources()
+    template = src["template"]
+    app = src["app"]
+    for element_id in (
+        "verdict-action-line",
+        "show-hint",
+        "reveal-debrief",
+        "verification-receipt",
+        "verification-fingerprint",
+        "download-grade",
+        "safer-alternative",
+        "safer-action",
+        "safer-policy",
+        "result-strongest-gain",
+        "result-weakness",
+        "result-elapsed",
+        "result-next-drill",
+        "practice-weakest",
+        "download-learning",
+    ):
+        assert f'id="{element_id}"' in template
+    assert "function renderVerdictUpgrade" in app
+    assert "$('#verdict-explanation').textContent=''" in app
+    assert "$('#tell-list').replaceChildren()" in app
+    assert "if(!canRevise)renderFullDebrief()" in app
+    assert "MutationObserver" in app
+    assert "grade.verification" in app
+    assert "function renderSaferAlternative" in app
+    assert "JSON.stringify(grade.safe_policy,null,2)" in app
+    assert "Download is unavailable in this browser." in app
+    assert "state.results.recommended_drill_family" in app
 
 
 def test_oversight_bias_block_is_wired_and_delta_is_demoted() -> None:

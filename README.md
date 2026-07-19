@@ -1,7 +1,7 @@
 # Blast Radius
 
 **Blast Radius is a browser game for practicing safe approval decisions around AI coding
-agents, backed by 20 receipt-linked scenarios and 409 automated tests.** Inspect a proposed
+agents, backed by 20 receipt-linked scenarios and 421 automated tests.** Inspect a proposed
 command, dependency, tool manifest, diff, retrieved instruction, or marketplace skill; choose
 **approve**, **sandbox**, or **reject**; then name the evidence tell. The verdict scores the
 action, tell coverage, and—when applicable—the exact sandbox policy, with direct evidence for
@@ -34,9 +34,19 @@ are inert strings and are never executed.
   `/author` that validates drafts against the production gate before a PR.
 - **A bring-your-own-artifact screen** at `/screen`, plus an offline fuzz/evaluation harness,
   lets developers verify commands, diffs, and sandbox policies with the same model-free engine.
+  Frozen benign/caution/critical examples, copyable fixes, learning links, and downloadable JSON
+  receipts make it useful beyond the game.
 - **Persistent, pseudonymous learner profiles** use a signed browser cookie, optional nickname,
   recoverable token, custom Blastling companion, score/level progression, and a public
-  scores-only leaderboard. No email address or password is collected.
+  scores-only leaderboard. The Blastling can be dragged or moved with the keyboard; its normalized
+  position stays only on that device and never enters the profile token. No email address or
+  password is collected.
+- A judge-friendly **60-second verified incident** is the primary entry path. The full six-round
+  pre/post measurement remains available as “Measure my approval reflex,” while the landing page
+  is organized around **Learn / Screen / Integrate**.
+- Every grade now carries a public-presentation fingerprint and the actual deterministic scenario
+  gate result. Grade, screening, and learning receipts can be downloaded as JSON without exposing
+  hidden keyword mappings or scenario ground truth.
 
 `BLAST_RADIUS_LIVE_GENERATION=false` remains the safe deployment default. An explicitly
 enabled live session selects a verified anchor first, then Luna may reskin only its
@@ -97,6 +107,17 @@ The key stays server-side. Responses requests use `store: false`, bounded output
 SDK retries, and the opaque session UUID as `safety_identifier`. Provider-dispatched attempts
 count against the UTC daily application budget; configure a provider-side project budget as
 the hard financial ceiling.
+
+For the shortest product tour, choose **Try one verified incident · 60 sec**. It opens one
+day/client-stable `dangerous_command` drill with no nickname, profile step, or assessment. Choose
+**Measure my approval reflex** for the full pre/post run. The three landing destinations are:
+
+- **Learn** — cited field guides, including `/?view=learn&family=dangerous_command` deep links;
+- **Screen** — the access-gated `/screen` workflow for commands, diffs, and policies;
+- **Integrate** — copyable CLI, MCP, GitHub Action, Codex hook, and team-rule setup.
+
+Unknown learning deep links fall back to the landing page, and a valid deep link does not fetch
+its module until the visitor explicitly opens the field guide.
 
 ## Use it as a daily tool
 
