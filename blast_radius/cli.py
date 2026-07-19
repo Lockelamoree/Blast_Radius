@@ -11,8 +11,12 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from glob import glob, has_magic
 from pathlib import Path
 
+from pydantic import ValidationError
+
+from blast_radius import __version__
 from blast_radius.engine import inspector
 from blast_radius.engine.bank import ScenarioBank
 from blast_radius.engine.gate import CorrectnessGate
@@ -21,6 +25,8 @@ from blast_radius.models import BlastRadiusConfig, InspectionReport, Scenario
 _DATA_DIR = Path(__file__).resolve().parent / "data"
 _VERDICT_RANK = {"looks-scoped": 0, "sandbox-recommended": 1, "reject-recommended": 2}
 _FAIL_ON_THRESHOLD = {"never": 3, "reject": 2, "sandbox": 1}
+_MODEL_EVAL_DEFAULT = "model_eval_baseline.json"
+_DETECTION_EVAL_DEFAULT = "detection_eval_baseline.json"
 
 
 def _read_source(positional: str | None, file_option: str | None) -> str:
@@ -129,8 +135,15 @@ def _cmd_verify(args: argparse.Namespace) -> int:
         print(f"PASS {len(scenarios)} scenario(s) through CorrectnessGate")
         return 0
 
+    paths: list[str] = []
+    for candidate in args.scenarios:
+        matches = sorted(glob(candidate)) if has_magic(candidate) else [candidate]
+        if not matches:
+            raise FileNotFoundError(f"no scenario files matched: {candidate}")
+        paths.extend(matches)
+
     failures = 0
-    for path in args.scenarios:
+    for path in dict.fromkeys(paths):
         scenario = Scenario.model_validate_json(Path(path).read_text(encoding="utf-8"))
         result = gate.verify(scenario)
         if result.passed:
@@ -241,7 +254,7 @@ def _cmd_eval_model(args: argparse.Namespace) -> int:
     )
     payload = report.to_dict()
     payload["generated_at"] = datetime.now(UTC).isoformat()
-    out = Path(args.out) if args.out else (_DATA_DIR / "model_eval_baseline.json")
+    out = Path(args.out) if args.out else (Path.cwd() / _MODEL_EVAL_DEFAULT)
     out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     print(
         f"wrote {out}\n  model={model} action_accuracy={report.action_accuracy}% "
@@ -409,6 +422,11 @@ def build_parser() -> argparse.ArgumentParser:
         description="Deterministic red-flag screen and scenario gate verifier. "
         "No model runs; it cannot prove an artifact is safe.",
     )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__} (engine {inspector.ENGINE_VERSION})",
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     check = sub.add_parser("check", help="screen a command, diff, or sandbox config")
@@ -465,7 +483,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--effort", default="low", choices=["low", "medium", "high"], help="reasoning effort"
     )
     evalp.add_argument("--max-output-tokens", type=int, default=2000)
-    evalp.add_argument("--out", help="output path (default: packaged model_eval_baseline.json)")
+    evalp.add_argument(
+        "--out",
+        help=f"output path (default: ./{_MODEL_EVAL_DEFAULT})",
+    )
     evalp.set_defaults(func=_cmd_eval_model)
 
     detect = sub.add_parser(
@@ -478,9 +499,9 @@ def build_parser() -> argparse.ArgumentParser:
     detect.add_argument(
         "--out",
         nargs="?",
-        const=str(_DETECTION_BASELINE),
+        const=_DETECTION_EVAL_DEFAULT,
         default=None,
-        help="write the baseline scorecard (bare flag writes the packaged baseline)",
+        help=f"write the scorecard (bare flag writes ./{_DETECTION_EVAL_DEFAULT})",
     )
     detect.add_argument(
         "--check-baseline",
@@ -510,7 +531,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "verify" and not args.bank and not args.scenarios:
         parser.error("verify needs scenario file(s) or --bank")
-    return args.func(args)
+    try:
+        return args.func(args)
+    except (OSError, UnicodeError, ValidationError, json.JSONDecodeError) as error:
+        print(f"blastradius: {error}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":
