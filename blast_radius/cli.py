@@ -71,6 +71,15 @@ def _render_human(report: InspectionReport, *, explain: bool = False) -> None:
 
 
 def _cmd_check(args: argparse.Namespace) -> int:
+    custom = None
+    if not args.no_rules:
+        from blast_radius.engine import custom_rules
+
+        rules_path = Path(args.rules) if args.rules else custom_rules.discover()
+        custom, rules_error = custom_rules.load_safe(rules_path)
+        if rules_error:
+            print(f"blast-radius: ignoring custom rules — {rules_error}", file=sys.stderr)
+
     if args.config:
         config = BlastRadiusConfig.model_validate_json(
             Path(args.config).read_text(encoding="utf-8")
@@ -80,7 +89,7 @@ def _cmd_check(args: argparse.Namespace) -> int:
             expected = BlastRadiusConfig.model_validate_json(
                 Path(args.expected).read_text(encoding="utf-8")
             )
-        report = inspector.inspect_config(config, expected)
+        report = inspector.inspect_config(config, expected, custom=custom)
         kind = "config"
     else:
         content = _read_source(args.artifact, args.diff)
@@ -88,7 +97,7 @@ def _cmd_check(args: argparse.Namespace) -> int:
         if kind == "config":
             print("error: use --config FILE for config checks", file=sys.stderr)
             return 2
-        report = inspector.inspect_text(content, kind=kind)
+        report = inspector.inspect_text(content, kind=kind, custom=custom)
 
     if not args.no_audit:
         from blast_radius import audit
@@ -395,6 +404,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-audit",
         action="store_true",
         help="do not append a fingerprint-only entry to the local audit log",
+    )
+    check.add_argument(
+        "--rules", help="path to a .blastradius.toml custom-rule set (default: auto-discover)"
+    )
+    check.add_argument(
+        "--no-rules", action="store_true", help="ignore any .blastradius.toml custom rules"
     )
     check.add_argument(
         "--fail-on",

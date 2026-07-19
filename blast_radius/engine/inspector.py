@@ -22,10 +22,11 @@ import re
 import unicodedata
 from dataclasses import dataclass, field
 
-from blast_radius.engine import grader
+from blast_radius.engine import custom_rules, grader
 from blast_radius.engine.gate import _GENERATED_PRESENTATION_BLOCKLIST
 from blast_radius.models import (
     BlastRadiusConfig,
+    CustomRulesConfig,
     InspectionFinding,
     InspectionMatch,
     InspectionProvenance,
@@ -273,18 +274,24 @@ def _categories_hash() -> str:
 
 
 def _build_provenance(
-    input_fingerprint: str, driving: list[str], *, decode_layers: int = 0
+    input_fingerprint: str,
+    driving: list[str],
+    *,
+    decode_layers: int = 0,
+    custom_rules_fingerprint: str = "",
 ) -> InspectionProvenance:
     """A reproducible receipt. `runtime` carries the CPython + Unicode DB versions
     because canonicalization (a later phase) depends on the Unicode DB, so a
     receipt without them could not let a reviewer reproduce a verdict elsewhere.
-    `decode_layers` records how many embedded payloads were decoded and rescanned."""
+    `decode_layers` records how many embedded payloads were decoded and rescanned;
+    `custom_rules_fingerprint` ties the verdict to any team rule set applied."""
     return InspectionProvenance(
         engine_version=ENGINE_VERSION,
         categories_hash=_categories_hash(),
         input_fingerprint=input_fingerprint,
         driving_findings=list(driving),
         decode_layers=decode_layers,
+        custom_rules_fingerprint=custom_rules_fingerprint,
         runtime={
             "python": platform.python_version(),
             "unicode": unicodedata.unidata_version,
@@ -331,11 +338,53 @@ def _locate(haystack_lower: str, haystack: str, keyword: str) -> str | None:
     return None
 
 
-def _scan(scanned: str) -> list[InspectionFinding]:
+def _custom_categories(config: CustomRulesConfig | None) -> tuple[CategorySpec, ...]:
+    """Turn team custom rules into detector CategorySpecs. They screen with the
+    exact same token+regex machinery as built-ins, so custom coverage is real
+    coverage — never a second-class path."""
+    if config is None:
+        return ()
+    return tuple(
+        CategorySpec(
+            id=rule.id,
+            label=rule.label,
+            severity=rule.severity,
+            families=(rule.family,),
+            keywords=tuple(rule.keywords),
+            patterns=tuple(_p(pattern) for pattern in rule.patterns),
+        )
+        for rule in config.rules
+    )
+
+
+def _apply_allowlist(
+    findings: list[InspectionFinding], config: CustomRulesConfig | None
+) -> list[InspectionFinding]:
+    """Drop *caution* findings whose evidence matches a team allowlist regex.
+    Critical findings are never dropped — the schema and this guard together make
+    it impossible for a config to hide a real critical."""
+    if config is None or not config.allowlist:
+        return findings
+    allow = [re.compile(pattern, re.IGNORECASE) for pattern in config.allowlist]
+    kept: list[InspectionFinding] = []
+    for finding in findings:
+        if finding.severity == "critical":
+            kept.append(finding)
+            continue
+        evidence = " ".join(f"{match.matched} {match.excerpt}" for match in finding.matches)
+        if any(pattern.search(evidence) for pattern in allow):
+            continue  # caution acknowledged by the team's allowlist
+        kept.append(finding)
+    return kept
+
+
+def _scan(
+    scanned: str, categories: tuple[CategorySpec, ...] = CATEGORIES
+) -> list[InspectionFinding]:
     tokens = grader.tokenize(scanned)
     lower = scanned.lower()
     findings: list[InspectionFinding] = []
-    for category in CATEGORIES:
+    for category in categories:
         seen: set[str] = set()
         matches: list[InspectionMatch] = []
         for keyword in category.keywords:
@@ -597,7 +646,9 @@ def _verdict(
     return "looks-scoped", []
 
 
-def inspect_text(content: str, *, kind: str) -> InspectionReport:
+def inspect_text(
+    content: str, *, kind: str, custom: CustomRulesConfig | None = None
+) -> InspectionReport:
     if kind not in {"command", "diff"}:
         raise ValueError("inspect_text kind must be 'command' or 'diff'")
     normalized = _normalize(content)
@@ -605,11 +656,13 @@ def inspect_text(content: str, *, kind: str) -> InspectionReport:
     scanned = normalized
     if kind == "diff":
         scanned, parsed_as = _diff_added_text(normalized)
-    scanned_findings = _scan(scanned)
+    categories = CATEGORIES + _custom_categories(custom)
+    scanned_findings = _scan(scanned, categories)
     decoded_payloads = _decode_candidates(scanned)
     for payload in decoded_payloads:
-        scanned_findings.extend(_scan(payload))
+        scanned_findings.extend(_scan(payload, categories))
     scanned_findings = _merge_findings(scanned_findings)
+    scanned_findings = _apply_allowlist(scanned_findings, custom)
     correlations = _correlate(scanned_findings)
     findings = _enrich_findings(scanned_findings + correlations)
     verdict, driving = _verdict(findings)
@@ -625,7 +678,10 @@ def inspect_text(content: str, *, kind: str) -> InspectionReport:
             for finding in correlations
         ],
         provenance=_build_provenance(
-            fingerprint_text(scanned), driving, decode_layers=len(decoded_payloads)
+            fingerprint_text(scanned),
+            driving,
+            decode_layers=len(decoded_payloads),
+            custom_rules_fingerprint=custom_rules.fingerprint(custom),
         ),
     )
 
@@ -634,7 +690,10 @@ ZERO_TRUST = BlastRadiusConfig()
 
 
 def inspect_config(
-    config: BlastRadiusConfig, expected: BlastRadiusConfig | None = None
+    config: BlastRadiusConfig,
+    expected: BlastRadiusConfig | None = None,
+    *,
+    custom: CustomRulesConfig | None = None,
 ) -> InspectionReport:
     findings: list[InspectionFinding] = []
     if config.network_enabled and not config.network_allowlist:
@@ -681,6 +740,7 @@ def inspect_config(
         deltas = grader.compute_policy_deltas(config, ZERO_TRUST)
         baseline = "zero-trust"
     has_excess = any(delta.status == "excess" for delta in deltas)
+    findings = _apply_allowlist(findings, custom)
     findings = _enrich_findings(findings)  # config owns no correlation (item 12)
     verdict, driving = _verdict(findings, score=score, has_excess=has_excess)
     config_fingerprint = fingerprint_text(
@@ -695,7 +755,11 @@ def inspect_config(
         baseline=baseline,
         policy_deltas=deltas,
         confidence=_report_confidence(findings),
-        provenance=_build_provenance(config_fingerprint, driving),
+        provenance=_build_provenance(
+            config_fingerprint,
+            driving,
+            custom_rules_fingerprint=custom_rules.fingerprint(custom),
+        ),
     )
 
 

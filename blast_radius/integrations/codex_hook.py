@@ -47,9 +47,11 @@ def main() -> int:
     if not command:
         return _emit("allow")
     try:
-        from blast_radius.engine import inspector
+        from blast_radius.engine import custom_rules, inspector
 
-        report = inspector.inspect_text(command, kind="command")
+        # Team custom rules from a repo .blastradius.toml, if present (fail-open).
+        rules, _ = custom_rules.load_safe(custom_rules.discover())
+        report = inspector.inspect_text(command, kind="command", custom=rules)
     except Exception as exc:  # screening unavailable -> fail open, but say why
         print(f"blast-radius: command not screened ({type(exc).__name__})", file=sys.stderr)
         return _emit("allow")

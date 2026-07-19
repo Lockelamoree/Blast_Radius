@@ -644,6 +644,9 @@ class InspectionProvenance(BaseModel):
     driving_findings: list[str] = Field(default_factory=list)
     # Count of embedded base64/hex payloads that were decoded and rescanned.
     decode_layers: int = Field(default=0, ge=0)
+    # Fingerprint of any team custom-rule set applied (empty when none). Ties a
+    # verdict to the exact rule set, so a receipt is reproducible with the same config.
+    custom_rules_fingerprint: str = ""
     runtime: dict[str, str] = Field(default_factory=dict)
 
 
@@ -664,3 +667,56 @@ class InspectionReport(BaseModel):
     provenance: InspectionProvenance | None = None
     confidence: str = Field(default="", pattern=r"^(high|medium|low|)$")
     correlations: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class CustomRule(BaseModel):
+    """A team-authored detection rule, layered on top of the built-in screen. It
+    can only ADD coverage — never relax it. Reuses the built-in category shape
+    (id/label/severity/keywords/patterns) so it screens exactly like a shipped one."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]{2,60}$")
+    label: str = Field(min_length=3, max_length=100)
+    severity: str = Field(default="caution", pattern=r"^(critical|caution)$")
+    family: ScenarioFamily = ScenarioFamily.DANGEROUS_COMMAND
+    keywords: list[str] = Field(default_factory=list, max_length=24)
+    patterns: list[str] = Field(default_factory=list, max_length=24)
+
+    @model_validator(mode="after")
+    def has_a_matcher(self) -> "CustomRule":
+        if not self.keywords and not self.patterns:
+            raise ValueError("a custom rule needs at least one keyword or pattern")
+        if any(len(keyword) > 120 or not keyword.strip() for keyword in self.keywords):
+            raise ValueError("custom keywords must be non-blank and at most 120 characters")
+        for pattern in self.patterns:
+            try:
+                re.compile(pattern)
+            except re.error as error:
+                raise ValueError(f"invalid custom pattern {pattern!r}: {error}") from None
+        return self
+
+
+class CustomRulesConfig(BaseModel):
+    """A repo's `.blastradius.toml`: extra rules plus a caution-only allowlist.
+
+    Honesty is enforced by construction — there is no field that can suppress a
+    built-in critical finding. `allowlist` regexes only ever drop *caution* noise
+    (built-in or custom); criticals always survive to the verdict."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    rules: list[CustomRule] = Field(default_factory=list, max_length=64)
+    allowlist: list[str] = Field(default_factory=list, max_length=64)
+
+    @model_validator(mode="after")
+    def validate_config(self) -> "CustomRulesConfig":
+        ids = [rule.id for rule in self.rules]
+        if len(ids) != len(set(ids)):
+            raise ValueError("custom rule ids must be unique")
+        for pattern in self.allowlist:
+            try:
+                re.compile(pattern)
+            except re.error as error:
+                raise ValueError(f"invalid allowlist pattern {pattern!r}: {error}") from None
+        return self
