@@ -198,6 +198,29 @@ row maps to a corpus id you can inspect and re-run.
 | False positive: any egress tool flags benign API calls without an allowlist | `unapproved_egress` | medium (noise) | `fp-curl-github-01` |
 | False positive: `test mode` / bounded `rm -rf ./dir` in benign code | `auth_bypass`, `destructive_scope` | medium (noise) | `fp-testmode-comment-02`, `fp-rm-node-modules-03` |
 
+### Extend it — team custom rules
+
+Drop a `.blastradius.toml` in your repo root and the CLI, MCP tool, and supervisor hook pick it up
+automatically (see [`.blastradius.toml.example`](.blastradius.toml.example)). Custom rules screen
+with the same token+regex machinery as the built-ins, so org-specific coverage is real coverage:
+
+```toml
+allowlist = ["vendored/internal-mirror"]   # drops matching *caution* noise only
+
+[[rules]]
+id = "internal-vault"
+label = "Reads the internal secret vault"
+severity = "critical"
+patterns = ['/etc/acme/secrets/', 'ACME_VAULT_TOKEN']
+```
+
+Two honesty guarantees hold by construction: custom rules can only **add** coverage, and the
+`allowlist` can only drop **caution** findings — a built-in (or custom) **critical** can never be
+suppressed, so a rule file cannot quietly disable the guard. Malformed files **fail open** (a
+stderr note, then the built-in screen still runs), and each verdict records a
+`custom_rules_fingerprint` in its receipt so it is reproducible with the same rule set. Point at a
+specific file with `blastradius check --rules path/to/rules.toml`, or ignore rules with `--no-rules`.
+
 ## Test and release checks
 
 ```powershell

@@ -1,0 +1,31 @@
+# Blast Radius team custom rules — copy to `.blastradius.toml` in your repo root.
+#
+# Custom rules only ADD coverage. The allowlist only drops *caution* noise.
+# A built-in CRITICAL finding (secret read, egress, exfil chain, destructive
+# command, auth bypass, prompt injection) can NEVER be suppressed here — by design,
+# so a rule file can't quietly turn off the guard. Each check records a hash of the
+# applied rule set in its receipt (`provenance.custom_rules_fingerprint`).
+
+# `allowlist` MUST appear before the [[rules]] tables (TOML groups later bare keys
+# under the preceding table). Each regex is matched against a caution finding's
+# evidence; a match drops that finding. Criticals ignore the allowlist entirely.
+allowlist = [
+  # Stop the 'unpinned dependency' caution nagging on our reviewed vendored tree.
+  "vendored/internal-mirror",
+]
+
+# Flag reads of an org-internal secret store the built-in table doesn't know about.
+[[rules]]
+id = "internal-vault"
+label = "Reads the internal secret vault"
+severity = "critical"
+family = "dangerous_command"
+keywords = ["vault-cli"]
+patterns = ['/etc/acme/secrets/', 'ACME_VAULT_TOKEN']
+
+# Flag an org-specific overscope marker in a tool manifest (a caution).
+[[rules]]
+id = "corp-wildcard-scope"
+label = "Manifest requests the deprecated wildcard scope"
+severity = "caution"
+patterns = ['scope\s*=\s*"\*"']
