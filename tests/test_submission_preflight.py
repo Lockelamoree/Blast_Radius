@@ -28,7 +28,6 @@ def test_gallery_check_detects_duplicate_assets(tmp_path: Path) -> None:
 
 def test_documentation_check_detects_stale_claims(tmp_path: Path) -> None:
     (tmp_path / "README.md").write_text("409 tests passed", encoding="utf-8")
-    (tmp_path / "04_PITCH_AND_VIDEO.md").write_text("20 scenarios", encoding="utf-8")
     (tmp_path / "16_DEVPOST_FINAL_COPY.md").write_text("ready", encoding="utf-8")
     result = preflight._documentation_check(tmp_path)
     assert result.status == "fail"

@@ -35,7 +35,10 @@ def _png_dimensions(path: Path) -> tuple[int, int]:
 
 
 def _documentation_check(root: Path) -> Check:
-    paths = (root / "README.md", root / "04_PITCH_AND_VIDEO.md", root / "16_DEVPOST_FINAL_COPY.md")
+    paths = [root / "README.md", root / "16_DEVPOST_FINAL_COPY.md"]
+    local_pitch = root / "04_PITCH_AND_VIDEO.md"
+    if local_pitch.exists():
+        paths.append(local_pitch)
     text = "\n".join(path.read_text(encoding="utf-8") for path in paths)
     stale = [
         token
