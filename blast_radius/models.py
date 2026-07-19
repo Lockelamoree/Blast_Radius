@@ -520,6 +520,18 @@ class InspectionFinding(BaseModel):
     matches: list[InspectionMatch]
 
 
+class InspectionProvenance(BaseModel):
+    """Deterministic receipt for an inspection: enough to reproduce the verdict
+    off any interpreter without trusting this instance. Echoes only public inputs
+    (a fingerprint of the artifact the user submitted), never ground truth."""
+
+    engine_version: str
+    categories_hash: str
+    input_fingerprint: str
+    driving_findings: list[str] = Field(default_factory=list)
+    runtime: dict[str, str] = Field(default_factory=dict)
+
+
 class InspectionReport(BaseModel):
     kind: str
     verdict: str = Field(pattern=r"^(reject-recommended|sandbox-recommended|looks-scoped)$")
@@ -534,3 +546,4 @@ class InspectionReport(BaseModel):
     policy_deltas: list[PolicyDelta] | None = None
     learn: dict[str, str] | None = None
     toolkit: dict[str, str] | None = None
+    provenance: InspectionProvenance | None = None

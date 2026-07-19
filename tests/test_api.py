@@ -162,7 +162,19 @@ def test_gate_catch_rejects_planted_hallucination_without_leaking_it(client) -> 
     assert citation.json()["reasons"] == [
         "evidence source is not approved for this template"
     ]
-    assert "ground_truth" not in tell.text + citation.text
+    # "stack" plants BOTH lies at once → two independent gate reasons (order-agnostic).
+    stack = client.get("/api/demo/gate-catch?case=stack")
+    assert stack.status_code == 200
+    assert stack.json()["case"] == "stack"
+    reasons = stack.json()["reasons"]
+    assert len(reasons) == 2
+    assert set(reasons) == {
+        "evidence source is not approved for this template",
+        "presented artifacts do not support declared tell: hidden remote code execution backdoor",
+    }
+    # An unknown case is rejected, never silently defaulted.
+    assert client.get("/api/demo/gate-catch?case=nope").status_code == 422
+    assert "ground_truth" not in tell.text + citation.text + stack.text
 
 
 def test_gate_catch_is_rate_limited(client) -> None:

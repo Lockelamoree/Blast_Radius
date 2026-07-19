@@ -14,7 +14,10 @@ cannot leak that scenario's verdict; this module stays pure and stateless.
 from __future__ import annotations
 
 import hashlib
+import json
+import platform
 import re
+import unicodedata
 from dataclasses import dataclass, field
 
 from blast_radius.engine import grader
@@ -23,9 +26,14 @@ from blast_radius.models import (
     BlastRadiusConfig,
     InspectionFinding,
     InspectionMatch,
+    InspectionProvenance,
     InspectionReport,
     ScenarioFamily,
 )
+
+# Bumped whenever the deterministic screen's behaviour changes. Recorded in every
+# InspectionProvenance so a verdict can be tied to the exact engine that produced it.
+ENGINE_VERSION = "1.0.0"
 
 _MAX_MATCHES_PER_CATEGORY = 6
 _EXCERPT_RADIUS = 40
@@ -215,6 +223,42 @@ CATEGORIES: tuple[CategorySpec, ...] = (
 )
 
 
+def _categories_hash() -> str:
+    """Stable SHA-256 over the frozen CATEGORIES table. Cosmetic reorders are
+    no-ops (everything sorted); any content change churns the hash, so a pinned
+    test turns silent drift into a loud failure. ENGINE_VERSION is deliberately
+    NOT folded in — version and content-hash stay independent."""
+    payload = [
+        {
+            "id": category.id,
+            "label": category.label,
+            "severity": category.severity,
+            "families": sorted(family.value for family in category.families),
+            "keywords": sorted(category.keywords),
+            "patterns": sorted(pattern.pattern for pattern in category.patterns),
+        }
+        for category in CATEGORIES
+    ]
+    blob = json.dumps(payload, sort_keys=True, ensure_ascii=True)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+def _build_provenance(input_fingerprint: str, driving: list[str]) -> InspectionProvenance:
+    """A reproducible receipt. `runtime` carries the CPython + Unicode DB versions
+    because canonicalization (a later phase) depends on the Unicode DB, so a
+    receipt without them could not let a reviewer reproduce a verdict elsewhere."""
+    return InspectionProvenance(
+        engine_version=ENGINE_VERSION,
+        categories_hash=_categories_hash(),
+        input_fingerprint=input_fingerprint,
+        driving_findings=list(driving),
+        runtime={
+            "python": platform.python_version(),
+            "unicode": unicodedata.unidata_version,
+        },
+    )
+
+
 def _normalize(text: str) -> str:
     return text.replace("\r\n", "\n").replace("\r", "\n")
 
@@ -310,16 +354,21 @@ def _verdict(
     *,
     score: int | None = None,
     has_excess: bool = False,
-) -> str:
-    if any(finding.severity == "critical" for finding in findings):
-        return "reject-recommended"
-    if (
-        any(finding.severity == "caution" for finding in findings)
-        or has_excess
-        or (score is not None and score < 70)
-    ):
-        return "sandbox-recommended"
-    return "looks-scoped"
+) -> tuple[str, list[str]]:
+    """Return (verdict, driving) — the ordered signals that SET the verdict, so the
+    provenance receipt echoes this single source of truth rather than re-deriving
+    (and possibly diverging from) the branch logic."""
+    criticals = [finding.category for finding in findings if finding.severity == "critical"]
+    if criticals:
+        return "reject-recommended", criticals
+    driving = [finding.category for finding in findings if finding.severity == "caution"]
+    if has_excess:
+        driving.append("policy-excess")
+    if score is not None and score < 70:
+        driving.append("low-score")
+    if driving:
+        return "sandbox-recommended", driving
+    return "looks-scoped", []
 
 
 def inspect_text(content: str, *, kind: str) -> InspectionReport:
@@ -331,12 +380,14 @@ def inspect_text(content: str, *, kind: str) -> InspectionReport:
     if kind == "diff":
         scanned, parsed_as = _diff_added_text(normalized)
     findings = _scan(scanned)
+    verdict, driving = _verdict(findings)
     return InspectionReport(
         kind=kind,
-        verdict=_verdict(findings),
+        verdict=verdict,
         findings=findings,
         families=_families_ranked(findings),
         parsed_as=parsed_as,
+        provenance=_build_provenance(fingerprint_text(scanned), driving),
     )
 
 
@@ -391,14 +442,19 @@ def inspect_config(
         deltas = grader.compute_policy_deltas(config, ZERO_TRUST)
         baseline = "zero-trust"
     has_excess = any(delta.status == "excess" for delta in deltas)
+    verdict, driving = _verdict(findings, score=score, has_excess=has_excess)
+    config_fingerprint = fingerprint_text(
+        json.dumps(config.model_dump(mode="json"), sort_keys=True)
+    )
     return InspectionReport(
         kind="config",
-        verdict=_verdict(findings, score=score, has_excess=has_excess),
+        verdict=verdict,
         findings=findings,
         families=_families_ranked(findings),
         score=score,
         baseline=baseline,
         policy_deltas=deltas,
+        provenance=_build_provenance(config_fingerprint, driving),
     )
 
 

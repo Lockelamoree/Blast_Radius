@@ -422,22 +422,30 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
     @router.get("/demo/gate-catch")
     def demo_gate_catch(request: Request, case: str = "tell") -> dict:
         limiter.check(f"gate-catch:{client_host(request)}")
-        if case not in {"tell", "citation"}:
-            raise HTTPException(status_code=422, detail="case must be tell or citation")
+        if case not in {"tell", "citation", "stack"}:
+            raise HTTPException(
+                status_code=422, detail="case must be tell, citation, or stack"
+            )
         planted = engine.bank.get("dep-typo-1").model_copy(deep=True)
         planted.id = "demo-planted-hallucination"
-        if case == "tell":
-            planted_claim = "hidden remote code execution backdoor"
-            planted.ground_truth.tells.append(planted_claim)
-            planted.ground_truth.tell_keywords[planted_claim] = [
+        # "stack" plants BOTH lies on one scenario, so the deterministic gate
+        # returns two independent reasons at once — a visible multi-defect catch.
+        if case in {"tell", "stack"}:
+            tell = "hidden remote code execution backdoor"
+            planted.ground_truth.tells.append(tell)
+            planted.ground_truth.tell_keywords[tell] = [
                 "remote code execution",
                 "backdoor",
             ]
-        else:
-            planted_claim = "off-catalog security receipt"
+        if case in {"citation", "stack"}:
             planted.ground_truth.evidence[0].source = (
                 "https://example.com/fabricated-security-guidance"
             )
+        planted_claim = {
+            "tell": "hidden remote code execution backdoor",
+            "citation": "off-catalog security receipt",
+            "stack": "hidden remote code execution backdoor + off-catalog security receipt",
+        }[case]
         result = engine.gate.verify(planted)
         return {
             "case": case,

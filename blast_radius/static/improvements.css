@@ -179,6 +179,23 @@
   word-break: break-word;
 }
 
+.gate-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.gate-chip {
+  font: 9px/1.4 var(--mono);
+  letter-spacing: .02em;
+  color: var(--acid);
+  border: 1px solid color-mix(in srgb, var(--acid) 45%, transparent);
+  border-radius: 5px;
+  padding: 3px 7px;
+  background: color-mix(in srgb, var(--acid) 10%, transparent);
+}
+
 .gate-verdict {
   display: flex;
   flex-direction: column;

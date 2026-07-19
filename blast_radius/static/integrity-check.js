@@ -49,7 +49,27 @@ const PLANT_COPY = {
     scan: 'Checked the source against the approved receipt list',
     scanResult: 'not found',
     rule: 'Every source must be a pre-approved receipt, so an invented link cannot pose as evidence.',
-    next: 'a fabricated vulnerability',
+    next: 'two stacked defects at once',
+  },
+  stack: {
+    artifact: {
+      title: 'Install proposal · what you would be shown',
+      lines: [
+        '$ pip install reqeusts==2.32.0',
+        'Approved lockfile entry: requests==2.32.0',
+        'source: on the approved receipt list',
+      ],
+    },
+    beat1Note: 'Genuine. The real tell is the near-miss name — reqeusts vs requests.',
+    beat2Lead: 'The AI stacked TWO lies on one scenario at once:',
+    lieLabel: 'declared threat',
+    lieValue: () => '“hidden remote code execution backdoor”',
+    lieSub: () =>
+      'AND the citation was swapped to an off-catalog link not on the approved receipt list',
+    scan: 'Ran every invariant — groundedness AND the approved-receipt list',
+    scanResult: '2 defects caught',
+    rule: 'Each lie fails a different deterministic rule; the gate reports them all, independently.',
+    next: 'a single fabricated tell',
   },
 };
 
@@ -69,7 +89,7 @@ document.querySelector('#gate-catch').addEventListener('click', async (event) =>
   const result = document.querySelector('#gate-catch-result');
   const selectedCase = integrityCase;
   const copy = PLANT_COPY[selectedCase];
-  integrityCase = integrityCase === 'tell' ? 'citation' : 'tell';
+  integrityCase = { tell: 'citation', citation: 'stack', stack: 'tell' }[integrityCase];
   button.disabled = true;
   result.className = 'gate-running';
   result.textContent = 'Feeding a planted fake through the correctness gate…';
@@ -141,10 +161,23 @@ document.querySelector('#gate-catch').addEventListener('click', async (event) =>
       rule.className = 'gate-note';
       rule.textContent = copy.rule;
       beat.append(rule);
-      const receipt = document.createElement('span');
-      receipt.className = 'gate-receipt';
-      receipt.textContent = `gate log · ${review.reasons.join(' · ')}`;
-      beat.append(receipt);
+      if (review.reasons.length > 1) {
+        // Multi-defect catch: each independent reason as its own chip.
+        const chips = document.createElement('div');
+        chips.className = 'gate-chips';
+        review.reasons.forEach((reason) => {
+          const chip = document.createElement('span');
+          chip.className = 'gate-chip';
+          chip.textContent = reason;
+          chips.append(chip);
+        });
+        beat.append(chips);
+      } else {
+        const receipt = document.createElement('span');
+        receipt.className = 'gate-receipt';
+        receipt.textContent = `gate log · ${review.reasons.join(' · ')}`;
+        beat.append(receipt);
+      }
     });
 
     // Verdict — the win.
