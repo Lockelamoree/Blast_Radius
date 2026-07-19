@@ -24,7 +24,7 @@
   --pet-body:#4a9dff;--pet-hi:#aacdff;--pet-sh:#2f6fd0;   /* default palette: codex blue */
 }
 .pet-stage,.pet-bubble{pointer-events:none}   /* mascot + bubble never block */
-.pet-toggle,.pet-hud{pointer-events:auto}     /* only these capture clicks */
+.pet-toggle,.pet-move,.pet-hud{pointer-events:auto} /* only explicit controls capture clicks */
 
 /* ---- palettes (decoupled from shape; any shape wears any palette) ---- */
 #pet-panel[data-palette="codex"] {--pet-body:#4a9dff;--pet-hi:#aacdff;--pet-sh:#2f6fd0;--pet-out:#0a1526}
@@ -37,7 +37,7 @@
 
 /* ---- collapsible stats / builder HUD (opens above the mascot on click) ---- */
 .pet-hud{
-  position:fixed;right:16px;bottom:58px;
+  position:absolute;right:0;bottom:42px;
   width:min(252px,calc(100vw - 24px));display:none;flex-direction:column;gap:10px;
   background:color-mix(in srgb,var(--panel) 94%,transparent);
   border:1px solid color-mix(in srgb,var(--pet-accent) 36%,var(--line));border-radius:14px;padding:12px;
@@ -45,6 +45,8 @@
   max-height:calc(100dvh - 72px);overflow-y:auto;overscroll-behavior:contain;
 }
 #pet-panel[data-open="true"] .pet-hud{display:flex}
+#pet-panel[data-hud-x="right"] .pet-hud{right:auto;left:0}
+#pet-panel[data-hud-y="below"] .pet-hud{bottom:auto;top:100%}
 .pet-meta{display:flex;justify-content:space-between;gap:6px;font-size:10px;letter-spacing:.04em;color:var(--muted);text-transform:uppercase}
 #pet-meta-level{color:var(--pet-accent);font-weight:700}
 #pet-meta-name{color:var(--ink);font-weight:700;text-transform:none;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -85,6 +87,13 @@ progress.pet-xp::-moz-progress-bar{background:var(--pet-accent);border-radius:3p
   font-family:var(--mono);font-size:10px;padding:4px 6px;cursor:pointer;text-transform:uppercase;letter-spacing:.04em;
 }
 .pet-hide-btn:hover{border-color:var(--pet-accent);color:var(--pet-accent)}
+.pet-hud-actions{display:flex;flex-wrap:wrap;gap:6px}
+.pet-reset-btn{
+  background:transparent;border:1px solid var(--line);border-radius:6px;color:var(--muted);
+  font-family:var(--mono);font-size:10px;padding:4px 6px;cursor:pointer;text-transform:uppercase;letter-spacing:.04em;
+}
+.pet-reset-btn:hover{border-color:var(--pet-accent);color:var(--pet-accent)}
+.pet-reset-btn:focus-visible,.pet-hide-btn:focus-visible{outline:2px solid var(--pet-accent);outline-offset:1px}
 
 /* ---- speech bubble (coach line; click-through) ---- */
 .pet-bubble{
@@ -94,6 +103,7 @@ progress.pet-xp::-moz-progress-bar{background:var(--pet-accent);border-radius:3p
 }
 .pet-bubble:empty{display:none}
 #pet-bubble-text{display:block}
+#pet-panel[data-hud-x="right"] .pet-bubble{align-self:flex-start}
 
 /* ---- mascot ---- */
 .pet-stage{position:relative;display:flex;justify-content:flex-end;align-items:flex-end;height:126px;min-width:126px}
@@ -109,12 +119,21 @@ progress.pet-xp::-moz-progress-bar{background:var(--pet-accent);border-radius:3p
   box-shadow:0 6px 18px rgba(0,0,0,.4);
 }
 .pet-toggle:hover{box-shadow:0 0 14px color-mix(in srgb,var(--pet-accent) 55%,transparent)}
-.pet-toggle:focus-visible{outline:2px solid var(--pet-accent);outline-offset:2px}
+.pet-toggle:focus-visible,.pet-move:focus-visible{outline:2px solid var(--pet-accent);outline-offset:2px}
+.pet-move{
+  position:absolute;right:42px;bottom:0;width:34px;height:34px;
+  border:1px solid var(--line);border-radius:9px;background:var(--black);color:var(--muted);
+  font-family:var(--mono);font-size:15px;font-weight:700;cursor:grab;touch-action:none;
+  box-shadow:0 6px 18px rgba(0,0,0,.35);
+}
+.pet-move:hover{border-color:var(--pet-accent);color:var(--pet-accent)}
+.pet-move:active,#pet-panel[data-dragging="true"] .pet-move{cursor:grabbing}
 
 /* dismissed: hide everything except the summon puck */
 #pet-panel[data-dismissed="true"] .pet-stage,
 #pet-panel[data-dismissed="true"] .pet-bubble,
-#pet-panel[data-dismissed="true"] .pet-hud{display:none}
+#pet-panel[data-dismissed="true"] .pet-hud,
+#pet-panel[data-dismissed="true"] .pet-move{display:none}
 #pet-panel[data-dismissed="true"] .pet-toggle{border-radius:50%}
 
 /* ================= chibi sprite ================= */
@@ -220,6 +239,8 @@ progress.pet-xp::-moz-progress-bar{background:var(--pet-accent);border-radius:3p
 #pet-panel[data-face-style="visor"] .visor-eye{animation:pet-scan 1.8s ease-in-out infinite}
 #pet-panel[data-idle="look"] .pet-face{animation:pet-look 5.2s ease-in-out}
 #pet-panel[data-idle="look"] .pet-accessory{animation:pet-look-accessory 5.2s ease-in-out}
+#pet-panel[data-idle="blink"] .pet-face{animation:pet-blink 5.2s steps(1,end)}
+#pet-panel[data-idle="scan"] .pet-face{animation:pet-terminal-scan 5.2s ease-in-out}
 #pet-panel[data-idle="stretch"] .pet-arm-left{animation:pet-stretch-left 5.2s ease-in-out}
 #pet-panel[data-idle="stretch"] .pet-arm-right{animation:pet-stretch-right 5.2s ease-in-out}
 #pet-panel[data-state="waiting"] .pet-shell{animation:pet-attention 1.5s ease-in-out infinite}
@@ -240,6 +261,9 @@ progress.pet-xp::-moz-progress-bar{background:var(--pet-accent);border-radius:3p
 #pet-panel[data-state="done"] .pet-ov-check path{animation:pet-pop .4s ease-out}
 #pet-panel[data-mood="smug"] .pet-shell{animation:pet-breathe 4.8s ease-in-out infinite,pet-smug 2.4s ease-in-out}
 #pet-panel.pet-levelup .pet-svg{animation:pet-float 4.8s ease-in-out infinite,pet-sparkle .8s ease-out}
+#pet-panel[data-dragging="true"] .pet-stage{transform:rotate(-3deg) translateY(-2px)}
+#pet-panel[data-dragging="true"] .pet-shadow{animation:none;transform:scaleX(.78);opacity:.42}
+#pet-panel[data-settling="true"] .pet-stage{animation:pet-settle .42s cubic-bezier(.2,.8,.3,1)}
 
 @keyframes pet-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
 @keyframes pet-breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.018,.985)}}
@@ -249,6 +273,8 @@ progress.pet-xp::-moz-progress-bar{background:var(--pet-accent);border-radius:3p
 @keyframes pet-scan{0%,100%{transform:translateX(-9px)}50%{transform:translateX(9px)}}
 @keyframes pet-look{0%,18%,82%,100%{transform:translateX(0)}30%,62%{transform:translateX(2.4px)}70%{transform:translateX(-1.5px)}}
 @keyframes pet-look-accessory{0%,18%,82%,100%{transform:rotate(0)}30%,62%{transform:rotate(2deg)}70%{transform:rotate(-1.5deg)}}
+@keyframes pet-blink{0%,44%,49%,100%{transform:scaleY(1)}45%,48%{transform:scaleY(.12)}}
+@keyframes pet-terminal-scan{0%,24%,76%,100%{transform:translateX(0)}40%,58%{transform:translateX(3px)}}
 @keyframes pet-stretch-left{0%,16%,72%,100%{transform:rotate(0)}31%,52%{transform:rotate(24deg) translate(-2px,-2px)}}
 @keyframes pet-stretch-right{0%,16%,72%,100%{transform:rotate(0)}31%,52%{transform:rotate(-24deg) translate(2px,-2px)}}
 @keyframes pet-attention{0%,100%{transform:scale(1)}50%{transform:scale(1.025,.98)}}
@@ -268,23 +294,24 @@ progress.pet-xp::-moz-progress-bar{background:var(--pet-accent);border-radius:3p
 @keyframes pet-pop{0%{transform:scale(.4)}100%{transform:scale(1)}}
 @keyframes pet-smug{0%,100%{transform:rotate(0)}50%{transform:rotate(-4deg)}}
 @keyframes pet-sparkle{0%{filter:drop-shadow(0 0 0 var(--acid))}50%{filter:drop-shadow(0 0 9px var(--acid))}100%{filter:drop-shadow(0 0 0 var(--acid))}}
+@keyframes pet-settle{0%{transform:rotate(-3deg) translateY(-2px)}48%{transform:rotate(1.5deg) translateY(1px)}100%{transform:rotate(0) translateY(0)}}
 
 .pet-svg,.pet-ov-check path,.visor-eye{transform-box:view-box;transform-origin:center}
 
 @media (prefers-reduced-motion:reduce){
-  .pet-svg,.pet-part,.pet-shell,.pet-shadow,.pet-foot,.face-default line,.face-think .gld,.pet-ov-think .gld2,.p-screen,.pet-ov-check path,.visor-eye,#pet-panel.pet-levelup .pet-svg,#pet-panel[data-mood="smug"] .pet-shell{animation:none!important}
+  .pet-svg,.pet-stage,.pet-face,.pet-part,.pet-shell,.pet-shadow,.pet-foot,.face-default line,.face-think .gld,.pet-ov-think .gld2,.p-screen,.pet-ov-check path,.visor-eye,#pet-panel.pet-levelup .pet-svg,#pet-panel[data-mood="smug"] .pet-shell{animation:none!important;transition:none!important}
 }
 
 @media (max-width:520px){
   #pet-panel{bottom:10px;right:10px}
-  .pet-hud{right:10px;bottom:52px;width:min(232px,calc(100vw - 20px));max-height:calc(100dvh - 62px)}
+  .pet-hud{width:min(232px,calc(100vw - 24px));max-height:calc(100dvh - 62px)}
   .pet-stage{height:112px;min-width:112px}
   .pet-svg{width:104px}
   .pet-bubble{max-width:min(218px,68vw)}
 }
 
 @media (max-height:560px){
-  .pet-hud{bottom:10px;right:58px;max-height:calc(100dvh - 20px)}
+  .pet-hud{max-height:calc(100dvh - 24px)}
   .pet-stage{height:104px;min-width:104px}
   .pet-svg{width:98px}
 }

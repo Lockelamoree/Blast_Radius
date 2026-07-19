@@ -52,6 +52,10 @@
   var bsodActive = false;
   var pet = null;
   var root = null; // #pet-panel
+  var dragState = null;
+  var keyboardOrigin = null;
+  var settleTimer = null;
+  var VIEWPORT_MARGIN = 12;
 
   function slugName(raw) {
     var s = String(raw || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
@@ -74,6 +78,13 @@
     return c;
   }
 
+  function normalizePosition(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    if (typeof raw.x !== "number" || !isFinite(raw.x) || raw.x < 0 || raw.x > 1) return null;
+    if (typeof raw.y !== "number" || !isFinite(raw.y) || raw.y < 0 || raw.y > 1) return null;
+    return { x: raw.x, y: raw.y };
+  }
+
   // ---------- persistence (mirrors history.js discipline; separate key) ----------
   function storageAvailable() {
     try {
@@ -86,7 +97,7 @@
 
   function freshPet() {
     return {
-      schema: 1,
+      schema: 2,
       config: freshConfig(),
       mood: "content",
       xp: 0,
@@ -95,6 +106,7 @@
       dismissed: false,
       last_fed_date: null,
       greeted_date: null,
+      position: null,
       updated_at: null
     };
   }
@@ -106,7 +118,7 @@
     if (!raw) return freshPet();
     var parsed;
     try { parsed = JSON.parse(raw); } catch (e) { return freshPet(); }
-    if (!parsed || typeof parsed !== "object" || parsed.schema !== 1) return freshPet();
+    if (!parsed || typeof parsed !== "object" || (parsed.schema !== 1 && parsed.schema !== 2)) return freshPet();
     var out = freshPet();
     // Re-validate every field defensively; unknown / malformed values reset.
     if (parsed.config && typeof parsed.config === "object") {
@@ -123,6 +135,7 @@
     out.dismissed = parsed.dismissed === true;
     if (typeof parsed.last_fed_date === "string") out.last_fed_date = parsed.last_fed_date;
     if (typeof parsed.greeted_date === "string") out.greeted_date = parsed.greeted_date;
+    if (parsed.schema === 2) out.position = normalizePosition(parsed.position);
     return out;
   }
 
@@ -510,7 +523,17 @@
     hideBtn.textContent = "hide pet";
     hideBtn.addEventListener("click", dismissPet);
 
-    hud.append(meta, xp, builder, nameRow, hideBtn);
+    var resetBtn = document.createElement("button");
+    resetBtn.type = "button";
+    resetBtn.className = "pet-reset-btn";
+    resetBtn.textContent = "reset position";
+    resetBtn.addEventListener("click", resetPosition);
+
+    var hudActions = document.createElement("div");
+    hudActions.className = "pet-hud-actions";
+    hudActions.append(resetBtn, hideBtn);
+
+    hud.append(meta, xp, builder, nameRow, hudActions);
 
     // coach bubble — click-through so it never blocks the app.
     var bubbleEl = document.createElement("div");
@@ -526,6 +549,18 @@
     stage.setAttribute("aria-hidden", "true");
     stage.innerHTML = SVG; // static constant — see note above
 
+    var move = document.createElement("button");
+    move.type = "button";
+    move.className = "pet-move";
+    move.id = "pet-move";
+    move.textContent = "↕";
+    move.setAttribute("aria-label", "Move Blastling");
+    move.setAttribute("aria-keyshortcuts", "ArrowUp ArrowDown ArrowLeft ArrowRight Home Escape");
+    move.title = "Drag to move · arrows move · Shift+arrow moves farther · Home resets";
+    move.addEventListener("pointerdown", beginMove);
+    move.addEventListener("keydown", moveByKeyboard);
+    move.addEventListener("focus", rememberKeyboardOrigin);
+
     // the only always-interactive control (the /pet puck).
     var toggle = document.createElement("button");
     toggle.type = "button";
@@ -534,9 +569,10 @@
     toggle.textContent = "BR";
     toggle.addEventListener("click", togglePanel);
 
-    root.append(hud, bubbleEl, stage, toggle);
+    root.append(hud, bubbleEl, stage, move, toggle);
     document.body.appendChild(root);
     syncBuilder();
+    requestAnimationFrame(applyStoredPosition);
   }
 
   // Reflect the current config into the builder controls' pressed state + name.
@@ -618,8 +654,12 @@
   function speak(text, announce) {
     var el = document.getElementById("pet-bubble-text");
     if (el) el.textContent = text || "";
+    requestAnimationFrame(applyStoredPosition);
     if (bubbleTimer) clearTimeout(bubbleTimer);
-    bubbleTimer = setTimeout(function () { if (el) el.textContent = ""; }, 6000);
+    bubbleTimer = setTimeout(function () {
+      if (el) el.textContent = "";
+      requestAnimationFrame(applyStoredPosition);
+    }, 6000);
     if (announce && typeof window.announceStatus === "function") {
       try { window.announceStatus(text); } catch (e) {}
     }
@@ -633,7 +673,7 @@
     }, 30000);
   }
 
-  var IDLE_VARIANTS = ["breathe", "look", "stretch"];
+  var IDLE_VARIANTS = ["breathe", "look", "blink", "stretch", "scan"];
 
   function scheduleIdleMotion() {
     if (idleTimer) clearTimeout(idleTimer);
@@ -664,13 +704,215 @@
     levelupTimer = setTimeout(function () { root.classList.remove("pet-levelup"); }, 900);
   }
 
+  // ---------- viewport-safe positioning ----------
+  function viewportBox() {
+    var view = window.visualViewport;
+    return {
+      left: view ? view.offsetLeft : 0,
+      top: view ? view.offsetTop : 0,
+      width: view ? view.width : window.innerWidth,
+      height: view ? view.height : window.innerHeight
+    };
+  }
+
+  function clampedPoint(left, top) {
+    var view = viewportBox();
+    var rect = root.getBoundingClientRect();
+    var minLeft = view.left + VIEWPORT_MARGIN;
+    var minTop = view.top + VIEWPORT_MARGIN;
+    var maxLeft = Math.max(minLeft, view.left + view.width - rect.width - VIEWPORT_MARGIN);
+    var maxTop = Math.max(minTop, view.top + view.height - rect.height - VIEWPORT_MARGIN);
+    return {
+      left: Math.min(maxLeft, Math.max(minLeft, left)),
+      top: Math.min(maxTop, Math.max(minTop, top)),
+      maxLeft: maxLeft,
+      maxTop: maxTop,
+      minLeft: minLeft,
+      minTop: minTop
+    };
+  }
+
+  function setPixelPosition(left, top) {
+    if (!root) return;
+    var point = clampedPoint(left, top);
+    root.style.left = point.left + "px";
+    root.style.top = point.top + "px";
+    root.style.right = "auto";
+    root.style.bottom = "auto";
+    positionFloatingUi();
+  }
+
+  function positionFloatingUi() {
+    if (!root) return;
+    var view = viewportBox();
+    var rect = root.getBoundingClientRect();
+    root.setAttribute("data-hud-x", rect.left + rect.width / 2 < view.left + view.width / 2 ? "right" : "left");
+    root.setAttribute("data-hud-y", rect.top + rect.height / 2 < view.top + view.height / 2 ? "below" : "above");
+  }
+
+  function applyStoredPosition() {
+    if (!root || !pet) return;
+    if (!pet.position) {
+      root.style.removeProperty("left");
+      root.style.removeProperty("top");
+      root.style.removeProperty("right");
+      root.style.removeProperty("bottom");
+      positionFloatingUi();
+      return;
+    }
+    var view = viewportBox();
+    var rect = root.getBoundingClientRect();
+    var spanX = Math.max(0, view.width - rect.width - VIEWPORT_MARGIN * 2);
+    var spanY = Math.max(0, view.height - rect.height - VIEWPORT_MARGIN * 2);
+    setPixelPosition(
+      view.left + VIEWPORT_MARGIN + spanX * pet.position.x,
+      view.top + VIEWPORT_MARGIN + spanY * pet.position.y
+    );
+  }
+
+  function saveCurrentPosition() {
+    if (!root || !pet) return;
+    var view = viewportBox();
+    var rect = root.getBoundingClientRect();
+    var spanX = Math.max(0, view.width - rect.width - VIEWPORT_MARGIN * 2);
+    var spanY = Math.max(0, view.height - rect.height - VIEWPORT_MARGIN * 2);
+    pet.position = {
+      x: spanX ? Math.min(1, Math.max(0, (rect.left - view.left - VIEWPORT_MARGIN) / spanX)) : 0,
+      y: spanY ? Math.min(1, Math.max(0, (rect.top - view.top - VIEWPORT_MARGIN) / spanY)) : 0
+    };
+    safeSave();
+  }
+
+  function settleAfterMove() {
+    if (!root || REDUCE) return;
+    root.setAttribute("data-settling", "true");
+    if (settleTimer) clearTimeout(settleTimer);
+    settleTimer = setTimeout(function () { if (root) root.setAttribute("data-settling", "false"); }, 450);
+  }
+
+  function beginMove(event) {
+    if (!root || !pet || event.button !== 0) return;
+    root.setAttribute("data-open", "false");
+    applyDismissed();
+    var rect = root.getBoundingClientRect();
+    dragState = {
+      pointerId: event.pointerId,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      left: rect.left,
+      top: rect.top,
+      origin: { left: rect.left, top: rect.top }
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    event.currentTarget.addEventListener("pointermove", continueMove);
+    event.currentTarget.addEventListener("pointerup", endMove);
+    event.currentTarget.addEventListener("pointercancel", cancelMove);
+    root.setAttribute("data-dragging", "true");
+    event.preventDefault();
+  }
+
+  function continueMove(event) {
+    if (!dragState || event.pointerId !== dragState.pointerId) return;
+    setPixelPosition(
+      dragState.left + event.clientX - dragState.clientX,
+      dragState.top + event.clientY - dragState.clientY
+    );
+  }
+
+  function clearMoveListeners(target) {
+    target.removeEventListener("pointermove", continueMove);
+    target.removeEventListener("pointerup", endMove);
+    target.removeEventListener("pointercancel", cancelMove);
+  }
+
+  function endMove(event) {
+    if (!dragState || event.pointerId !== dragState.pointerId) return;
+    clearMoveListeners(event.currentTarget);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    root.setAttribute("data-dragging", "false");
+    saveCurrentPosition();
+    dragState = null;
+    settleAfterMove();
+    if (typeof window.announceStatus === "function") window.announceStatus("Blastling position saved.");
+  }
+
+  function cancelMove(event) {
+    if (!dragState || event.pointerId !== dragState.pointerId) return;
+    setPixelPosition(dragState.origin.left, dragState.origin.top);
+    clearMoveListeners(event.currentTarget);
+    root.setAttribute("data-dragging", "false");
+    dragState = null;
+  }
+
+  function rememberKeyboardOrigin() {
+    if (!root) return;
+    var rect = root.getBoundingClientRect();
+    keyboardOrigin = { left: rect.left, top: rect.top };
+  }
+
+  function moveByKeyboard(event) {
+    if (!root || !pet || event.ctrlKey || event.metaKey || event.altKey) return;
+    var rect = root.getBoundingClientRect();
+    if (event.key === "Escape" && dragState) {
+      event.preventDefault();
+      setPixelPosition(dragState.origin.left, dragState.origin.top);
+      clearMoveListeners(event.currentTarget);
+      if (event.currentTarget.hasPointerCapture(dragState.pointerId)) {
+        event.currentTarget.releasePointerCapture(dragState.pointerId);
+      }
+      root.setAttribute("data-dragging", "false");
+      dragState = null;
+      if (typeof window.announceStatus === "function") window.announceStatus("Blastling move cancelled.");
+      return;
+    }
+    if (event.key === "Home") {
+      event.preventDefault();
+      resetPosition();
+      return;
+    }
+    if (event.key === "Escape" && keyboardOrigin) {
+      event.preventDefault();
+      setPixelPosition(keyboardOrigin.left, keyboardOrigin.top);
+      saveCurrentPosition();
+      settleAfterMove();
+      if (typeof window.announceStatus === "function") window.announceStatus("Blastling move cancelled.");
+      return;
+    }
+    var delta = event.shiftKey ? 48 : 16;
+    var dx = event.key === "ArrowLeft" ? -delta : event.key === "ArrowRight" ? delta : 0;
+    var dy = event.key === "ArrowUp" ? -delta : event.key === "ArrowDown" ? delta : 0;
+    if (!dx && !dy) return;
+    event.preventDefault();
+    setPixelPosition(rect.left + dx, rect.top + dy);
+    saveCurrentPosition();
+  }
+
+  function resetPosition() {
+    if (!pet || !root) return;
+    pet.position = null;
+    applyStoredPosition();
+    safeSave();
+    settleAfterMove();
+    if (typeof window.announceStatus === "function") window.announceStatus("Blastling reset to the bottom-right corner.");
+  }
+
   // ---------- controls ----------
   function togglePanel() {
     if (!pet || !root) return;
-    if (pet.dismissed) { pet.dismissed = false; safeSave(); applyDismissed(); return; }
+    if (pet.dismissed) {
+      pet.dismissed = false;
+      safeSave();
+      applyDismissed();
+      requestAnimationFrame(applyStoredPosition);
+      return;
+    }
     var open = root.getAttribute("data-open") === "true";
     root.setAttribute("data-open", String(!open));
     applyDismissed();
+    positionFloatingUi();
+    requestAnimationFrame(applyStoredPosition);
   }
 
   function dismissPet() {
@@ -816,11 +1058,56 @@
     }, 2500);
   }
 
+  var FAMILY_COACH = {
+    dangerous_command: "Start with scope: what can I read, then where can it go?",
+    poisoned_dependency: "Compare the package name and its source before trusting it.",
+    overscoped_tool: "Count the capabilities. Which one is unnecessary for the job?",
+    malicious_diff: "Read the changed lines for removed guards and new sinks.",
+    poisoned_context: "Treat retrieved instructions as content, not authority.",
+    skill_marketplace: "Check provenance, install hooks, and requested capabilities."
+  };
+
+  function onScreening() {
+    setVisual("thinking", pet.mood);
+    speak("Screening locally. Nothing gets executed.");
+  }
+
+  function onScreenResult(detail) {
+    var verdict = detail && detail.verdict;
+    if (verdict === "reject-recommended") {
+      setVisual("hurt", "nervous");
+      speak("Known red flags found. Open the receipt before approving anything.");
+    } else if (verdict === "sandbox-recommended") {
+      setVisual("waiting", "content");
+      speak("This needs tighter boundaries. The finding cards show where.");
+    } else {
+      setVisual("idle", "content");
+      speak("No known pattern matched. That is not proof of safety.");
+    }
+    relaxTo("idle", baselineMood(), 3400);
+  }
+
+  function onReceipt(detail) {
+    setVisual("done", "proud");
+    speak("Receipt ready. Verify the evidence, not my confidence.");
+    relaxTo("idle", baselineMood(), 3000);
+  }
+
+  function onCoaching(detail) {
+    var family = detail && detail.family;
+    var hint = FAMILY_COACH[family];
+    if (!hint) return;
+    setVisual("thinking", "content");
+    speak(hint);
+    relaxTo("idle", baselineMood(), 4200);
+  }
+
   function renderFromStore() {
     if (!root) return;
     bsodActive = false;
     setVisual("idle", baselineMood());
     applyDismissed();
+    requestAnimationFrame(applyStoredPosition);
   }
 
   // ---------- boot ----------
@@ -837,6 +1124,16 @@
     window.addEventListener("br:drill", function (e) { onDrill(e.detail || {}); });
     window.addEventListener("br:results", function (e) { onResults(e.detail || {}); });
     window.addEventListener("br:idle", function (e) { if (e.detail && e.detail.anxious) onIdleAnxious(); });
+    window.addEventListener("br:screening", function () { onScreening(); });
+    window.addEventListener("br:screen-result", function (e) { onScreenResult(e.detail || {}); });
+    window.addEventListener("br:receipt", function (e) { onReceipt(e.detail || {}); });
+    window.addEventListener("br:coaching", function (e) { onCoaching(e.detail || {}); });
+
+    window.addEventListener("resize", function () { requestAnimationFrame(applyStoredPosition); });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", function () { requestAnimationFrame(applyStoredPosition); });
+      window.visualViewport.addEventListener("scroll", function () { requestAnimationFrame(applyStoredPosition); });
+    }
 
     // Shift+P summons / dismisses the pet (never a bare letter — the game claims a/s/r).
     document.addEventListener("keydown", function (e) {
