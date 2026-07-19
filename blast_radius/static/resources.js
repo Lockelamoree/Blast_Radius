@@ -2,6 +2,11 @@
 // served from /api/learn and /api/toolkit. Reuses the globals defined in app.js
 // (api, show, announce, escapeFamily) — classic scripts share one global scope.
 const resourceLoaded = { learn: false, protect: false };
+const RESOURCE_FAMILIES = new Set([
+  'dangerous_command', 'poisoned_dependency', 'overscoped_tool',
+  'malicious_diff', 'poisoned_context', 'skill_marketplace',
+]);
+let pendingLearnFamily = null;
 
 function resourceLink(source) {
   const isUrl = /^https?:\/\//i.test(source.url || '');
@@ -39,6 +44,11 @@ function renderLearn(modules) {
   modules.forEach((module) => {
     const card = document.createElement('article');
     card.className = 'resource-card';
+    card.dataset.family = module.family;
+    if (module.family === pendingLearnFamily) {
+      card.classList.add('resource-card-target');
+      card.tabIndex = -1;
+    }
 
     const tag = document.createElement('span');
     tag.className = 'resource-tag';
@@ -76,6 +86,8 @@ function renderLearn(modules) {
     grid.append(card);
   });
   grid.setAttribute('aria-busy', 'false');
+  const target = grid.querySelector('.resource-card-target');
+  if (target) requestAnimationFrame(() => target.focus({ preventScroll: false }));
 }
 
 function renderSnippet(snippet) {
@@ -190,3 +202,43 @@ async function openResource(target) {
 [...document.querySelectorAll('[data-open]')].forEach((button) => {
   button.addEventListener('click', () => openResource(button.dataset.open));
 });
+
+[...document.querySelectorAll('[data-copy-integration]')].forEach((button) => {
+  button.addEventListener('click', () => {
+    const code = button.closest('article').querySelector('code').textContent;
+    navigator.clipboard.writeText(code).then(() => {
+      window.announceStatus(`${button.textContent} copied.`);
+    }).catch(() => {
+      window.announceStatus('Copy is unavailable in this browser.');
+    });
+  });
+});
+
+function applyResourceDeepLink() {
+  const params = new URLSearchParams(window.location.search);
+  const view = params.get('view');
+  const family = params.get('family');
+  if (view !== 'learn' || !RESOURCE_FAMILIES.has(family)) return;
+  pendingLearnFamily = family;
+  show('learn');
+  const grid = document.querySelector('#learn-modules');
+  grid.setAttribute('aria-busy', 'false');
+  grid.replaceChildren();
+  const prompt = document.createElement('div');
+  prompt.className = 'resource-deep-link';
+  const copy = document.createElement('p');
+  copy.textContent = `Ready to open the ${escapeFamily(family)} field guide.`;
+  const load = document.createElement('button');
+  load.type = 'button';
+  load.className = 'button primary';
+  load.textContent = 'Open field guide';
+  load.addEventListener('click', async () => {
+    load.disabled = true;
+    await ensureResource('learn');
+  });
+  prompt.append(copy, load);
+  grid.append(prompt);
+  window.announceStatus('Learning link ready. Open the field guide to load the cited module.');
+}
+
+applyResourceDeepLink();

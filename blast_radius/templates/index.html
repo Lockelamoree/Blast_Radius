@@ -15,9 +15,9 @@
   <meta name="theme-color" content="#090a09">
   <title>Blast Radius — Size the risk before you approve</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%23090a09'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-family='monospace' font-size='26' font-weight='700' fill='%23c8ff3d'%3EBR%3C/text%3E%3C/svg%3E">
-  <link rel="stylesheet" href="/static/styles.css?v=20260719-2">
-  <link rel="stylesheet" href="/static/improvements.css?v=20260719-2">
-  <link rel="stylesheet" href="/static/pet.css?v=20260719-2">
+  <link rel="stylesheet" href="/static/styles.css?v=20260719-3">
+  <link rel="stylesheet" href="/static/improvements.css?v=20260719-3">
+  <link rel="stylesheet" href="/static/pet.css?v=20260719-3">
 </head>
 <body>
   <p id="app-status" class="sr-only" aria-live="polite" aria-atomic="true"></p>
@@ -46,50 +46,59 @@
           <div><strong>100%</strong><span>receipt-backed</span></div>
         </div>
         <div class="hero-actions">
-          <button class="button primary" data-start="demo">Start verified run <span>→</span></button>
+          <button class="button primary" id="start-drill" type="button">Try one verified incident <span>· 60 sec →</span></button>
           <div class="secondary-actions" aria-label="More ways to play">
             <span class="secondary-actions-label">More ways to play</span>
+            <button class="button ghost" data-start="demo">Measure my approval reflex <span>→</span></button>
             <button class="button ghost" data-start="live" disabled>Try live variation <span class="badge-new">GPT-5.6</span></button>
-            <button class="button ghost" id="start-drill" type="button">90-second daily drill <span>→</span></button>
           </div>
-        </div>
-        <p class="handle-row"><label class="handle-label" for="operator-handle">NICKNAME · OPTIONAL</label><input id="operator-handle" maxlength="40" autocomplete="off" spellcheck="false" placeholder="e.g. max-g"><span class="microcopy handle-note">Saved to your profile and shown on the leaderboard. No email, no account — leave blank to stay anonymous.</span></p>
-        <div id="profile-strip" class="profile-strip hidden" aria-label="Your persistent profile">
-          <div class="profile-facts">
-            <div><span>OPERATOR</span><strong id="profile-nickname">anonymous</strong></div>
-            <div><span>SCORE</span><strong id="profile-score">0</strong></div>
-            <div><span>LEVEL</span><strong id="profile-level">1</strong></div>
-            <div><span>RANK</span><strong id="profile-rank">—</strong></div>
-          </div>
-          <div class="profile-actions">
-            <button id="profile-token" class="linklike" type="button">copy my token</button>
-            <button id="profile-adopt" class="linklike" type="button">restore on another device</button>
-          </div>
-          <input id="profile-adopt-input" class="profile-adopt-input hidden" maxlength="512" autocomplete="off" spellcheck="false" placeholder="paste your token, press Enter">
-          <p class="microcopy profile-note">Your progress is saved to this browser. Copy the token to keep it — or restore it anywhere.</p>
         </div>
         <p id="live-note" class="microcopy">Live mode falls back to verified scenarios if generation is unavailable.</p>
-        <div id="history-panel" class="history-panel hidden" aria-label="Your local progress">
-          <div class="history-facts">
-            <div><span>STREAK</span><strong id="history-streak">—</strong></div>
-            <div><span>LAST DELTA</span><strong id="history-last-delta">—</strong></div>
-            <div><span>WEAKEST</span><strong id="history-weakest">—</strong></div>
+        <details class="progress-disclosure">
+          <summary>Progress &amp; leaderboard</summary>
+          <div class="progress-disclosure-body">
+            <p class="handle-row"><label class="handle-label" for="operator-handle">NICKNAME · OPTIONAL</label><input id="operator-handle" maxlength="40" autocomplete="off" spellcheck="false" placeholder="e.g. max-g"><span class="microcopy handle-note">Saved to your profile and shown on the leaderboard. No email, no account — leave blank to stay anonymous.</span></p>
+            <div id="profile-strip" class="profile-strip hidden" aria-label="Your persistent profile">
+              <div class="profile-facts">
+                <div><span>OPERATOR</span><strong id="profile-nickname">anonymous</strong></div>
+                <div><span>SCORE</span><strong id="profile-score">0</strong></div>
+                <div><span>LEVEL</span><strong id="profile-level">1</strong></div>
+                <div><span>RANK</span><strong id="profile-rank">—</strong></div>
+              </div>
+              <div class="profile-actions">
+                <button id="profile-token" class="linklike" type="button">copy my token</button>
+                <button id="profile-adopt" class="linklike" type="button">restore on another device</button>
+              </div>
+              <input id="profile-adopt-input" class="profile-adopt-input hidden" maxlength="512" autocomplete="off" spellcheck="false" placeholder="paste your token, press Enter">
+              <p class="microcopy profile-note">Your progress is saved to this browser. Copy the token to keep it — or restore it anywhere.</p>
+            </div>
+            <div id="history-panel" class="history-panel hidden" aria-label="Your local progress">
+              <div class="history-facts">
+                <div><span>STREAK</span><strong id="history-streak">—</strong></div>
+                <div><span>LAST DELTA</span><strong id="history-last-delta">—</strong></div>
+                <div><span>WEAKEST</span><strong id="history-weakest">—</strong></div>
+              </div>
+              <button id="callback-start" class="button ghost hidden" type="button"></button>
+              <button id="history-clear" class="linklike" type="button">stored only in this browser — clear</button>
+            </div>
+            <section id="leaderboard-panel" class="leaderboard-panel hidden" aria-label="Public leaderboard">
+              <p class="leaderboard-label">LEADERBOARD · TOP OPERATORS</p>
+              <ol id="leaderboard-rows" class="leaderboard-rows"></ol>
+            </section>
           </div>
-          <button id="callback-start" class="button ghost hidden" type="button"></button>
-          <button id="history-clear" class="linklike" type="button">stored only in this browser — clear</button>
-        </div>
-        <section id="leaderboard-panel" class="leaderboard-panel hidden" aria-label="Public leaderboard">
-          <p class="leaderboard-label">LEADERBOARD · TOP OPERATORS</p>
-          <ol id="leaderboard-rows" class="leaderboard-rows"></ol>
-        </section>
+        </details>
         <p class="integrity-teaser">Don't just trust us — <button type="button" class="linklike" data-open="integrity">watch the deterministic gate catch a planted fake →</button></p>
-        <nav class="resource-nav" aria-label="Learn and protect">
+        <nav class="resource-nav" aria-label="Learn, screen, and integrate">
           <button type="button" class="resource-link" data-open="learn">
-            <span class="resource-link-title">Learn the six threats <span aria-hidden="true">→</span></span>
+            <span class="resource-link-title">Learn <span aria-hidden="true">→</span></span>
             <span class="resource-link-note">Field guide to every family, with cited sources.</span>
           </button>
+          <a class="resource-link" href="/screen">
+            <span class="resource-link-title">Screen <span aria-hidden="true">→</span></span>
+            <span class="resource-link-note">Check a command, diff, or policy with no model.</span>
+          </a>
           <button type="button" class="resource-link" data-open="protect">
-            <span class="resource-link-title">Protect your setup <span aria-hidden="true">→</span></span>
+            <span class="resource-link-title">Integrate <span aria-hidden="true">→</span></span>
             <span class="resource-link-note">Copy-paste defenses and vetted tools.</span>
           </button>
         </nav>
@@ -166,7 +175,8 @@
         <p id="verdict-provenance" class="verdict-provenance hidden"></p>
         <div id="verdict-seal" class="verdict-seal">CORRECT</div>
         <h2 id="verdict-heading">You contained the blast radius.</h2>
-        <p id="verdict-explanation" class="lede"></p>
+        <p id="verdict-action-line" class="verdict-action-line"></p>
+        <p id="verdict-explanation" class="lede hidden"></p>
         <div class="score-row"><div><strong id="reason-score">0</strong><span>tell coverage</span></div><div><strong id="action-score">✓</strong><span>action</span></div><div><strong id="sandbox-score">—</strong><span>sandbox</span></div></div>
         <p id="sandbox-note" class="microcopy sandbox-note hidden"></p>
         <div id="verdict-debrief" class="verdict-debrief hidden">
@@ -184,11 +194,24 @@
           <summary>Compare your sandbox</summary>
           <table><thead><tr><th>Dimension</th><th>Yours</th><th>Safe</th><th>Status</th></tr></thead><tbody id="policy-rows"></tbody></table>
         </details>
+        <div id="safer-alternative" class="safer-alternative hidden">
+          <p class="panel-label">SAFER ALTERNATIVE</p>
+          <p>Verified action: <strong id="safer-action">—</strong></p>
+          <pre id="safer-policy" class="hidden"></pre>
+        </div>
       </div>
       <div class="receipt-column">
-        <h3>Evidence receipts</h3>
-        <div id="receipts"></div>
+        <h3 id="receipt-heading" class="hidden">Evidence receipts</h3>
+        <div id="receipts" class="hidden"></div>
         <div class="socratic"><span>FOLLOW-UP</span><p id="socratic-question"></p></div>
+        <div id="second-hint" class="second-hint hidden">
+          <p class="panel-label">EVIDENCE POINTER</p>
+          <p id="second-hint-text"></p>
+        </div>
+        <div id="debrief-actions" class="debrief-actions hidden">
+          <button id="show-hint" class="button ghost" type="button">Need a stronger clue?</button>
+          <button id="reveal-debrief" class="button ghost" type="button">Reveal full debrief</button>
+        </div>
         <div id="reflect-block" class="reflect hidden">
           <label for="reflect-input" class="panel-label">ASK THE COACH · ONE REFLECTION</label>
           <textarea id="reflect-input" maxlength="500" placeholder="Ask one question about this round…"></textarea>
@@ -205,6 +228,17 @@
             <div class="revise-col"><span class="panel-label">COACHED</span><strong id="revise-coached">—</strong><small id="revise-coached-tells">—</small></div>
           </div>
         </div>
+        <details id="verification-receipt" class="verification-receipt hidden">
+          <summary>How this verdict was verified</summary>
+          <dl>
+            <div><dt>Correct action</dt><dd id="verification-action">—</dd></div>
+            <div><dt>Scenario gate</dt><dd id="verification-gate">—</dd></div>
+            <div><dt>Public fingerprint</dt><dd><code id="verification-fingerprint">—</code></dd></div>
+            <div><dt>Deterministic tells</dt><dd id="verification-tells">—</dd></div>
+            <div><dt>GPT role</dt><dd id="verification-critic">—</dd></div>
+          </dl>
+          <button id="download-grade" class="button ghost" type="button">Download grade receipt</button>
+        </details>
         <button id="next-round" class="button primary">Next request <span>→</span></button>
         <p class="microcopy key-hint"><kbd>↵</kbd> Enter continues</p>
       </div>
@@ -242,8 +276,16 @@
           </div>
           <p id="bias-summary" class="microcopy">—</p>
         </div>
+        <div class="learning-impact" aria-label="Measured learning details">
+          <div><span>STRONGEST GAIN</span><strong id="result-strongest-gain">—</strong><small id="result-strongest-label">No positive gain measured yet</small></div>
+          <div><span>REMAINING WEAKNESS</span><strong id="result-weakness">—</strong><small>lowest combined assessment and round accuracy</small></div>
+          <div><span>ELAPSED TIME</span><strong id="result-elapsed">—</strong><small>wall-clock session time</small></div>
+          <div><span>NEXT DRILL</span><strong id="result-next-drill">—</strong><small>one verified incident</small></div>
+        </div>
         <div class="delta-block secondary-stat"><span>COMPETENCY DELTA</span><strong id="result-delta">—</strong><small id="result-tests">—</small><small class="delta-caveat">5-question calibration · read as directional, not precise</small></div>
         <button id="share-result" class="button primary">Copy result</button>
+        <button id="practice-weakest" class="button ghost" type="button">Practice my weakest area</button>
+        <button id="download-learning" class="button ghost" type="button">Download learning receipt</button>
         <button id="restart" class="button ghost">Run it again — fresh deck →</button>
         <div class="guardrail-export">
           <p class="panel-label">EXPORT YOUR GUARDRAILS</p>
@@ -277,10 +319,17 @@
 
     <section id="screen-protect" class="screen resource-screen">
       <div class="section-heading">
-        <div><p class="kicker">TOOLKIT / DEFEND YOUR AGENT</p><h2>Protect yourself<br>in a few steps.</h2></div>
+        <div><p class="kicker">INTEGRATE / DEFEND YOUR AGENT</p><h2>Put the gate<br>in the approval loop.</h2></div>
         <button type="button" class="button ghost" data-open="landing">← Back</button>
       </div>
       <p class="resource-intro">Concrete, copy-pasteable defenses for each threat family, plus the vetted open tools that automate them. Nothing here is executed for you — review before you run it.</p>
+      <div class="integration-grid" aria-label="Blast Radius integration setup">
+        <article><h3>CLI</h3><p>Screen a command locally.</p><pre><code>blastradius check --kind command --content "pytest -q"</code></pre><button type="button" class="linklike" data-copy-integration>copy CLI command</button></article>
+        <article><h3>MCP</h3><p>Expose the read-only screen to an MCP-aware agent.</p><pre><code>{ "mcpServers": { "blast-radius": { "command": "blastradius-mcp" } } }</code></pre><button type="button" class="linklike" data-copy-integration>copy MCP config</button></article>
+        <article><h3>GitHub Action</h3><p>Start advisory, then tighten the threshold.</p><pre><code>- uses: Lockelamoree/Blast_Radius@v1&#10;  with:&#10;    diff-base: $&#123;&#123; github.event.pull_request.base.sha &#125;&#125;&#10;    fail-on: never</code></pre><button type="button" class="linklike" data-copy-integration>copy Action step</button></article>
+        <article><h3>Codex hook</h3><p>Supervise proposed shell commands before execution.</p><pre><code>blastradius-supervise&#10;# set BLAST_RADIUS_FAIL_ON=reject</code></pre><button type="button" class="linklike" data-copy-integration>copy hook setup</button></article>
+        <article><h3>Team policy</h3><p>Add org-specific coverage without suppressing critical rules.</p><pre><code>[[rules]]&#10;id = "internal-vault"&#10;severity = "critical"&#10;patterns = ['/etc/acme/secrets/']</code></pre><button type="button" class="linklike" data-copy-integration>copy policy example</button></article>
+      </div>
       <div id="toolkit-cards" class="resource-grid" aria-busy="true">Loading the toolkit…</div>
       <div class="resource-footer"><button type="button" class="button primary" data-open="learn">Back to the field guide <span>→</span></button></div>
     </section>
@@ -312,11 +361,11 @@
     </section>
   </main>
   <footer><span>BLAST RADIUS / BUILD WEEK 2026</span><span id="footer-rev" class="footer-rev"></span><span>Nothing shown here is executed.</span></footer>
-  <script src="/static/app.js?v=20260719-2" defer></script>
-  <script src="/static/integrity-check.js?v=20260719-2" defer></script>
-  <script src="/static/guardrails.js?v=20260719-2" defer></script>
-  <script src="/static/resources.js?v=20260719-2" defer></script>
-  <script src="/static/history.js?v=20260719-2" defer></script>
-  <script src="/static/pet.js?v=20260719-2" defer></script>
+  <script src="/static/app.js?v=20260719-3" defer></script>
+  <script src="/static/integrity-check.js?v=20260719-3" defer></script>
+  <script src="/static/guardrails.js?v=20260719-3" defer></script>
+  <script src="/static/resources.js?v=20260719-3" defer></script>
+  <script src="/static/history.js?v=20260719-3" defer></script>
+  <script src="/static/pet.js?v=20260719-3" defer></script>
 </body>
 </html>
