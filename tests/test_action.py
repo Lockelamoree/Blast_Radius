@@ -1,13 +1,9 @@
 import os
 import re
-import shutil
 import sys
 from pathlib import Path
 
-import pytest
-
 ROOT = Path(__file__).resolve().parents[1]
-BASH = shutil.which("bash")
 
 
 def test_action_yml_is_a_composite_action() -> None:
@@ -104,53 +100,5 @@ def test_ci_runs_the_action_script_syntax_check_and_cli_smoke() -> None:
     assert "uses: ./" in ci
     assert "fetch-depth: 0" in ci
     assert "persist-credentials: false" in ci
-
-
-@pytest.mark.skipif(BASH is None, reason="requires bash")
-def test_action_fails_when_configured_scenario_glob_matches_nothing(tmp_path) -> None:
-    import subprocess
-
-    summary = tmp_path / "summary.md"
-    result = subprocess.run(
-        [BASH, str(ROOT / "scripts" / "action_verify.sh")],
-        cwd=ROOT,
-        env={
-            **os.environ,
-            "GITHUB_ACTION_PATH": str(ROOT),
-            "GITHUB_STEP_SUMMARY": str(summary),
-            "BR_SCENARIOS": "definitely-missing-scenarios/*.json",
-            "BR_DIFF_BASE": "",
-            "BR_FAIL_ON": "never",
-        },
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    assert result.returncode == 1
-    assert "No scenario files matched" in result.stdout
-    assert "No files matched" in summary.read_text(encoding="utf-8")
-
-
-@pytest.mark.skipif(BASH is None, reason="requires bash")
-def test_action_fails_when_diff_base_is_not_available(tmp_path) -> None:
-    import subprocess
-
-    summary = tmp_path / "summary.md"
-    result = subprocess.run(
-        [BASH, str(ROOT / "scripts" / "action_verify.sh")],
-        cwd=ROOT,
-        env={
-            **os.environ,
-            "GITHUB_ACTION_PATH": str(ROOT),
-            "GITHUB_STEP_SUMMARY": str(summary),
-            "BR_SCENARIOS": "",
-            "BR_DIFF_BASE": "refs/heads/definitely-missing",
-            "BR_FAIL_ON": "never",
-        },
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    assert result.returncode == 1
-    assert "Diff base is not available" in result.stdout
-    assert "fetch-depth: 0" in summary.read_text(encoding="utf-8")
+    assert "Assert unmatched scenario globs fail closed" in ci
+    assert "Assert unavailable diff bases fail closed" in ci

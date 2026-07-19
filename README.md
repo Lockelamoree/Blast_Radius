@@ -1,7 +1,7 @@
 # Blast Radius
 
 **Blast Radius is a browser game for practicing safe approval decisions around AI coding
-agents, backed by 20 receipt-linked scenarios and 434 automated tests.** Inspect a proposed
+agents, backed by 20 receipt-linked scenarios and 432 automated tests.** Inspect a proposed
 command, dependency, tool manifest, diff, retrieved instruction, or marketplace skill; choose
 **approve**, **sandbox**, or **reject**; then name the evidence tell. The verdict scores the
 action, tell coverage, and—when applicable—the exact sandbox policy, with direct evidence for
@@ -274,8 +274,8 @@ specific file with `blastradius check --rules path/to/rules.toml`, or ignore rul
 .\.venv\Scripts\python -m build --wheel
 ```
 
-Current baseline: **434 tests collected** on 2026-07-19. The local Windows run skips the two
-Bash-runtime Action checks; the Ubuntu Action smoke job exercises them in CI.
+Current baseline: **432 automated tests** on 2026-07-19, plus native Ubuntu checks that exercise
+the composite Action and its fail-closed shell paths.
 
 Before submission, verify every verdict receipt points directly to a healthy source:
 
@@ -495,7 +495,7 @@ verify it against immutable truth, then expose direct evidence. Concrete contrib
   than maintaining a second checker.
 - Adversarial regression tests for truth drift, prompt injection, unsafe sandbox scope,
   duplicate session mutation, model failure, receipt safety, and deterministic artifact screening.
-- CI that runs Ruff, the 434-test suite, the 20-scenario verifier, wheel construction, and
+- CI that runs Ruff, the 432-test suite, the 20-scenario verifier, wheel construction, and
   packaged-resource checks on supported Python versions.
 
 The visible merge at `494a258` reconciles parallel Codex workstreams after the integrity-tab

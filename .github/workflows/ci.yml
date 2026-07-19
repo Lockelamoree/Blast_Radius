@@ -88,3 +88,26 @@ jobs:
           test -n "$VERDICT"
           [[ "$CRITICAL" =~ ^[0-9]+$ ]]
           [[ "$CAUTION" =~ ^[0-9]+$ ]]
+      - name: Assert unmatched scenario globs fail closed
+        shell: bash
+        run: |
+          summary="$RUNNER_TEMP/no-match-summary.md"
+          if BR_SCENARIOS="definitely-missing-scenarios/*.json" \
+             BR_DIFF_BASE="" BR_FAIL_ON="never" \
+             GITHUB_ACTION_PATH="$GITHUB_WORKSPACE" GITHUB_STEP_SUMMARY="$summary" \
+             bash scripts/action_verify.sh; then
+            echo "Expected an unmatched scenario glob to fail"
+            exit 1
+          fi
+          grep -F "No files matched" "$summary"
+      - name: Assert unavailable diff bases fail closed
+        shell: bash
+        run: |
+          summary="$RUNNER_TEMP/missing-base-summary.md"
+          if BR_SCENARIOS="" BR_DIFF_BASE="refs/heads/definitely-missing" \
+             BR_FAIL_ON="never" GITHUB_ACTION_PATH="$GITHUB_WORKSPACE" \
+             GITHUB_STEP_SUMMARY="$summary" bash scripts/action_verify.sh; then
+            echo "Expected an unavailable diff base to fail"
+            exit 1
+          fi
+          grep -F "fetch-depth: 0" "$summary"
