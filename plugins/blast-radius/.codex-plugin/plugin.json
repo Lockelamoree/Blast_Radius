@@ -1,0 +1,30 @@
+{
+  "name": "blast-radius",
+  "version": "0.1.0",
+  "description": "Deterministically screen agent commands, diffs, and sandbox policies before execution.",
+  "author": {
+    "name": "Lockelamoree",
+    "url": "https://github.com/Lockelamoree"
+  },
+  "homepage": "https://github.com/Lockelamoree/Blast_Radius#readme",
+  "repository": "https://github.com/Lockelamoree/Blast_Radius",
+  "license": "MIT",
+  "keywords": ["agent-security", "developer-tools", "guardrail", "mcp", "sandbox"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Blast Radius",
+    "shortDescription": "Screen risky agent actions before they run.",
+    "longDescription": "Adds Blast Radius's offline, deterministic inspector to Codex. Screen commands, unified diffs, and sandbox policies; inspect reproducible receipts; and verify scenario drafts without sending artifacts to a model.",
+    "developerName": "Lockelamoree",
+    "category": "Developer Tools",
+    "capabilities": ["Read", "Security", "Interactive"],
+    "websiteURL": "https://github.com/Lockelamoree/Blast_Radius",
+    "defaultPrompt": [
+      "Screen this command with Blast Radius.",
+      "Review my diff for agent-security risks.",
+      "Check whether this sandbox policy is over-scoped."
+    ],
+    "brandColor": "#FF5A36"
+  },
+  "mcpServers": "./.mcp.json"
+}

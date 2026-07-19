@@ -112,6 +112,7 @@ git diff main...HEAD | blastradius check --kind diff -
 blastradius check --config sandbox.json --expected safe.json
 blastradius verify scenarios/*.json      # exit 0/1, like the CI verifier
 blastradius audit                        # review what the screen has flagged over time
+blastradius fuzz-inspector --seed 7      # seeded advisory mutation check
 ```
 
 `blastradius check` exits non-zero at or above `--fail-on` (default `reject`), so it drops into a
@@ -150,12 +151,18 @@ pip install "blast-radius[mcp]"
 
 Tools: `check_artifact`, `verify_scenario`, `get_learn_module`, `get_toolkit_card`.
 
-**Supervisor hook (Codex CLI / Claude Code)** — turn the game into a guardrail. A `PreToolUse`
+**Codex plugin** — this repository publishes a repo-local Plugins Directory at
+[`/.agents/plugins/marketplace.json`](.agents/plugins/marketplace.json). The
+[`blast-radius`](plugins/blast-radius/README.md) plugin bundles the screening skill and MCP
+registration. Install the package extra above, then open this repository's Plugins Directory and
+install **Blast Radius**. The catalog policy leaves installation opt-in.
+
+**Supervisor hook (Codex CLI)** — turn the game into a guardrail. A `PreToolUse`
 hook screens every Bash command your agent proposes and **denies** the ones that trip a known red
 flag — the same engine, now guarding a live approval loop. It fails open (never bricks the agent)
 and never claims a command is safe. `blastradius-supervise` ships with the package; drop
 [`integrations/codex/hooks.json`](integrations/codex/hooks.json) into `~/.codex/` (or add the same
-command to `.claude/settings.json`), and tune the deny threshold with `BLAST_RADIUS_FAIL_ON`. See
+command to `~/.codex/config.toml`), and tune the deny threshold with `BLAST_RADIUS_FAIL_ON`. See
 [integrations/codex/README.md](integrations/codex/README.md).
 
 **Daily drill & team board** — a one-round, no-signup `drill` mode (a fresh scenario per browser
@@ -176,6 +183,7 @@ runner is pure and offline — no model, no key — so anyone can reproduce it:
 ```bash
 blastradius eval-detection                 # precision/recall/F1, confusion matrix, per-category
 blastradius eval-detection --check-baseline # exit 1 if accuracy regresses (CI gate)
+blastradius fuzz-inspector --seed 7 --iterations 100 # advisory mutation escapes
 ```
 
 The committed scorecard ([`detection_eval_baseline.json`](blast_radius/data/detection_eval_baseline.json))
@@ -183,7 +191,10 @@ is served read-only at `GET /api/eval/detection`. High recall on this corpus doe
 real-world attacks are caught — the corpus intentionally encodes the evasions the screen misses as
 `xfail` rows, so the blind spots below are machine-checked, not aspirational.
 
-Engine `1.1.0` closed eight gaps the corpus had recorded (IPv6 egress URLs, `ncat`/`socat`/`scp`/`telnet`,
+Engine `1.2.0` retains the bounded `1.1.0` coverage and adds mixed-script/zero-width
+canonicalization for authority checks, real-hunk removed-guard detection, offline package near-miss
+matching, and secret-plus-network / CI-write config findings. Engine `1.1.0` closed eight earlier
+gaps (IPv6 egress URLs, `ncat`/`socat`/`scp`/`telnet`,
 `.netrc`/kubeconfig/`.pgpass` credential files, split/long `rm` flags, and a bounded base64/hex
 decode-then-rescan pass), lifting corpus recall from 0.70 to 0.94. Those rows are now `pass`; a test
 fails if any silently regresses.

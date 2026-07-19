@@ -1,0 +1,20 @@
+{
+  "name": "blast-radius",
+  "interface": {
+    "displayName": "Blast Radius"
+  },
+  "plugins": [
+    {
+      "name": "blast-radius",
+      "source": {
+        "source": "local",
+        "path": "./plugins/blast-radius"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "blast-radius": {
+      "command": "blastradius-mcp"
+    }
+  }
+}
