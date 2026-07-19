@@ -1,7 +1,6 @@
-/* Codex pet — a self-contained companion modeled on OpenAI's default Codex pet
-   "Codey": a chubby chibi bot with a fluffy cloud head, little arms and feet,
-   and a dark terminal "screen" face showing a >_ prompt. It is now fully
-   customisable: shape, colour palette, face, and accessory are chosen from
+/* Blastling — a self-contained Blast Radius companion with a grounded,
+   articulated SVG rig. Shape, colour palette, face, accessory, and temperament
+   are chosen from
    closed sets and applied purely through data-* attributes on #pet-panel, so
    meaning is carried by shape + attribute — no inline styles, no external
    assets (CSP-safe). Colour is decoupled from shape: any shape wears any palette.
@@ -16,7 +15,7 @@
   display:flex;flex-direction:column;align-items:flex-end;gap:8px;
   font-family:var(--mono);color:var(--ink);
   pointer-events:none;              /* container is transparent to clicks */
-  max-width:min(250px,52vw);
+  max-width:min(280px,68vw);
   /* chrome stays Blast-Radius acid for brand identity */
   --pet-accent:var(--acid);
   --pet-out:#0a1526;
@@ -38,11 +37,12 @@
 
 /* ---- collapsible stats / builder HUD (opens above the mascot on click) ---- */
 .pet-hud{
-  width:214px;display:none;flex-direction:column;gap:8px;
+  position:fixed;right:16px;bottom:58px;
+  width:min(252px,calc(100vw - 24px));display:none;flex-direction:column;gap:10px;
   background:color-mix(in srgb,var(--panel) 94%,transparent);
-  border:1px solid var(--line);border-radius:12px;padding:10px;
-  box-shadow:0 10px 30px rgba(0,0,0,.45);backdrop-filter:blur(3px);
-  max-height:70vh;overflow-y:auto;
+  border:1px solid color-mix(in srgb,var(--pet-accent) 36%,var(--line));border-radius:14px;padding:12px;
+  box-shadow:0 16px 42px rgba(0,0,0,.55),0 0 22px color-mix(in srgb,var(--pet-accent) 8%,transparent);backdrop-filter:blur(5px);
+  max-height:calc(100dvh - 72px);overflow-y:auto;overscroll-behavior:contain;
 }
 #pet-panel[data-open="true"] .pet-hud{display:flex}
 .pet-meta{display:flex;justify-content:space-between;gap:6px;font-size:10px;letter-spacing:.04em;color:var(--muted);text-transform:uppercase}
@@ -54,16 +54,25 @@ progress.pet-xp::-webkit-progress-value{background:var(--pet-accent);border-radi
 progress.pet-xp::-moz-progress-bar{background:var(--pet-accent);border-radius:3px}
 
 /* ---- pet builder (closed-enum option chips) ---- */
-.pet-builder{display:flex;flex-direction:column;gap:6px}
-.pet-opt-row{display:flex;flex-direction:column;gap:3px}
+.pet-builder{display:flex;flex-direction:column;gap:8px}
+.pet-opt-row{display:flex;flex-direction:column;gap:4px}
 .pet-opt-label{font-size:9px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
 .pet-opt-choices{display:flex;flex-wrap:wrap;gap:3px}
 .pet-opt{
   background:var(--black);border:1px solid var(--line);border-radius:6px;color:var(--muted);
-  font-family:var(--mono);font-size:9.5px;padding:3px 6px;cursor:pointer;letter-spacing:.02em;
+  font-family:var(--mono);font-size:9.5px;padding:4px 7px 4px 5px;cursor:pointer;letter-spacing:.02em;
+  display:inline-flex;align-items:center;gap:4px;min-height:27px;
 }
+.pet-opt::before{content:attr(data-glyph);display:inline-grid;place-items:center;min-width:16px;height:16px;color:var(--pet-accent);font-size:11px;font-weight:700}
 .pet-opt:hover{border-color:var(--pet-accent);color:var(--ink)}
 .pet-opt[aria-pressed="true"]{border-color:var(--pet-accent);color:var(--black);background:var(--pet-accent)}
+.pet-opt[aria-pressed="true"]::before{color:var(--black)}
+.pet-opt[data-axis="palette"]{padding-right:6px}
+.pet-opt[data-axis="palette"]::before{border:1px solid currentColor;border-radius:50%;font-size:0;background:#4a9dff}
+.pet-opt[data-axis="palette"][data-value="acid"]::before{background:#a6e635}
+.pet-opt[data-axis="palette"][data-value="ember"]::before{background:#ff8a3d}
+.pet-opt[data-axis="palette"][data-value="violet"]::before{background:#a988ff}
+.pet-opt[data-axis="palette"][data-value="slate"]::before{background:#9fb0c4}
 .pet-opt:focus-visible{outline:2px solid var(--pet-accent);outline-offset:1px}
 .pet-name-row{display:flex;gap:4px}
 #pet-name{
@@ -87,8 +96,9 @@ progress.pet-xp::-moz-progress-bar{background:var(--pet-accent);border-radius:3p
 #pet-bubble-text{display:block}
 
 /* ---- mascot ---- */
-.pet-stage{display:flex;justify-content:flex-end;align-items:flex-end;height:96px}
-.pet-svg{width:88px;height:auto;overflow:visible}
+.pet-stage{position:relative;display:flex;justify-content:flex-end;align-items:flex-end;height:126px;min-width:126px}
+.pet-stage::before{content:"";position:absolute;right:9px;bottom:2px;width:104px;height:72px;border-radius:50%;background:radial-gradient(ellipse,color-mix(in srgb,var(--pet-body) 15%,transparent),transparent 68%);filter:blur(5px)}
+.pet-svg{position:relative;width:118px;height:auto;overflow:visible;filter:drop-shadow(0 8px 8px rgba(0,0,0,.34))}
 
 /* ---- toggle puck (the /pet control: reveals the stats/builder HUD) ---- */
 .pet-toggle{
@@ -124,6 +134,15 @@ progress.pet-xp::-moz-progress-bar{background:var(--pet-accent);border-radius:3p
 .ant{stroke:var(--pet-out);stroke-width:3;stroke-linecap:round}
 .p-antball{fill:var(--blue)}
 .warn{fill:#ffcf3d}
+.pet-shadow{fill:rgba(2,7,14,.46);transform-origin:center}
+.pet-part{transform-box:fill-box;transform-origin:center}
+.pet-shell{transform-origin:center bottom}
+.pet-face{transform-origin:center}
+.pet-arm-left{transform-origin:right center}
+.pet-arm-right{transform-origin:left center}
+.pet-foot-left,.pet-foot-right{transform-box:fill-box;transform-origin:center bottom}
+.pet-accessory{transform-origin:center bottom}
+.pet-status{transform-origin:center}
 
 /* one silhouette shows, chosen by the shape (data-form is the shape; bsod maps to monitor) */
 .form{display:none}
@@ -189,38 +208,83 @@ progress.pet-xp::-moz-progress-bar{background:var(--pet-accent);border-radius:3p
 #pet-panel[data-state="done"]     .pet-ov-check{display:block}
 #pet-panel[data-state="hurt"]     .pet-ov-x{display:block}
 
-/* ================= animation ================= */
-.pet-svg{animation:pet-bob 3.6s ease-in-out infinite}
+/* ================= articulated motion ================= */
+.pet-svg{animation:pet-float 4.8s ease-in-out infinite}
+.pet-shell{animation:pet-breathe 4.8s ease-in-out infinite}
+.pet-shadow{animation:pet-shadow-breathe 4.8s ease-in-out infinite}
 #pet-panel[data-face="default"] .face-default line{animation:pet-cursor 1.1s steps(1,end) infinite}
 #pet-panel[data-face="think"] .face-think .gld,
 #pet-panel[data-state="thinking"] .pet-ov-think .gld2{animation:pet-think 1.2s ease-in-out infinite}
 #pet-panel[data-face="think"] .face-think .gld:nth-child(3){animation-delay:.2s}
 #pet-panel[data-face="think"] .face-think .gld:nth-child(4){animation-delay:.4s}
 #pet-panel[data-face-style="visor"] .visor-eye{animation:pet-scan 1.8s ease-in-out infinite}
-#pet-panel[data-state="hurt"] .pet-svg{animation:pet-shake .5s ease-in-out}
+#pet-panel[data-idle="look"] .pet-face{animation:pet-look 5.2s ease-in-out}
+#pet-panel[data-idle="look"] .pet-accessory{animation:pet-look-accessory 5.2s ease-in-out}
+#pet-panel[data-idle="stretch"] .pet-arm-left{animation:pet-stretch-left 5.2s ease-in-out}
+#pet-panel[data-idle="stretch"] .pet-arm-right{animation:pet-stretch-right 5.2s ease-in-out}
+#pet-panel[data-state="waiting"] .pet-shell{animation:pet-attention 1.5s ease-in-out infinite}
+#pet-panel[data-state="waiting"] .pet-status{animation:pet-status-hover 1.5s ease-in-out infinite}
+#pet-panel[data-state="anxious"] .pet-shell{animation:pet-anxious-shell .36s ease-in-out infinite}
+#pet-panel[data-state="anxious"] .pet-arm-left{animation:pet-anxious-left .3s ease-in-out infinite alternate}
+#pet-panel[data-state="anxious"] .pet-arm-right{animation:pet-anxious-right .3s ease-in-out infinite alternate}
+#pet-panel[data-state="thinking"] .pet-face{animation:pet-thought-glance 1.7s ease-in-out infinite}
+#pet-panel[data-state="thinking"] .pet-status{animation:pet-status-hover 1.25s ease-in-out infinite}
+#pet-panel[data-state="done"] .pet-svg{animation:pet-celebrate .7s cubic-bezier(.2,.8,.3,1)}
+#pet-panel[data-state="done"] .pet-arm-left{animation:pet-cheer-left .7s ease-out}
+#pet-panel[data-state="done"] .pet-arm-right{animation:pet-cheer-right .7s ease-out}
+#pet-panel[data-state="done"] .pet-status{animation:pet-check-pop .5s cubic-bezier(.2,.9,.3,1.3)}
+#pet-panel[data-state="hurt"] .pet-svg{animation:pet-recoil .5s ease-in-out}
+#pet-panel[data-state="hurt"] .pet-arm-left{animation:pet-slump-left .8s ease-out forwards}
+#pet-panel[data-state="hurt"] .pet-arm-right{animation:pet-slump-right .8s ease-out forwards}
 #pet-panel[data-bsod="true"] .p-screen{animation:pet-bsod-flicker .35s steps(2) infinite}
 #pet-panel[data-state="done"] .pet-ov-check path{animation:pet-pop .4s ease-out}
-#pet-panel[data-mood="smug"] .pet-svg{animation:pet-bob 3.6s ease-in-out infinite,pet-smug 2.4s ease-in-out}
-#pet-panel.pet-levelup .pet-svg{animation:pet-bob 3.6s ease-in-out infinite,pet-sparkle .8s ease-out}
+#pet-panel[data-mood="smug"] .pet-shell{animation:pet-breathe 4.8s ease-in-out infinite,pet-smug 2.4s ease-in-out}
+#pet-panel.pet-levelup .pet-svg{animation:pet-float 4.8s ease-in-out infinite,pet-sparkle .8s ease-out}
 
-@keyframes pet-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes pet-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+@keyframes pet-breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.018,.985)}}
+@keyframes pet-shadow-breathe{0%,100%{transform:scaleX(1);opacity:.72}50%{transform:scaleX(.91);opacity:.52}}
 @keyframes pet-cursor{0%,55%{opacity:1}56%,100%{opacity:.15}}
 @keyframes pet-think{0%,100%{opacity:.25}50%{opacity:1}}
 @keyframes pet-scan{0%,100%{transform:translateX(-9px)}50%{transform:translateX(9px)}}
-@keyframes pet-shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-3px)}40%{transform:translateX(3px)}60%{transform:translateX(-2px)}80%{transform:translateX(2px)}}
+@keyframes pet-look{0%,18%,82%,100%{transform:translateX(0)}30%,62%{transform:translateX(2.4px)}70%{transform:translateX(-1.5px)}}
+@keyframes pet-look-accessory{0%,18%,82%,100%{transform:rotate(0)}30%,62%{transform:rotate(2deg)}70%{transform:rotate(-1.5deg)}}
+@keyframes pet-stretch-left{0%,16%,72%,100%{transform:rotate(0)}31%,52%{transform:rotate(24deg) translate(-2px,-2px)}}
+@keyframes pet-stretch-right{0%,16%,72%,100%{transform:rotate(0)}31%,52%{transform:rotate(-24deg) translate(2px,-2px)}}
+@keyframes pet-attention{0%,100%{transform:scale(1)}50%{transform:scale(1.025,.98)}}
+@keyframes pet-status-hover{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+@keyframes pet-anxious-shell{0%,100%{transform:rotate(-1deg)}50%{transform:rotate(1deg)}}
+@keyframes pet-anxious-left{from{transform:rotate(-8deg)}to{transform:rotate(7deg)}}
+@keyframes pet-anxious-right{from{transform:rotate(8deg)}to{transform:rotate(-7deg)}}
+@keyframes pet-thought-glance{0%,100%{transform:translateX(-1px)}50%{transform:translateX(2px)}}
+@keyframes pet-celebrate{0%,100%{transform:translateY(0) scale(1)}38%{transform:translateY(-10px) scale(1.04,.97)}68%{transform:translateY(-2px) scale(.98,1.03)}}
+@keyframes pet-cheer-left{0%,100%{transform:rotate(0)}42%{transform:rotate(38deg) translate(-2px,-3px)}}
+@keyframes pet-cheer-right{0%,100%{transform:rotate(0)}42%{transform:rotate(-38deg) translate(2px,-3px)}}
+@keyframes pet-check-pop{0%{transform:scale(.45);opacity:.2}75%{transform:scale(1.12);opacity:1}100%{transform:scale(1)}}
+@keyframes pet-recoil{0%,100%{transform:translateX(0) rotate(0)}20%{transform:translateX(-4px) rotate(-2deg)}42%{transform:translateX(4px) rotate(2deg)}65%{transform:translateX(-2px) rotate(-1deg)}}
+@keyframes pet-slump-left{to{transform:rotate(-18deg) translateY(2px)}}
+@keyframes pet-slump-right{to{transform:rotate(18deg) translateY(2px)}}
 @keyframes pet-bsod-flicker{0%{opacity:1}100%{opacity:.8}}
 @keyframes pet-pop{0%{transform:scale(.4)}100%{transform:scale(1)}}
 @keyframes pet-smug{0%,100%{transform:rotate(0)}50%{transform:rotate(-4deg)}}
 @keyframes pet-sparkle{0%{filter:drop-shadow(0 0 0 var(--acid))}50%{filter:drop-shadow(0 0 9px var(--acid))}100%{filter:drop-shadow(0 0 0 var(--acid))}}
 
-.pet-svg,.pet-ov-check path,.visor-eye{transform-box:view-box}
+.pet-svg,.pet-ov-check path,.visor-eye{transform-box:view-box;transform-origin:center}
 
 @media (prefers-reduced-motion:reduce){
-  .pet-svg,.face-default line,.face-think .gld,.pet-ov-think .gld2,.p-screen,.pet-ov-check path,.visor-eye,#pet-panel.pet-levelup .pet-svg,#pet-panel[data-mood="smug"] .pet-svg{animation:none!important}
+  .pet-svg,.pet-part,.pet-shell,.pet-shadow,.pet-foot,.face-default line,.face-think .gld,.pet-ov-think .gld2,.p-screen,.pet-ov-check path,.visor-eye,#pet-panel.pet-levelup .pet-svg,#pet-panel[data-mood="smug"] .pet-shell{animation:none!important}
 }
 
 @media (max-width:520px){
   #pet-panel{bottom:10px;right:10px}
-  .pet-hud{width:186px}
-  .pet-svg{width:76px}
+  .pet-hud{right:10px;bottom:52px;width:min(232px,calc(100vw - 20px));max-height:calc(100dvh - 62px)}
+  .pet-stage{height:112px;min-width:112px}
+  .pet-svg{width:104px}
+  .pet-bubble{max-width:min(218px,68vw)}
+}
+
+@media (max-height:560px){
+  .pet-hud{bottom:10px;right:58px;max-height:calc(100dvh - 20px)}
+  .pet-stage{height:104px;min-width:104px}
+  .pet-svg{width:98px}
 }

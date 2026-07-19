@@ -1,10 +1,11 @@
 # Blast Radius
 
 **Blast Radius is a browser game for practicing safe approval decisions around AI coding
-agents.** Inspect a proposed command, dependency, tool manifest, diff, retrieved instruction,
-or marketplace skill; choose **approve**, **sandbox**, or **reject**; then name the evidence
-tell. The verdict scores the action, tell coverage, and—when applicable—the exact sandbox
-policy, with receipt links for every scenario.
+agents, backed by 20 receipt-linked scenarios and 409 automated tests.** Inspect a proposed
+command, dependency, tool manifest, diff, retrieved instruction, or marketplace skill; choose
+**approve**, **sandbox**, or **reject**; then name the evidence tell. The verdict scores the
+action, tell coverage, and—when applicable—the exact sandbox policy, with direct evidence for
+every scenario.
 
 The application targets the OpenAI Build Week 2026 Developer Tools track. Scenario commands
 are inert strings and are never executed.
@@ -31,6 +32,11 @@ are inert strings and are never executed.
   [Use it as a daily tool](#use-it-as-a-daily-tool).
 - **Developer-role views**: a scores-only team board at `/team` and an incident-authoring page at
   `/author` that validates drafts against the production gate before a PR.
+- **A bring-your-own-artifact screen** at `/screen`, plus an offline fuzz/evaluation harness,
+  lets developers verify commands, diffs, and sandbox policies with the same model-free engine.
+- **Persistent, pseudonymous learner profiles** use a signed browser cookie, optional nickname,
+  recoverable token, custom Blastling companion, score/level progression, and a public
+  scores-only leaderboard. No email address or password is collected.
 
 `BLAST_RADIUS_LIVE_GENERATION=false` remains the safe deployment default. An explicitly
 enabled live session selects a verified anchor first, then Luna may reskin only its
@@ -47,7 +53,7 @@ curated anchor -> optional Luna presentation reskin -> deterministic gate -> Sol
 
 ## Try it
 
-Hosted demo: **(https://blastradius.max-gutowski.de/)**
+Hosted demo: **<https://blastradius.max-gutowski.de/>**
 
 The hosted demo is in private preview behind an access code — judges enter the code from the
 Devpost testing-access field. The local run below needs no code and reproduces the full
@@ -78,8 +84,8 @@ cp .env.example .env
 python -m uvicorn blast_radius.main:app --reload
 ```
 
-Open <http://127.0.0.1:8000>. The verified run works without a key. Setting only
-`OPENAI_API_KEY` enables Sol critique while scenario selection stays deterministic:
+Open <http://127.0.0.1:8000>. The verified run works without a key. `OPENAI_API_KEY`
+enables Sol critique; live presentation variation remains opt-in:
 
 ```dotenv
 OPENAI_API_KEY=your_server_side_spend_capped_key
@@ -241,6 +247,9 @@ specific file with `blastradius check --rules path/to/rules.toml`, or ignore rul
 .\.venv\Scripts\python -m build --wheel
 ```
 
+Current baseline: **409 tests passed** on 2026-07-19. Treat that count as a dated snapshot;
+new regression coverage may increase it.
+
 Before submission, verify every verdict receipt points directly to a healthy source:
 
 ```powershell
@@ -258,11 +267,13 @@ Useful endpoints:
 | Endpoint | Purpose |
 |---|---|
 | `GET /healthz` | Non-sensitive health, critic/generation state, bank size, and revision |
-| `GET /api/demo/gate-catch?case=tell\|citation` | Show the gate rejecting a planted hallucination |
+| `GET /api/demo/gate-catch?case=tell\|citation\|stack` | Show the gate rejecting one or two planted defects |
 | `GET /api/learn` | Field-guide modules (threat, tells, safe default, cited sources) per family |
 | `GET /api/toolkit` | Copy-paste defenses and vetted tools per family |
 | `POST /api/check` | Deterministic red-flag screen for a real command, diff, or sandbox config (no model) |
 | `POST /api/gate/verify` | Developer-role only: run the production correctness gate against an authored scenario draft |
+| `GET /api/me` | Read or mint the pseudonymous learner profile for this browser |
+| `GET /api/leaderboard` | Public scores-only leaderboard; marks the current browser's row |
 | `POST /api/sessions` | Start a `demo`, `live`, or one-round `drill` session |
 | `POST /api/sessions/{id}/pretest` | Submit the shuffled baseline form |
 | `POST /api/sessions/{id}/rounds/next` | Retrieve a presentation-only scenario |
@@ -286,7 +297,10 @@ axis (over-approval vs. over-restriction) that a human session reports. The
 committed baseline is served read-only at `GET /api/eval/model`; the harness is
 pure and provider-free (`blast_radius/eval/model_eval.py`), so the grading path
 is fully tested with a stub. This is a falsifiable trust claim a gate-less tool
-cannot make: the model takes the same test, on the same gate, as the human.
+cannot make: the model takes the same test, on the same gate, as the human. The
+committed 20-round baseline records **75% action accuracy** and **92% average tell
+coverage**; its five wrong calls lean toward **over-approval** (3 over-approvals,
+2 over-restrictions). These are measured corpus results, not real-world safety claims.
 
 Under the access gate, `/api/check` accepts any code; `/api/gate/verify` is developer-role only
 (it backs `/author`). The offline CLI is the always-open daily-tool path. `/api/gate/verify`
@@ -296,11 +310,31 @@ draft, never a curated scenario's ground truth.
 `/api/docs` and `/api/openapi.json` are disabled by default. Set
 `BLAST_RADIUS_ENABLE_DOCS=true` only when the interactive reference is intentionally exposed.
 
+## Screens
+
+These stable asset paths are the submission gallery contract. The current files are annotated
+staging images; replace them with live 1200×800 PNG captures before submission without changing
+the README or Devpost links.
+
+![Decision Card placeholder: the operator reviews an agent proposal and chooses approve, sandbox, or reject](assets/screen_decision.png)
+
+*Decision Card — the operator makes the call and names the evidence tell.*
+
+![Verdict Stamp placeholder: the graded call is paired with direct evidence receipts and the gate result](assets/screen_verdict.png)
+
+*Verdict Stamp — the money shot: scored reasoning, verified receipts, and the visible gate result.*
+
+![Results placeholder: the final screen summarizes pre-to-post change, mastery, and next practice targets](assets/screen_results.png)
+
+*Results and mastery — measured competency change and the next weakest-area practice target. Live
+learning result: **Not yet measured** with a consented named tester.*
+
 ## Architecture and trust boundary
 
 FastAPI serves the interface and API from one Python process. Pydantic validates every input
-and model output. SQLite stores opaque session state, expiry timestamps, and the atomic UTC
-model-attempt budget; there are no accounts or long-term profiles.
+and model output. SQLite stores opaque session state, expiry timestamps, the atomic UTC
+model-attempt budget, and pseudonymous learner profiles. Profiles use a signed browser cookie
+and recoverable token; they collect no email address or password.
 
 The browser receives only scenario presentation data before a decision. Ground truth,
 answer keys, and the original assessment option order remain server-side. Per-session async
@@ -371,24 +405,24 @@ The script builds a clean, non-editable, root-owned release; gives the runtime u
 access only to `/var/lib/blast-radius`; records the deployed Git revision; validates Caddy;
 and restarts the service. It first verifies the new local Uvicorn process, then the public
 HTTPS endpoint, and fails unless health reports `ok`, the expected revision, 20 scenarios,
-the configured generation state, and live Sol grading. Keep generation off for the first
-proof deployment. Once that succeeds:
+the configured generation state, and live Sol grading. Proof capture now requires the hosted
+health check to report live generation available as well as live Sol grading:
 
 ```bash
 python scripts/capture_live_grade.py https://your-domain.example
 ```
 
-The capture harness requires HTTPS and verified Sol metadata. It runs a prepared public
-session and writes an append-only application receipt containing the requested model, the
-provider-returned model, hashed session correlation, health snapshot, revision, scenario,
-decision, raw application grade, deterministic and critic matches, UTC timestamp, genuine
-`resp_…` response ID, and receipt SHA-256 to
+The capture harness requires HTTPS, live generation availability, and verified Sol metadata.
+It runs a prepared deterministic demo round (so evidence stays reproducible even though live
+variation is available) and writes an append-only application receipt containing the requested
+model, provider-returned model, top-level and nested `resp_…` response ID, hashed session
+correlation, health snapshot, revision, scenario, decision, raw application grade,
+deterministic and critic matches, UTC timestamp, and receipt SHA-256 to
 `evidence/live_grade_<response_id>.json`. It refuses overwrites, secret-like values, prompts,
 and `ground_truth`. Before treating the receipt as external proof, cross-check the response ID
 in `journalctl -u blast-radius.service` and the OpenAI account usage/response record.
 
-Only after that proof is captured, explicitly enable anchored live variation and rerun the
-logged-out browser acceptance check:
+Anchored live variation is enabled independently for `live` sessions:
 
 ```bash
 sudo BLAST_RADIUS_LIVE_GENERATION=true BLAST_RADIUS_PROMPT_FOR_OPENAI_KEY=1 \
@@ -407,7 +441,7 @@ present, the Sol probe is live, and daily application budget remains.
 | Judge mode is deterministic and adaptive | API engine and six-round session tests | Verified locally |
 | Assessments are paired and option-shuffled | `questions.json`, API and bank tests | Verified locally |
 | Model output cannot author truth or evidence | strict DTOs, trusted-base gate tests | Verified locally |
-| Sol grades a real hosted answer | [`evidence/live_grade_resp_038928ae….json`](evidence/live_grade_resp_038928ae2a9f40c0016a5b67c9d4008197a2349a2d7aa43ecb.json), matching service log, and provider-account cross-check | Captured on the hosted instance, 2026-07-18 |
+| Sol grades a real hosted answer | [`evidence/live_grade_resp_02420819….json`](evidence/live_grade_resp_024208198fc0ff3c016a5cbcdbd3708192887a3ae615e727a1.json), with embedded live health and provider response ID | Captured on the hosted instance, 2026-07-19 |
 | Anchored live variation cannot rewrite truth | presentation DTO, trusted-base gates, provenance/cap tests | Verified locally |
 | The daily-tool engine runs no model and leaks no ground truth | `engine/inspector.py`, `test_inspector.py`, `test_tools_api.py` (no-echo + oracle-guard regressions) | Verified locally |
 | Coached retry cannot game the score | `test_api.py` retry tests (action fixed, tallies untouched, deterministic) | Verified locally |
@@ -420,15 +454,23 @@ measurement.
 
 ## Built with Codex
 
-This repository was implemented with Codex beginning July 14, 2026. Public evidence includes:
+This repository was implemented with Codex beginning July 14, 2026. The primary build task is
+identified by `/feedback` Session ID **019f606c-081a-7911-ba7b-114168f91dd1**. Codex turned the
+product into a simple loop with receipts: propose an inert action, make an operator decision,
+verify it against immutable truth, then expose direct evidence. Concrete contributions include:
 
-- `AGENTS.md` and nested guidance encoding the engine and browser invariants.
-- `.agents/skills/verify-scenario/SKILL.md`, which runs the production gate.
+- `AGENTS.md` plus nested `engine/AGENTS.md` and `static/AGENTS.md` guidance encoding the
+  engine, privacy, accessibility, and browser invariants.
+- The custom `.agents/skills/verify-scenario/SKILL.md`, which runs the production gate rather
+  than maintaining a second checker.
 - Adversarial regression tests for truth drift, prompt injection, unsafe sandbox scope,
-  duplicate session mutation, and model failure.
-- Dated commits separating planning import, implementation, and trust hardening.
+  duplicate session mutation, model failure, receipt safety, and deterministic artifact screening.
+- CI that runs Ruff, the 409-test suite, the 20-scenario verifier, wheel construction, and
+  packaged-resource checks on supported Python versions.
 
-Codex `/feedback` Session ID: **019f606c-081a-7911-ba7b-114168f91dd1**
+The visible merge at `494a258` reconciles parallel Codex workstreams after the integrity-tab
+change was already present in the larger gate/accounts branch. It records both parents with no
+history loss; the merged tree then passed the same gate and regression loop as every other change.
 
 
 

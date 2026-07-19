@@ -505,7 +505,7 @@ class SessionSummary(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Persistent user identity + custom Codex pet
+# Persistent user identity + custom Blastling
 # ---------------------------------------------------------------------------
 # The pet is customised entirely from closed enum choices so it stays safe under
 # the strict CSP: every option maps to a CSS class / data-attribute the frontend
@@ -550,7 +550,7 @@ class PetTrait(StrEnum):
     DEADPAN = "deadpan"
 
 
-DEFAULT_PET_NAME = "codey"
+DEFAULT_PET_NAME = "fuse"
 
 
 def slug_pet_name(raw: str | None) -> str:
@@ -565,7 +565,7 @@ def slug_pet_name(raw: str | None) -> str:
 
 
 class PetConfig(BaseModel):
-    """A user's custom Codex pet. All visual axes are closed enums (CSP-safe);
+    """A user's custom Blastling. All visual axes are closed enums (CSP-safe);
     only the bounded, slugified name is free text."""
 
     model_config = ConfigDict(extra="forbid")

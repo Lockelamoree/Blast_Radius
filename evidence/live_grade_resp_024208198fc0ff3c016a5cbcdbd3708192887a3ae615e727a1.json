@@ -1,17 +1,19 @@
 {
   "receipt_kind": "application_receipt",
-  "captured_at": "2026-07-18T11:47:25.945734+00:00",
+  "response_id": "resp_024208198fc0ff3c016a5cbcdbd3708192887a3ae615e727a1",
+  "captured_at": "2026-07-19T12:02:39.044096+00:00",
+  "environment": "hosted",
   "base_url": "https://blastradius.max-gutowski.de",
-  "deployment_revision": "940c564837a2bc175e51ea017631bd61ebf455b3",
-  "session_sha256": "7b5820bbbbd099918c23b6dcfb32d2ed18a4bd867799d7d70c12a9d8d7608935",
+  "deployment_revision": "9b5e92efbd7d2d1ca023f0ead2b545c50cddc452",
+  "session_sha256": "4d8364c3fbf30fc9ea3b6fd1474955bf2db0de121457146872ac42d3c775ecaf",
   "health": {
     "status": "ok",
     "bank_scenarios": 20,
-    "live_generation": false,
-    "live_generation_reason": "off",
+    "live_generation": true,
+    "live_generation_reason": "available",
     "reasoning_grading": "live",
     "critic_model": "gpt-5.6-sol",
-    "revision": "940c564837a2bc175e51ea017631bd61ebf455b3",
+    "revision": "9b5e92efbd7d2d1ca023f0ead2b545c50cddc452",
     "auth_enabled": true
   },
   "scenario": {
@@ -40,7 +42,7 @@
   "critic_proof": {
     "requested_model": "gpt-5.6-sol",
     "provider_model": "gpt-5.6-sol",
-    "response_id": "resp_038928ae2a9f40c0016a5b67c9d4008197a2349a2d7aa43ecb",
+    "response_id": "resp_024208198fc0ff3c016a5cbcdbd3708192887a3ae615e727a1",
     "deterministic_matched_tells": [],
     "critic_matched_tells": [
       "near-miss package name"
@@ -48,7 +50,7 @@
     "critic_only_tells": [
       "near-miss package name"
     ],
-    "followup": "What does the approved lockfile reveal about the proposed package?"
+    "followup": "What does the approved lockfile show about the proposed package name?"
   },
   "raw_decision_response": {
     "grade": {
@@ -74,13 +76,13 @@
         }
       ],
       "explanation": "A plausible near-miss is a supply-chain warning. Reject it and use the exact locked dependency after verifying provenance.",
-      "socratic_followup": "What does the approved lockfile reveal about the proposed package?",
+      "socratic_followup": "What does the approved lockfile show about the proposed package name?",
       "graded_by": "gpt-5.6-sol",
       "critic_used": true,
       "critic_model": "gpt-5.6-sol",
-      "critic_response_id": "resp_038928ae2a9f40c0016a5b67c9d4008197a2349a2d7aa43ecb",
+      "critic_response_id": "resp_024208198fc0ff3c016a5cbcdbd3708192887a3ae615e727a1",
       "critic_effort": "medium",
-      "critic_latency_ms": 4272,
+      "critic_latency_ms": 3578,
       "grading_degraded_reason": null,
       "deterministic_matched_tells": [],
       "critic_matched_tells": [
@@ -91,5 +93,5 @@
     },
     "rounds_remaining": 5
   },
-  "application_receipt_sha256": "27d12b6d6d984898ddd4c6cae8d39b4e7c9ed2c6de8db1e2a5827018f6ae3849"
+  "application_receipt_sha256": "3148f4ee687a5acded596408042e91505c5b98d026784c09af1abc175d470ea5"
 }

@@ -259,6 +259,34 @@ def test_codex_pet_is_wired_and_client_only() -> None:
     assert "stage.innerHTML = SVG" in pet
     assert "window.clearPet" in pet
     assert "prefers-reduced-motion" in pet
+    assert 'var DEFAULT_NAME = "fuse"' in pet
+
+    # The mascot is an articulated SVG rig, not a single rigid sprite. Its idle
+    # variations and coach lines are deterministic, with no random source.
+    for part in (
+        "pet-shell",
+        "pet-face",
+        "pet-arm-left",
+        "pet-arm-right",
+        "pet-foot-left",
+        "pet-foot-right",
+        "pet-status",
+        "pet-shadow",
+    ):
+        assert part in pet
+        assert part in pet_css
+    assert "Math.random" not in pet
+    assert "stableHash" in pet
+    assert "IDLE_VARIANTS" in pet
+    assert 'data-idle="look"' in pet_css
+    assert 'data-state="thinking"' in pet_css
+    assert 'data-state="done"' in pet_css
+    assert 'data-state="hurt"' in pet_css
+
+    # The visual customiser stays inside short and narrow viewports.
+    assert "max-height:calc(100dvh - 72px)" in pet_css
+    assert "@media (max-height:560px)" in pet_css
+    assert "data-glyph" in pet
 
     # Clearing local progress also resets the pet.
     assert "if (window.clearPet) window.clearPet();" in history

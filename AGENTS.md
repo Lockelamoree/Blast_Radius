@@ -48,8 +48,8 @@ python -m venv .venv
 - Secrets come from environment variables and are never logged.
 - Ground truth is immutable; an LLM may explain it but cannot rewrite it.
 - MaRa is not part of this build. Do not copy or claim integration with it.
-- No accounts, multiplayer, command execution, or server-side personal profiles.
-  Two narrow, deliberate exceptions keep this honest rather than silently broken:
+- No email/password accounts, multiplayer, command execution, or storage of reasoning text in
+  long-lived profiles. Three narrow, deliberate persistence features are part of the product:
   - **Browser-local history.** Learner progress lives only in a single versioned
     `localStorage` key, written and read exclusively by client-side code, and is never
     sent to or stored by the server — the ephemeral session row and its TTL remain the
@@ -64,8 +64,23 @@ python -m venv .venv
     aggregate them. Reasoning text, answers, IPs, and any other personal data are never
     persisted in summaries. Handles are display labels, not identities: they are not
     verified, not unique, and grant no access.
+  - **Pseudonymous learner profiles and leaderboard.** A signed `br_uid` browser cookie maps to
+    score, level, nickname, pet configuration, and aggregate session counts. A high-entropy
+    recovery token may adopt that profile in another browser. Profiles never collect an email,
+    password, reasoning text, raw answers, or IP address; the public leaderboard exposes only
+    nickname, score, level, rank, and whether the row belongs to the current browser.
 - The `/team` and `/author` pages are developer-role only and read-only with respect to the
   scenario bank: authored drafts are validated against the production gate and downloaded
   client-side; they enter the repo exclusively via PR + CI.
 - The `/api/check` inspector and the CLI are deterministic keyword screens — they never run a
   model and never claim an artifact is safe. Do not add wording that implies otherwise.
+
+## Submission evidence and copy
+
+- The primary Codex build task is `/feedback` Session ID
+  `019f606c-081a-7911-ba7b-114168f91dd1`; keep concrete Codex contributions in the README.
+- The visible `494a258` merge records parallel workstreams with no history loss. Describe it
+  plainly; do not imply the project had a single writer or hide the reconciliation.
+- Prefer prove, verify, receipts, evidence, trust, accountability, “it caught its own mistake,”
+  and hours saved. Avoid fear-first framing and unsupported metrics. If learning impact has not
+  been measured with a consented named tester, write “Not yet measured.”

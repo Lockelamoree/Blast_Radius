@@ -80,7 +80,7 @@ class FakeHostedInstance:
                 "status": "ok",
                 "reasoning_grading": "live",
                 "critic_model": self.health_model,
-                "live_generation": False,
+                "live_generation": True,
                 "bank_scenarios": 20,
                 "revision": "abc123def456",
             }
@@ -157,6 +157,8 @@ def test_capture_writes_real_response_id_and_side_by_side_matches(tmp_path) -> N
 
     assert output.name == "live_grade_resp_live_123.json"
     assert evidence["critic_proof"]["response_id"] == "resp_live_123"
+    assert evidence["response_id"] == "resp_live_123"
+    assert evidence["environment"] == "hosted"
     assert evidence["critic_proof"]["requested_model"] == "gpt-5.6-sol"
     assert evidence["critic_proof"]["provider_model"] == "gpt-5.6-sol"
     assert evidence["receipt_kind"] == "application_receipt"

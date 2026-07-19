@@ -1,5 +1,5 @@
-/* Codex pet — a client-only companion for Blast Radius, inspired by OpenAI's
-   Codex-app pet. It is the agent you supervise: it proposes an action and waits
+/* Blastling — a client-only companion for Blast Radius. It is the agent you
+   supervise: it proposes an action and waits
    for your ruling (orange clock), then its fate follows your verdict (acid check
    when contained, rogue / BSOD when it slips past). Longer-term mood tracks your
    streak + mastery, and its level mirrors your persistent profile score.
@@ -24,11 +24,11 @@
   var ACCESSORIES = ["none", "antenna", "halo", "bowtie", "shades"];
   var TRAITS = ["stoic", "playful", "anxious", "proud", "deadpan"];
   var SHAPE_LABEL = { cloud: "Cloud", droplet: "Droplet", rock: "Rock", monitor: "Monitor" };
-  var PALETTE_LABEL = { codex: "Codex", acid: "Acid", ember: "Ember", violet: "Violet", slate: "Slate" };
+  var PALETTE_LABEL = { codex: "Signal", acid: "Acid", ember: "Ember", violet: "Violet", slate: "Slate" };
   var FACE_LABEL = { terminal: "Terminal", dot: "Dots", visor: "Visor" };
   var ACC_LABEL = { none: "None", antenna: "Antenna", halo: "Halo", bowtie: "Bowtie", shades: "Shades" };
   var TRAIT_LABEL = { stoic: "Stoic", playful: "Playful", anxious: "Anxious", proud: "Proud", deadpan: "Deadpan" };
-  var DEFAULT_NAME = "codey";
+  var DEFAULT_NAME = "fuse";
 
   var MOODS = ["sleepy", "content", "happy", "proud", "nervous", "rogue", "smug"];
 
@@ -46,6 +46,9 @@
   var sleepTimer = null;
   var bubbleTimer = null;
   var levelupTimer = null;
+  var idleTimer = null;
+  var idleCycle = 0;
+  var lineCursor = {};
   var bsodActive = false;
   var pet = null;
   var root = null; // #pet-panel
@@ -264,16 +267,27 @@
     skill_marketplace: "that skill was not what it claimed"
   };
 
-  function pick(arr) {
+  function stableHash(value) {
+    var hash = 0;
+    var text = String(value || "");
+    for (var i = 0; i < text.length; i += 1) hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0;
+    return Math.abs(hash);
+  }
+
+  function pick(arr, key) {
     if (!arr || !arr.length) return "";
-    return arr[Math.floor(Math.random() * arr.length)];
+    var cursorKey = String(key || "default");
+    var cursor = lineCursor[cursorKey] || 0;
+    var chosen = arr[(stableHash(cursorKey) + cursor) % arr.length];
+    lineCursor[cursorKey] = cursor + 1;
+    return chosen;
   }
 
   function line(key, ctx) {
     ctx = ctx || {};
     var trait = (pet && pet.config && pet.config.trait) || "stoic";
     var pool = (LINES[key] && (LINES[key][trait] || LINES[key].stoic)) || [];
-    var text = pick(pool).replace("{lv}", pet ? pet.level : 1);
+    var text = pick(pool, key + ":" + trait + ":" + petName()).replace("{lv}", pet ? pet.level : 1);
     if (ctx.rankLine && rankTier() !== "unranked") text += " " + ctx.rankLine;
     return text;
   }
@@ -328,55 +342,43 @@
 
   function cloudForm() {
     return '<g class="form form-cloud">' +
-      rrect(33, 71, 15, 14, 6, "p-out") + rrect(48, 71, 15, 14, 6, "p-out") + rrect(35, 71, 11, 11, 5, "p-foot") + rrect(50, 71, 11, 11, 5, "p-foot") +
-      circ(18, 56, 9, "p-out") + circ(78, 56, 9, "p-out") + circ(18, 56, 7, "p-arm") + circ(78, 56, 7, "p-arm") +
-      '<g class="p-head">' + headLayer(2.5, "p-out") + headLayer(0, "p-body") + '</g>' +
-      circ(34, 31, 6, "p-hi") +
-      rrect(25, 35, 46, 28, 12, "p-out") + rrect(27, 37, 42, 24, 10, "p-screen") +
-      faceGlyphs(48, 49) +
+      '<g class="pet-part pet-feet"><g class="pet-foot pet-foot-left">' + rrect(33, 71, 15, 14, 6, "p-out") + rrect(35, 71, 11, 11, 5, "p-foot") + '</g><g class="pet-foot pet-foot-right">' + rrect(48, 71, 15, 14, 6, "p-out") + rrect(50, 71, 11, 11, 5, "p-foot") + '</g></g>' +
+      '<g class="pet-part pet-arm pet-arm-left">' + circ(18, 56, 9, "p-out") + circ(18, 56, 7, "p-arm") + '</g><g class="pet-part pet-arm pet-arm-right">' + circ(78, 56, 9, "p-out") + circ(78, 56, 7, "p-arm") + '</g>' +
+      '<g class="pet-part pet-shell"><g class="p-head">' + headLayer(2.5, "p-out") + headLayer(0, "p-body") + '</g>' + circ(34, 31, 6, "p-hi") + '</g>' +
+      '<g class="pet-part pet-face">' + rrect(25, 35, 46, 28, 12, "p-out") + rrect(27, 37, 42, 24, 10, "p-screen") + faceGlyphs(48, 49) + '</g>' +
       '</g>';
   }
 
   function dropletForm() {
     return '<g class="form form-droplet">' +
-      rrect(37, 84, 10, 9, 4, "p-out") + rrect(49, 84, 10, 9, 4, "p-out") + rrect(38, 84, 8, 7, 3, "p-foot") + rrect(50, 84, 8, 7, 3, "p-foot") +
-      circ(15, 60, 7, "p-out") + circ(81, 60, 7, "p-out") + circ(15, 60, 5, "p-body") + circ(81, 60, 5, "p-body") +
-      ptK("shape-body", "M48 8 C34 30 20 44 20 60 A28 28 0 1 0 76 60 C76 44 62 30 48 8 Z") +
-      '<ellipse class="p-hi" cx="37" cy="34" rx="5" ry="8"></ellipse>' +
-      circ(31, 55, 4, "f-blush") + circ(65, 55, 4, "f-blush") +
-      simpleFace(48, 50) +
+      '<g class="pet-part pet-feet"><g class="pet-foot pet-foot-left">' + rrect(37, 84, 10, 9, 4, "p-out") + rrect(38, 84, 8, 7, 3, "p-foot") + '</g><g class="pet-foot pet-foot-right">' + rrect(49, 84, 10, 9, 4, "p-out") + rrect(50, 84, 8, 7, 3, "p-foot") + '</g></g>' +
+      '<g class="pet-part pet-arm pet-arm-left">' + circ(15, 60, 7, "p-out") + circ(15, 60, 5, "p-body") + '</g><g class="pet-part pet-arm pet-arm-right">' + circ(81, 60, 7, "p-out") + circ(81, 60, 5, "p-body") + '</g>' +
+      '<g class="pet-part pet-shell">' + ptK("shape-body", "M48 8 C34 30 20 44 20 60 A28 28 0 1 0 76 60 C76 44 62 30 48 8 Z") + '<ellipse class="p-hi" cx="37" cy="34" rx="5" ry="8"></ellipse></g>' +
+      '<g class="pet-part pet-face">' + circ(31, 55, 4, "f-blush") + circ(65, 55, 4, "f-blush") + simpleFace(48, 50) + '</g>' +
       '</g>';
   }
 
   function rockForm() {
     return '<g class="form form-rock">' +
-      rrect(32, 80, 14, 12, 5, "p-out") + rrect(50, 80, 14, 12, 5, "p-out") + rrect(34, 80, 10, 10, 4, "p-foot") + rrect(52, 80, 10, 10, 4, "p-foot") +
-      circ(13, 60, 8, "p-out") + circ(83, 60, 8, "p-out") + circ(13, 60, 6, "p-arm") + circ(83, 60, 6, "p-arm") +
-      poly("p-out", "33,34 40,19 47,34") + poly("p-out", "52,34 60,23 66,34") +
-      poly("p-body", "35,33 40,22 45,33") + poly("p-body", "54,33 60,25 64,33") +
-      rrect(14, 30, 68, 54, 26, "p-out") + rrect(16, 32, 64, 50, 24, "p-body") +
-      circ(33, 46, 6, "p-hi") +
-      circ(29, 58, 4, "f-blush") + circ(67, 58, 4, "f-blush") +
-      simpleFace(48, 54) +
+      '<g class="pet-part pet-feet"><g class="pet-foot pet-foot-left">' + rrect(32, 80, 14, 12, 5, "p-out") + rrect(34, 80, 10, 10, 4, "p-foot") + '</g><g class="pet-foot pet-foot-right">' + rrect(50, 80, 14, 12, 5, "p-out") + rrect(52, 80, 10, 10, 4, "p-foot") + '</g></g>' +
+      '<g class="pet-part pet-arm pet-arm-left">' + circ(13, 60, 8, "p-out") + circ(13, 60, 6, "p-arm") + '</g><g class="pet-part pet-arm pet-arm-right">' + circ(83, 60, 8, "p-out") + circ(83, 60, 6, "p-arm") + '</g>' +
+      '<g class="pet-part pet-shell">' + poly("p-out", "33,34 40,19 47,34") + poly("p-out", "52,34 60,23 66,34") + poly("p-body", "35,33 40,22 45,33") + poly("p-body", "54,33 60,25 64,33") + rrect(14, 30, 68, 54, 26, "p-out") + rrect(16, 32, 64, 50, 24, "p-body") + circ(33, 46, 6, "p-hi") + '</g>' +
+      '<g class="pet-part pet-face">' + circ(29, 58, 4, "f-blush") + circ(67, 58, 4, "f-blush") + simpleFace(48, 54) + '</g>' +
       '</g>';
   }
 
   function monitorForm() {
     return '<g class="form form-monitor">' +
-      rrect(33, 84, 13, 11, 5, "p-out") + rrect(50, 84, 13, 11, 5, "p-out") + rrect(35, 84, 9, 9, 4, "p-foot") + rrect(52, 84, 9, 9, 4, "p-foot") +
-      circ(14, 60, 7, "p-out") + circ(82, 60, 7, "p-out") + circ(14, 60, 5, "p-body") + circ(82, 60, 5, "p-body") +
-      rrect(36, 60, 24, 18, 7, "p-out") + rrect(38, 62, 20, 14, 5, "p-body") +
-      lnK("ant", 48, 20, 48, 8) + circ(48, 6, 3, "p-antball") +
-      rrect(18, 14, 60, 48, 10, "p-out") + rrect(20, 16, 56, 44, 8, "p-body") +
-      rrect(26, 22, 44, 32, 6, "p-screen") +
-      poly("warn", "31,31 35,24 39,31") +
-      faceGlyphs(50, 40) +
+      '<g class="pet-part pet-feet"><g class="pet-foot pet-foot-left">' + rrect(33, 84, 13, 11, 5, "p-out") + rrect(35, 84, 9, 9, 4, "p-foot") + '</g><g class="pet-foot pet-foot-right">' + rrect(50, 84, 13, 11, 5, "p-out") + rrect(52, 84, 9, 9, 4, "p-foot") + '</g></g>' +
+      '<g class="pet-part pet-arm pet-arm-left">' + circ(14, 60, 7, "p-out") + circ(14, 60, 5, "p-body") + '</g><g class="pet-part pet-arm pet-arm-right">' + circ(82, 60, 7, "p-out") + circ(82, 60, 5, "p-body") + '</g>' +
+      '<g class="pet-part pet-shell">' + rrect(36, 60, 24, 18, 7, "p-out") + rrect(38, 62, 20, 14, 5, "p-body") + lnK("ant", 48, 20, 48, 8) + circ(48, 6, 3, "p-antball") + rrect(18, 14, 60, 48, 10, "p-out") + rrect(20, 16, 56, 44, 8, "p-body") + '</g>' +
+      '<g class="pet-part pet-face">' + rrect(26, 22, 44, 32, 6, "p-screen") + poly("warn", "31,31 35,24 39,31") + faceGlyphs(50, 40) + '</g>' +
       '</g>';
   }
 
   // ---- accessories (one shown per data-accessory; centred on the head) ----
   function accessories() {
-    return '<g class="accs">' +
+    return '<g class="pet-part pet-accessory accs">' +
       '<g class="acc acc-antenna">' + lnK("acc-wire", 48, 15, 48, 4) + circ(48, 3, 3, "acc-bulb") + '</g>' +
       '<g class="acc acc-halo"><ellipse class="acc-ring" cx="48" cy="9" rx="17" ry="4.6"></ellipse></g>' +
       '<g class="acc acc-bowtie">' + poly("acc-bow", "41,64 48,68 41,72") + poly("acc-bow", "55,64 48,68 55,72") + circ(48, 68, 2, "acc-knot") + '</g>' +
@@ -386,7 +388,7 @@
 
   // thought bubble (top-right) — the signature Codex status channel, shared by all forms
   function bubble() {
-    return '<g class="pet-bubble-ov">' +
+    return '<g class="pet-part pet-status pet-bubble-ov">' +
       circ(66, 26, 2, "bub") + circ(62, 30, 1.4, "bub") +
       rrect(64, 2, 30, 22, 9, "bub-out") + rrect(66, 4, 26, 18, 7, "bub") +
       '<g class="pet-ov pet-ov-clock"><circle class="clk-ring" cx="79" cy="13" r="6.5"></circle>' + ln(79, 13, 79, 8.5) + ln(79, 13, 82.5, 13) + '</g>' +
@@ -403,6 +405,7 @@
   // the data-* attributes on #pet-panel.
   var SVG =
     '<svg class="pet-svg" viewBox="0 0 96 104" aria-hidden="true" focusable="false">' +
+      '<ellipse class="pet-shadow" cx="48" cy="97" rx="25" ry="4.5"></ellipse>' +
       cloudForm() + dropletForm() + rockForm() + monitorForm() +
       accessories() +
       bubble() +
@@ -426,15 +429,28 @@
       btn.className = "pet-opt";
       btn.setAttribute("data-axis", axis);
       btn.setAttribute("data-value", value);
+      btn.setAttribute("data-glyph", optionGlyph(axis, value));
       // Dynamic string (never a static pressed literal) so the template's pinned
       // aria-pressed count is unaffected by the runtime-built builder controls.
       btn.setAttribute("aria-pressed", String(false));
+      btn.setAttribute("aria-label", labelText + ": " + (labels[value] || value));
       btn.textContent = labels[value] || value;
       btn.addEventListener("click", function () { setAxis(axis, value); });
       group.appendChild(btn);
     });
     wrap.appendChild(group);
     return wrap;
+  }
+
+  function optionGlyph(axis, value) {
+    var glyphs = {
+      shape: { cloud: "●", droplet: "◆", rock: "⬢", monitor: "▣" },
+      palette: { codex: "●", acid: "●", ember: "●", violet: "●", slate: "●" },
+      face: { terminal: ">_", dot: "••", visor: "—" },
+      accessory: { none: "·", antenna: "⌁", halo: "○", bowtie: "⋈", shades: "▰" },
+      trait: { stoic: "S", playful: "P", anxious: "!", proud: "↑", deadpan: "—" }
+    };
+    return (glyphs[axis] && glyphs[axis][value]) || "·";
   }
 
   function mountPet() {
@@ -481,7 +497,7 @@
     nameInput.autocomplete = "off";
     nameInput.spellcheck = false;
     nameInput.placeholder = "name your pet…";
-    nameInput.setAttribute("aria-label", "Name your Codex pet");
+    nameInput.setAttribute("aria-label", "Name your Blastling");
     nameInput.addEventListener("change", function () { setName(nameInput.value); });
     nameInput.addEventListener("keydown", function (e) {
       if (e.key === "Enter") { e.preventDefault(); setName(nameInput.value); nameInput.blur(); }
@@ -580,6 +596,12 @@
     root.setAttribute("data-accessory", pet.config.accessory);
     root.setAttribute("data-face-style", pet.config.face);
     root.setAttribute("data-face", faceFor(root.getAttribute("data-state"), pet.mood));
+    if (root.getAttribute("data-state") === "idle") scheduleIdleMotion();
+    else {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = null;
+      root.setAttribute("data-idle", "still");
+    }
     var lvl = document.getElementById("pet-meta-level");
     var nm = document.getElementById("pet-meta-name");
     var xp = document.getElementById("pet-xp");
@@ -609,6 +631,21 @@
     sleepTimer = setTimeout(function () {
       if (root && root.getAttribute("data-state") === "idle") setVisual("idle", "sleepy");
     }, 30000);
+  }
+
+  var IDLE_VARIANTS = ["breathe", "look", "stretch"];
+
+  function scheduleIdleMotion() {
+    if (idleTimer) clearTimeout(idleTimer);
+    if (!root) return;
+    if (REDUCE || root.getAttribute("data-state") !== "idle") {
+      root.setAttribute("data-idle", "still");
+      return;
+    }
+    var index = (stableHash(petName()) + idleCycle) % IDLE_VARIANTS.length;
+    root.setAttribute("data-idle", IDLE_VARIANTS[index]);
+    idleCycle += 1;
+    idleTimer = setTimeout(scheduleIdleMotion, 5200);
   }
 
   function relaxTo(state, mood, delay) {
@@ -650,7 +687,7 @@
     var toggle = document.getElementById("pet-toggle");
     if (toggle) {
       toggle.setAttribute("aria-expanded", String(root.getAttribute("data-open") === "true"));
-      toggle.setAttribute("aria-label", pet.dismissed ? "Show Codex pet" : "Codex pet — open stats and customiser");
+      toggle.setAttribute("aria-label", pet.dismissed ? "Show Blastling" : "Blastling — open stats and customiser");
     }
   }
 

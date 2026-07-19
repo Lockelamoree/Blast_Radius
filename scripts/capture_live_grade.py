@@ -153,8 +153,8 @@ def capture_live_grade(
     revision = health.get("revision")
     if not revision or revision in {"unknown", "dev"}:
         raise RuntimeError("hosted instance does not report a deployed Git revision")
-    if health.get("live_generation") is not False:
-        raise RuntimeError("proof capture requires deterministic public scenario selection")
+    if health.get("live_generation") is not True:
+        raise RuntimeError("hosted live generation is not verified available")
     if health.get("bank_scenarios") != 20:
         raise RuntimeError("hosted instance does not report the 20-scenario verified bank")
     if health.get("critic_model") != EXPECTED_CRITIC_MODEL:
@@ -215,7 +215,9 @@ def capture_live_grade(
     critic = grade.get("critic_matched_tells", [])
     evidence = {
         "receipt_kind": "application_receipt",
+        "response_id": response_id,
         "captured_at": datetime.now(UTC).isoformat(),
+        "environment": "hosted",
         "base_url": base_url.rstrip("/"),
         "deployment_revision": revision,
         "session_sha256": audit_session_hash(session_id),
