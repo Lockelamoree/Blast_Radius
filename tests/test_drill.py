@@ -21,6 +21,7 @@ def test_drill_round_needs_no_pretest_and_grades(client: TestClient) -> None:
     data = nxt.json()
     assert data["complete"] is False
     assert data["provenance"] == "verified"
+    assert data["seconds"] == 60
     scenario = data["scenario"]
 
     decision = client.post(
@@ -62,6 +63,17 @@ def test_family_pin_serves_that_family(client: TestClient) -> None:
     session = _start_drill(client, family="poisoned_dependency", client_key="fam-client-1")["session_id"]
     data = client.post(f"/api/sessions/{session}/rounds/next", json={}).json()
     assert data["scenario"]["family"] == "poisoned_dependency"
+
+
+def test_sixty_second_entry_is_pinned_to_dangerous_commands(client: TestClient) -> None:
+    session = _start_drill(
+        client,
+        family="dangerous_command",
+        client_key="quick-entry-client",
+    )["session_id"]
+    data = client.post(f"/api/sessions/{session}/rounds/next", json={}).json()
+    assert data["seconds"] == 60
+    assert data["scenario"]["family"] == "dangerous_command"
 
 
 def test_drill_rejects_coached_retry(client: TestClient) -> None:

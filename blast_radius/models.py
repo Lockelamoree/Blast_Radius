@@ -296,6 +296,14 @@ class PolicyDelta(BaseModel):
     status: str = Field(pattern=r"^(ok|missing|excess)$")
 
 
+class GradeVerification(BaseModel):
+    """Public-input-only receipt for the gate that protected a graded round."""
+
+    scenario_fingerprint: str = Field(pattern=r"^[a-f0-9]{64}$")
+    gate_passed: bool
+    gate_reasons: list[str] = Field(default_factory=list)
+
+
 class GradeResult(BaseModel):
     scenario_id: str
     family: str | None = None
@@ -325,6 +333,7 @@ class GradeResult(BaseModel):
     critic_matched_tells: list[str] = Field(default_factory=list)
     safe_policy: BlastRadiusConfig | None = None
     policy_deltas: list[PolicyDelta] | None = None
+    verification: GradeVerification | None = None
 
 
 class CoachReply(BaseModel):
@@ -429,6 +438,12 @@ class CompetencyRef(BaseModel):
     label: str
 
 
+class CompetencyDelta(BaseModel):
+    key: str
+    label: str
+    delta: int
+
+
 class OversightBias(BaseModel):
     """Which direction the player's wrong calls lean, over a finished session.
 
@@ -464,6 +479,9 @@ class LearnerProgress(BaseModel):
     weakest_competency: CompetencyRef | None = None
     rounds_needed_nudge: int = Field(default=0, ge=0)
     oversight_bias: OversightBias | None = None
+    elapsed_seconds: int = Field(default=0, ge=0)
+    strongest_gain: CompetencyDelta | None = None
+    recommended_drill_family: str = ScenarioFamily.DANGEROUS_COMMAND.value
 
 
 class DrillResult(BaseModel):

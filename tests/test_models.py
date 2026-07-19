@@ -242,6 +242,37 @@ def test_legacy_session_state_json_without_new_fields_still_validates() -> None:
     assert restored.operator_handle is None
 
 
+def test_legacy_grade_and_progress_payloads_get_additive_receipt_defaults() -> None:
+    from blast_radius.models import GradeResult, LearnerProgress
+
+    grade = GradeResult(
+        scenario_id="legacy-grade",
+        verdict="correct",
+        action_correct=True,
+        reasoning_score=100,
+        matched_tells=[],
+        missed_tells=[],
+        receipts=[],
+        explanation="Legacy public explanation.",
+        socratic_followup="What evidence supports the choice?",
+    )
+    assert grade.verification is None
+
+    progress = LearnerProgress(
+        session_id="legacy-progress",
+        pretest_score=0,
+        test_total=5,
+        rounds_played=0,
+        rounds_generated=0,
+        competency_map={},
+        average_reasoning_score=0,
+        share_text="Legacy public summary.",
+    )
+    assert progress.elapsed_seconds == 0
+    assert progress.strongest_gain is None
+    assert progress.recommended_drill_family == "dangerous_command"
+
+
 def test_round_summary_retry_fields_default_and_validate() -> None:
     from blast_radius.models import RoundSummary
 

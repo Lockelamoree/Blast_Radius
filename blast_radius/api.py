@@ -36,11 +36,13 @@ from blast_radius.models import (
     BlastRadiusConfig,
     CoachReply,
     Competency,
+    CompetencyDelta,
     CompetencyProgress,
     CompetencyRef,
     DrillResult,
     GateResult,
     GenerationStatus,
+    GradeVerification,
     InspectionReport,
     LearnerProgress,
     PetConfig,
@@ -60,6 +62,35 @@ from blast_radius.storage import SessionStore
 # Cumulative-scoring points per graded round. Deterministic and honest — points
 # come only from rounds the player actually answered and the gate graded.
 VERDICT_POINTS = {"correct": 10, "partial": 4, "wrong": 1}
+
+DRILL_FAMILY_BY_COMPETENCY: dict[Competency, ScenarioFamily] = {
+    Competency.SCOPE: ScenarioFamily.DANGEROUS_COMMAND,
+    Competency.PROVENANCE: ScenarioFamily.POISONED_DEPENDENCY,
+    Competency.CAPABILITIES: ScenarioFamily.OVERSCOPED_TOOL,
+    Competency.DIFF_REVIEW: ScenarioFamily.MALICIOUS_DIFF,
+    Competency.PROMPT_INJECTION: ScenarioFamily.POISONED_CONTEXT,
+}
+
+
+def _public_scenario_fingerprint(scenario: Scenario) -> str:
+    """Hash only the canonical public presentation used for a graded round."""
+
+    payload = json.dumps(
+        scenario.public_view(),
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _grade_verification(engine: TrustEngine, scenario: Scenario) -> GradeVerification:
+    gate_receipt = engine.gate.verify(scenario)
+    return GradeVerification(
+        scenario_fingerprint=_public_scenario_fingerprint(scenario),
+        gate_passed=gate_receipt.passed,
+        gate_reasons=list(gate_receipt.reasons),
+    )
 
 
 class CreateSessionRequest(BaseModel):
@@ -974,7 +1005,7 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
             "complete": False,
             "round_number": state.current_index + 1,
             "rounds_total": len(state.scenario_order),
-            "seconds": 90 if state.mode == "drill" else max(35, 70 - state.current_index * 5),
+            "seconds": 60 if state.mode == "drill" else max(35, 70 - state.current_index * 5),
             "provenance": provenance,
             "generation_status": generation_status,
             "adaptive_focus": adaptive_focus,
@@ -1020,6 +1051,7 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
             allow_critic=state.active_provenance != ScenarioProvenance.GENERATED,
             session_budget=session_budget,
         )
+        grade.verification = _grade_verification(engine, scenario)
         state.llm_calls_used = session_budget.used
         competency = competency_for_family(scenario.family).value
         record = state.competency.setdefault(competency, {"hits": 0, "misses": 0})
@@ -1192,6 +1224,7 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
                 safety_identifier=state.id,
                 allow_critic=False,
             )
+            coached.verification = _grade_verification(engine, scenario)
             state.retried_grades.append(coached)
             store.save(state)
             # Compare deterministic-to-deterministic: the coached grade never
@@ -1312,6 +1345,23 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
             )
         test_total = engine.bank.assessment_size
         weakest = min(Competency, key=lambda item: competency_accuracy(state, item))
+        positive_gains = [
+            (competency, progress.test_delta)
+            for competency, progress in competency_map.items()
+            if progress.test_delta is not None and progress.test_delta > 0
+        ]
+        strongest_gain = None
+        if positive_gains:
+            competency, gain = max(positive_gains, key=lambda item: item[1])
+            strongest_gain = CompetencyDelta(
+                key=competency.value,
+                label=COMPETENCY_LABELS[competency],
+                delta=gain,
+            )
+        elapsed_seconds = max(
+            0,
+            round((state.updated_at - state.created_at).total_seconds()),
+        )
         retried_by_id = {grade.scenario_id: grade for grade in state.retried_grades}
         round_recap = [
             RoundSummary(
@@ -1373,6 +1423,9 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
             ),
             rounds_needed_nudge=rounds_needed_nudge,
             oversight_bias=oversight_bias,
+            elapsed_seconds=elapsed_seconds,
+            strongest_gain=strongest_gain,
+            recommended_drill_family=DRILL_FAMILY_BY_COMPETENCY[weakest].value,
         )
 
     return router

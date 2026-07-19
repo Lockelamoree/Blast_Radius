@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from blast_radius.api import (
     SessionMutationLocks,
     SlidingWindowLimiter,
+    _public_scenario_fingerprint,
     assessment_option_order,
 )
 from blast_radius.engine import TrustEngine
@@ -444,6 +445,54 @@ def test_full_demo_session(client, test_settings) -> None:
     weakest = result.json()["weakest_competency"]
     assert weakest["key"] in {item.value for item in Competency}
     assert weakest["label"]
+    assert result.json()["elapsed_seconds"] >= 0
+    assert result.json()["strongest_gain"] == {
+        "key": "scope",
+        "label": COMPETENCY_LABELS[Competency.SCOPE],
+        "delta": 1,
+    }
+    recommended = {
+        "scope": "dangerous_command",
+        "provenance": "poisoned_dependency",
+        "capabilities": "overscoped_tool",
+        "diff_review": "malicious_diff",
+        "prompt_injection": "poisoned_context",
+    }
+    assert result.json()["recommended_drill_family"] == recommended[weakest["key"]]
+
+
+def test_grade_verification_uses_public_presentation_and_real_gate(
+    client, test_settings
+) -> None:
+    session_id = create_started_session(client)
+    public_round = client.post(f"/api/sessions/{session_id}/rounds/next").json()
+    public_scenario = public_round["scenario"]
+    response = client.post(
+        f"/api/sessions/{session_id}/decisions",
+        json={
+            "scenario_id": public_scenario["id"],
+            "action": "reject",
+            "reasoning_text": "The public artifacts show a capability or provenance risk.",
+        },
+    )
+    assert response.status_code == 200, response.text
+    verification = response.json()["grade"]["verification"]
+
+    engine = TrustEngine(test_settings)
+    scenario = engine.bank.get(public_scenario["id"])
+    actual_gate = engine.gate.verify(scenario)
+    assert verification == {
+        "scenario_fingerprint": _public_scenario_fingerprint(scenario),
+        "gate_passed": actual_gate.passed,
+        "gate_reasons": actual_gate.reasons,
+    }
+    assert _public_scenario_fingerprint(scenario) == _public_scenario_fingerprint(scenario)
+    changed = scenario.model_copy(deep=True)
+    changed.presentation.ask_text += " (public presentation changed)"
+    assert _public_scenario_fingerprint(changed) != verification["scenario_fingerprint"]
+    serialized = str(verification)
+    for forbidden in ("ground_truth", "tell_keywords", "safe_blast_radius"):
+        assert forbidden not in serialized
 
 
 def test_finish_early_returns_honest_partial_results(client) -> None:
@@ -468,6 +517,15 @@ def test_finish_early_returns_honest_partial_results(client) -> None:
     assert body["posttest_score"] is None
     assert body["delta"] is None
     assert body["rounds_played"] == 2
+    assert body["strongest_gain"] is None
+    assert body["elapsed_seconds"] >= 0
+    assert body["recommended_drill_family"] in {
+        "dangerous_command",
+        "poisoned_dependency",
+        "overscoped_tool",
+        "malicious_diff",
+        "poisoned_context",
+    }
     assert len(body["rounds"]) == 2
     for competency in body["competency_map"].values():
         assert competency["post_score"] is None
@@ -894,6 +952,8 @@ def test_retry_regrades_deterministically_without_touching_budget(client) -> Non
     assert body["initial"]["verdict"] == verdict
     assert body["coached"]["graded_by"] == "deterministic"
     assert body["coached"]["critic_used"] is False
+    assert body["initial"]["verification"] == body["coached"]["verification"]
+    assert body["coached"]["verification"]["gate_passed"] is True
     assert "improved" in body
     # Second retry on the same round is refused.
     again = client.post(
