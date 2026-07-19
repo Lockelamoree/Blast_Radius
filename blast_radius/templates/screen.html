@@ -7,8 +7,9 @@
   <meta name="theme-color" content="#090a09">
   <title>Blast Radius · Screen an artifact</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%23090a09'/%3E%3Ctext x='32' y='40' text-anchor='middle' font-family='monospace' font-size='26' font-weight='700' fill='%23c8ff3d'%3EBR%3C/text%3E%3C/svg%3E">
-  <link rel="stylesheet" href="/static/styles.css?v=20260719-1">
-  <link rel="stylesheet" href="/static/screen.css?v=20260719-1">
+  <link rel="stylesheet" href="/static/styles.css?v=20260719-2">
+  <link rel="stylesheet" href="/static/screen.css?v=20260719-2">
+  <link rel="stylesheet" href="/static/pet.css?v=20260719-2">
 </head>
 <body>
   <p id="screen-status" class="sr-only" aria-live="polite" aria-atomic="true"></p>
@@ -41,8 +42,13 @@
             <option value="config">sandbox policy (JSON)</option>
           </select>
         </label>
+        <label class="screen-field">
+          <span>FROZEN EXAMPLE</span>
+          <select id="screen-example-select"></select>
+        </label>
         <div class="screen-buttons">
-          <button id="screen-example" type="button" class="button ghost">Load an example</button>
+          <button id="screen-example" type="button" class="button ghost">Load selected example</button>
+          <button id="screen-clear" type="button" class="button ghost">Clear artifact</button>
           <button id="screen-run" type="button" class="button primary">Screen artifact <span>&rarr;</span></button>
         </div>
       </div>
@@ -53,10 +59,15 @@
       <p id="screen-hint" class="microcopy"></p>
 
       <output id="screen-result" class="screen-result" aria-live="polite"></output>
+      <div id="screen-report-actions" class="screen-report-actions hidden">
+        <button id="screen-copy-receipt" type="button" class="button ghost">Copy receipt summary</button>
+        <button id="screen-download-receipt" type="button" class="button ghost">Download full JSON receipt</button>
+      </div>
     </section>
   </main>
 
   <footer><span>BLAST RADIUS / BUILD WEEK 2026</span><span>Deterministic keyword screen &mdash; not a proof of safety.</span></footer>
-  <script src="/static/screen.js?v=20260719-1" defer></script>
+  <script src="/static/screen.js?v=20260719-2" defer></script>
+  <script src="/static/pet.js?v=20260719-2" defer></script>
 </body>
 </html>

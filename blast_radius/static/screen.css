@@ -40,7 +40,8 @@
   text-transform: uppercase;
 }
 
-#screen-kind {
+#screen-kind,
+#screen-example-select {
   background: var(--panel);
   color: var(--ink);
   border: 1px solid var(--line);
@@ -49,13 +50,15 @@
   font: 13px/1 var(--mono);
 }
 
-#screen-kind:focus-visible {
+#screen-kind:focus-visible,
+#screen-example-select:focus-visible {
   outline: 2px solid var(--acid);
   outline-offset: 2px;
 }
 
 .screen-buttons {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
@@ -170,10 +173,42 @@
 .chip.sev-critical { color: var(--orange); border-color: color-mix(in srgb, var(--orange) 45%, transparent); }
 .chip.sev-caution { color: var(--blue); border-color: color-mix(in srgb, var(--blue) 45%, transparent); }
 .chip.conf { color: var(--acid); border-color: color-mix(in srgb, var(--acid) 40%, transparent); }
+.chip.no-model { margin-left: auto; color: var(--acid); border-color: color-mix(in srgb, var(--acid) 40%, transparent); }
 
 .finding-why { margin: 8px 0 4px; font-size: 13px; }
 .finding-fix { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
 .finding-fix b { color: var(--acid); font-weight: 600; }
+
+.finding-copy {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--acid);
+  cursor: pointer;
+  font: 700 9px var(--mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.finding-match-details {
+  margin-top: 10px;
+}
+
+.finding-match-details summary,
+.finding-practice {
+  color: var(--muted);
+  cursor: pointer;
+  font: 700 9px var(--mono);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.finding-practice {
+  display: inline-block;
+  margin-top: 12px;
+  color: var(--acid);
+  text-decoration: none;
+}
 
 .finding-matches {
   list-style: none;
@@ -224,4 +259,24 @@
   padding: 12px 14px;
   color: var(--ink);
   background: color-mix(in srgb, var(--orange) 10%, transparent);
+}
+
+.screen-report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+@media (max-width: 640px) {
+  .screen-field,
+  .screen-field select,
+  .screen-buttons,
+  .screen-buttons .button {
+    width: 100%;
+  }
+
+  .chip.no-model {
+    margin-left: 0;
+  }
 }
