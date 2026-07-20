@@ -1,14 +1,14 @@
 # Blast Radius
 
-**Blast Radius is a browser game for practicing safe approval decisions around AI coding
-agents, backed by 20 receipt-linked scenarios and 432 automated tests.** Inspect a proposed
+**Blast Radius is my browser game for practicing safe approval decisions around AI coding
+agents — backed by 20 receipt-linked scenarios and 432 automated tests.** You inspect a proposed
 command, dependency, tool manifest, diff, retrieved instruction, or marketplace skill; choose
-**approve**, **sandbox**, or **reject**; then name the evidence tell. The verdict scores the
-action, tell coverage, and—when applicable—the exact sandbox policy, with direct evidence for
+**approve**, **sandbox**, or **reject**; then name the evidence tell. The verdict scores your
+action, your tell coverage, and—when it applies—the exact sandbox policy, with direct evidence for
 every scenario.
 
-The application targets the OpenAI Build Week 2026 Developer Tools track. Scenario commands
-are inert strings and are never executed.
+I built it for the OpenAI Build Week 2026 Developer Tools track. Every scenario command is an
+inert string and is never executed.
 
 > **🔎 See it work → [Live walkthrough &amp; proof](https://lockelamoree.github.io/Blast_Radius/)** —
 > annotated real-UI screenshots, the live GPT-5.6 grade with its response id, and the correctness
@@ -29,9 +29,8 @@ genuinely fun, with a bit of my security-background flavour.
 The rule I cared about most: **nothing reaches your screen unless it passes a correctness gate
 against verified ground truth**, so the game can't teach you a hallucinated lesson. That principle
 actually came out of a scary bug — a subtly invalid output schema that would have silently disabled
-live GPT-5.6 grading while everything still looked green (the story is in *Production deployment and
-proof capture* below). After catching it, "no claim ships before its receipt" became the whole
-philosophy. Codex was a genuine gamechanger here, especially for the thinking: I started with a
+live GPT-5.6 grading while everything still looked green — and nothing on the surface would have
+told me. After catching it, "no claim ships before its receipt" became the whole philosophy. Codex was a genuine gamechanger here, especially for the thinking: I started with a
 planning session, had it interview me about the idea, wrote everything into design docs it could
 implement structurally, and used review agents to challenge my own features before I shipped them.
 
@@ -41,6 +40,8 @@ emerging — I'll keep building out the CLI, GitHub Action and Codex plugin, and
 the developers at my own company to use this. ;)
 
 ## What is shipped
+
+Here's what actually ships today:
 
 - 20 curated, receipt-backed scenarios across six threat families — including retrieval
   (web-fetch) prompt injection and MCP tool-description poisoning.
@@ -76,8 +77,8 @@ the developers at my own company to use this. ;)
   gate result. Grade, screening, and learning receipts can be downloaded as JSON without exposing
   hidden keyword mappings or scenario ground truth.
 
-`BLAST_RADIUS_LIVE_GENERATION=false` remains the safe deployment default. An explicitly
-enabled live session selects a verified anchor first, then Luna may reskin only its
+`BLAST_RADIUS_LIVE_GENERATION=false` is the safe deployment default I ship with. When a live
+session is explicitly enabled, it selects a verified anchor first, then Luna may reskin only its
 presentation fields. The anchor's family, template, action, tells, evidence, explanation,
 sandbox policy, and receipts remain deep-copied and immutable. The deterministic gate and a
 separate Sol consistency gate must both pass or the unchanged verified anchor is returned.
@@ -93,9 +94,9 @@ curated anchor -> optional Luna presentation reskin -> deterministic gate -> Sol
 
 Hosted demo: **<https://blastradius.max-gutowski.de/>**
 
-The hosted demo is in private preview behind an access code — judges enter the code from the
-Devpost testing-access field. The local run below needs no code and reproduces the full
-verified experience offline.
+The hosted demo runs in private preview behind an access code — judges enter the code from the
+Devpost testing-access field. If you'd rather run it yourself, the local setup below needs no code
+and reproduces the full verified experience offline.
 
 Requirements:
 
@@ -136,8 +137,8 @@ SDK retries, and the opaque session UUID as `safety_identifier`. Provider-dispat
 count against the UTC daily application budget; configure a provider-side project budget as
 the hard financial ceiling.
 
-For the shortest product tour, choose **Try one verified incident · 60 sec**. It opens one
-day/client-stable `dangerous_command` drill with no nickname, profile step, or assessment. Choose
+If you just want the fastest tour, hit **Try one verified incident · 60 sec** — it opens one
+day/client-stable `dangerous_command` drill with no nickname, profile step, or assessment. Pick
 **Measure my approval reflex** for the full pre/post run. The three landing destinations are:
 
 - **Learn** — cited field guides, including `/?view=learn&family=dangerous_command` deep links;
@@ -149,11 +150,11 @@ its module until the visitor explicitly opens the field guide.
 
 ## Use it as a daily tool
 
-The scenario bank is one way to practice; the deterministic engine is also a tool you can point
-at your *own* agent output every day. Everything below runs the same `CorrectnessGate` and
-`grade_decision` logic the game uses — **no model runs and it cannot prove an artifact is safe.**
-It is a keyword screen that flags known red-flag patterns; `looks-scoped` means only that nothing
-matched.
+The scenario bank is one way to practice — but I also wanted the deterministic engine to be a tool
+you can point at your *own* agent's output every day. Everything below runs the same
+`CorrectnessGate` and `grade_decision` logic the game uses — **no model runs, and it cannot prove
+an artifact is safe.** It's a keyword screen that flags known red-flag patterns; `looks-scoped`
+only ever means that nothing matched.
 
 **CLI** (installed with the package as `blastradius`, fully offline):
 
@@ -236,7 +237,7 @@ opening a PR.
 
 ### Measure the screen — accuracy and known blind spots
 
-A daily-driver guard is only as trustworthy as its measured accuracy, so the screen is scored
+A daily-driver guard is only as trustworthy as its measured accuracy, so I score the screen
 against a labeled corpus of malicious and benign artifacts
 ([`blast_radius/data/detection_corpus.jsonl`](blast_radius/data/detection_corpus.jsonl)). The
 runner is pure and offline — no model, no key — so anyone can reproduce it:
@@ -273,8 +274,8 @@ row maps to a corpus id you can inspect and re-run.
 ### Extend it — team custom rules
 
 Drop a `.blastradius.toml` in your repo root and the CLI, MCP tool, and supervisor hook pick it up
-automatically (see [`.blastradius.toml.example`](.blastradius.toml.example)). Custom rules screen
-with the same token+regex machinery as the built-ins, so org-specific coverage is real coverage:
+automatically (see [`.blastradius.toml.example`](.blastradius.toml.example)). I run custom rules
+through the same token+regex machinery as the built-ins, so org-specific coverage is real coverage:
 
 ```toml
 allowlist = ["vendored/internal-mirror"]   # drops matching *caution* noise only
@@ -314,7 +315,7 @@ python scripts/submission_preflight.py
 python scripts/submission_preflight.py --strict --health-url https://blastradius.max-gutowski.de/healthz
 ```
 
-The link checker is intentionally standalone—not part of pytest or CI—because it needs the
+I keep the link checker standalone—not part of pytest or CI—because it needs the
 network. It fails on dead sources and redirects, and covers the field-guide and toolkit
 citations (`learn.json`, `toolkit.json`) under the same rule as scenario evidence. GitHub Actions runs Ruff, pytest, the
 20-scenario verifier, wheel construction, and packaged-resource inspection on Python 3.11 and
@@ -345,7 +346,7 @@ Useful endpoints:
 
 ### Human vs. model oversight
 
-The same engine can score a *model* instead of a person. `blastradius eval-model`
+I can point the same engine at a *model* instead of a person. `blastradius eval-model`
 runs GPT-5.6 as a player through the exact 20 scenarios — it produces the same
 approve/sandbox/reject call and one-sentence tell a human does, and is graded by
 the identical deterministic gate (`grade_decision`). The model never gates
@@ -370,9 +371,9 @@ draft, never a curated scenario's ground truth.
 
 ## Screens
 
-These stable asset paths are the submission gallery contract. The current files are annotated
-staging images; replace them with live 1200×800 PNG captures before submission without changing
-the README or Devpost links.
+These stable asset paths are my submission gallery contract. The current files are annotated
+staging images; I'll replace them with live 1200×800 PNG captures before submission without
+changing the README or Devpost links.
 
 ![Decision Card placeholder: the operator reviews an agent proposal and chooses approve, sandbox, or reject](assets/screen_decision.png)
 
@@ -389,15 +390,15 @@ learning result: **Not yet measured** with a consented named tester.*
 
 ## Architecture and trust boundary
 
-FastAPI serves the interface and API from one Python process. Pydantic validates every input
-and model output. SQLite stores opaque session state, expiry timestamps, the atomic UTC
-model-attempt budget, and pseudonymous learner profiles. Profiles use a signed browser cookie
-and recoverable token; they collect no email address or password.
+I serve the interface and API from one FastAPI process. Pydantic validates every input and model
+output. SQLite stores opaque session state, expiry timestamps, the atomic UTC model-attempt
+budget, and pseudonymous learner profiles. Profiles use a signed browser cookie and recoverable
+token; they collect no email address or password.
 
-The browser receives only scenario presentation data before a decision. Ground truth,
-answer keys, and the original assessment option order remain server-side. Per-session async
-locks serialize mutations, so simultaneous duplicate decisions persist once and invoke the
-critic at most once under the documented single-worker deployment.
+The browser only ever receives scenario presentation data before a decision. Ground truth,
+answer keys, and the original assessment option order stay server-side. Per-session async locks
+serialize mutations, so simultaneous duplicate decisions persist once and invoke the critic at
+most once under the documented single-worker deployment.
 
 ![Architecture: the scenario path (bank, optional Luna reskin, deterministic gate, Sol gate) and the grading path (decision, deterministic grade, Sol tell match, verdict with receipts)](assets/architecture.svg)
 
@@ -450,10 +451,10 @@ enter that reasoning-critic prompt.
 
 ## Production deployment and proof capture
 
-Supported platforms are Windows, macOS, and Linux for self-hosting, plus current desktop and
-mobile browsers. Production files in `deploy/` target Ubuntu 24.04 LTS (Python 3.11+ is
-enforced) with Uvicorn under `systemd` and Caddy for HTTPS. Prompt for the spend-capped key so
-its value is not written to shell history:
+You can self-host on Windows, macOS, or Linux (plus any current desktop or mobile browser). My
+production files in `deploy/` target Ubuntu 24.04 LTS (Python 3.11+ is enforced) with Uvicorn
+under `systemd` and Caddy for HTTPS. Prompt for the spend-capped key so its value never lands in
+shell history:
 
 ```bash
 sudo BLAST_RADIUS_PROMPT_FOR_OPENAI_KEY=1 bash deploy/deploy.sh your-domain.example
@@ -507,14 +508,14 @@ present, the Sol probe is live, and daily application budget remains.
 | Build used Codex | repository guidance and dated commit history | Inspectable |
 | Learning improvement | one consented named pre/post run | Not yet measured |
 
-No learning delta, latency, accuracy, or productivity metric is claimed without a captured
-measurement.
+I don't claim a learning delta, latency, accuracy, or productivity metric without a captured
+measurement behind it.
 
 ## Built with Codex
 
-This repository was implemented with Codex beginning July 14, 2026. The primary build task is
-identified by `/feedback` Session ID **019f606c-081a-7911-ba7b-114168f91dd1**. Codex turned the
-product into a simple loop with receipts: propose an inert action, make an operator decision,
+I implemented this repository with Codex beginning July 14, 2026. My primary build task is
+identified by `/feedback` Session ID **019f606c-081a-7911-ba7b-114168f91dd1**. Codex helped me turn
+the product into a simple loop with receipts: propose an inert action, make an operator decision,
 verify it against immutable truth, then expose direct evidence. Concrete contributions include:
 
 - `AGENTS.md` plus nested `engine/AGENTS.md` and `static/AGENTS.md` guidance encoding the
@@ -534,7 +535,7 @@ history loss; the merged tree then passed the same gate and regression loop as e
 
 ## Prior work and exclusions
 
-The application code was implemented during the July 13–21, 2026 submission period; the
+I implemented the application code during the July 13–21, 2026 submission period; the
 dated history is the evidence.
 
 
