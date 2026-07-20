@@ -371,22 +371,23 @@ draft, never a curated scenario's ground truth.
 
 ## Screens
 
-These stable asset paths are my submission gallery contract. The current files are annotated
-staging images; I'll replace them with live 1200×800 PNG captures before submission without
-changing the README or Devpost links.
+These stable asset paths are my submission gallery contract — live 1200×800 captures from the
+hosted app at <https://blastradius.max-gutowski.de/>.
 
-![Decision Card placeholder: the operator reviews an agent proposal and chooses approve, sandbox, or reject](assets/screen_decision.png)
+![Decision Card: the operator reviews a proposed agent action and chooses approve, sandbox, or reject](assets/screen_decision.png)
 
 *Decision Card — the operator makes the call and names the evidence tell.*
 
-![Verdict Stamp placeholder: the graded call is paired with direct evidence receipts and the gate result](assets/screen_verdict.png)
+![Verdict: the graded call paired with the live GPT-5.6 Sol critique, evidence receipts, and the gate result](assets/screen_verdict.png)
 
-*Verdict Stamp — the money shot: scored reasoning, verified receipts, and the visible gate result.*
+*Verdict — the money shot: your reasoning graded live by GPT-5.6 Sol (real response id in-frame),
+verified evidence receipts, and the visible gate result.*
 
-![Results placeholder: the final screen summarizes pre-to-post change, mastery, and next practice targets](assets/screen_results.png)
+![The landing: the operator's-seat pitch, the proof strip, and the three learning modes](assets/screen_results.png)
 
-*Results and mastery — measured competency change and the next weakest-area practice target. Live
-learning result: **Not yet measured** with a consented named tester.*
+*The landing — the operator's seat, the proof strip (20 scenarios · 6 families · 0 commands executed ·
+100% receipt-backed), and the three ways to play. Learning-delta measurement with a consented named
+tester: **Not yet measured**.*
 
 ## Architecture and trust boundary
 
