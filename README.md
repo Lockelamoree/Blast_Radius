@@ -10,6 +10,10 @@ every scenario.
 The application targets the OpenAI Build Week 2026 Developer Tools track. Scenario commands
 are inert strings and are never executed.
 
+> **🔎 See it work → [Live walkthrough &amp; proof](https://lockelamoree.github.io/Blast_Radius/)** —
+> annotated real-UI screenshots, the live GPT-5.6 grade with its response id, and the correctness
+> gate rejecting a planted hallucination on demand. Mirrored in the repo under [`docs/`](docs/).
+
 ![The decision screen: a proposed agent action, three color-coded calls, and the tell prompt](assets/thumb_decision.png)
 
 ## What is shipped

@@ -194,6 +194,7 @@ Open `http://127.0.0.1:8000`. The deterministic run works without an API key.
 ## Links
 
 - Hosted demo: **https://blastradius.max-gutowski.de/**
+- Walkthrough &amp; proof (annotated screenshots + the live gate-catch JSON): **https://lockelamoree.github.io/Blast_Radius/**
 - Source: **https://github.com/Lockelamoree/Blast_Radius**
 - Public video: **VIDEO URL — ADD AFTER RECORDING**
 - License: **MIT**

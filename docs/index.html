@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blast Radius — how it works, and how we prove it</title>
+<meta name="description" content="Blast Radius trains developers to operate AI coding agents. See the live GPT-5.6 grade, watch the correctness gate reject a planted fake, and read the proof for every claim.">
+<style>
+  :root{
+    --ink:#f4f1e8; --muted:#9d9a91; --dim:#6f6d66; --black:#090a09; --panel:#101210;
+    --panel2:#151812; --line:#2a2d27; --acid:#c8ff3d; --orange:#ff6738;
+    --serif:Georgia,"Liberation Serif","DejaVu Serif",serif;
+    --mono:"Cascadia Mono","DejaVu Sans Mono","Liberation Mono",ui-monospace,monospace;
+    --sans:Inter,"DejaVu Sans",system-ui,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:
+      radial-gradient(circle at 84% -4%, rgba(200,255,61,.09), transparent 34%),
+      radial-gradient(circle at 4% 118%, rgba(255,103,56,.045), transparent 40%),
+      var(--black);
+    color:var(--ink); font-family:var(--sans); line-height:1.55;
+    -webkit-font-smoothing:antialiased; overflow-x:hidden;
+  }
+  .noise{position:fixed;inset:0;opacity:.04;pointer-events:none;z-index:0;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.85'/%3E%3C/svg%3E")}
+  .wrap{position:relative;z-index:1;max-width:1080px;margin:0 auto;padding:0 24px}
+  a{color:var(--acid);text-decoration:none}
+  a:hover{text-decoration:underline}
+  code,kbd{font-family:var(--mono);font-size:.86em}
+
+  /* nav */
+  nav{position:sticky;top:0;z-index:20;backdrop-filter:blur(8px);
+    background:rgba(9,10,9,.72);border-bottom:1px solid var(--line)}
+  .nav-in{max-width:1080px;margin:0 auto;padding:13px 24px;display:flex;align-items:center;
+    justify-content:space-between;gap:16px}
+  .brand{display:flex;align-items:center;gap:12px;font-family:var(--mono);
+    font-size:15px;letter-spacing:.2em}
+  .mark{display:grid;place-items:center;width:32px;height:32px;border:2px solid var(--acid);
+    color:var(--acid);font-weight:800;font-size:14px;letter-spacing:0}
+  .nav-links{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .btn{font-family:var(--mono);font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;
+    padding:9px 15px;border:1.5px solid var(--line);color:var(--ink);border-radius:2px;white-space:nowrap}
+  .btn:hover{border-color:var(--acid);color:var(--acid);text-decoration:none}
+  .btn.solid{background:var(--acid);color:#0a0c06;border-color:var(--acid);font-weight:700}
+  .btn.solid:hover{background:#d6ff5a}
+  .nav-links .btn.ghost{display:none}
+  @media(min-width:720px){.nav-links .btn.ghost{display:inline-block}}
+
+  /* hero */
+  header.hero{padding:78px 0 60px}
+  .kick{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--acid);margin-bottom:22px}
+  h1{font-family:var(--serif);font-weight:400;font-size:clamp(42px,7.4vw,86px);line-height:.94;
+    letter-spacing:-.03em;max-width:16ch}
+  h1 em{color:var(--acid);font-style:normal}
+  .sub{margin-top:26px;max-width:60ch;font-size:clamp(16px,2vw,19px);color:#d6d8cd}
+  .cta{margin-top:34px;display:flex;gap:12px;flex-wrap:wrap}
+  .cta .btn{font-size:13px;padding:13px 20px}
+
+  .proof{margin-top:52px;display:grid;grid-template-columns:repeat(2,1fr);
+    border-top:1px solid var(--line);border-left:1px solid var(--line)}
+  @media(min-width:640px){.proof{grid-template-columns:repeat(4,1fr)}}
+  .proof div{padding:20px 22px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .proof b{display:block;font-family:var(--serif);font-size:38px;color:var(--acid);
+    font-weight:400;line-height:1}
+  .proof span{display:block;margin-top:7px;font-family:var(--mono);font-size:11.5px;
+    letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+
+  /* sections */
+  section{padding:56px 0;border-top:1px solid var(--line)}
+  .eyebrow{font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.17em;
+    text-transform:uppercase;color:var(--orange);margin-bottom:14px}
+  .eyebrow.acid{color:var(--acid)}
+  h2{font-family:var(--serif);font-weight:400;font-size:clamp(28px,4.4vw,44px);
+    line-height:1.02;letter-spacing:-.02em;max-width:20ch}
+  .lead{margin-top:18px;max-width:64ch;font-size:17px;color:#d0d2c7}
+  .lead.small{font-size:15.5px;color:var(--muted)}
+
+  figure{margin:30px 0 0}
+  figure img,figure svg{width:100%;height:auto;display:block;border:1px solid var(--line);
+    border-radius:6px;background:var(--black)}
+  figcaption{margin-top:11px;font-family:var(--mono);font-size:12px;letter-spacing:.03em;
+    color:var(--dim)}
+  figcaption b{color:var(--muted);font-weight:400}
+  .callout-img{margin-top:20px}
+  .callout-img img{border-color:#31401a;box-shadow:0 0 40px rgba(200,255,61,.06)}
+
+  .two{display:grid;gap:34px;margin-top:8px}
+  @media(min-width:860px){.two{grid-template-columns:1.05fr .95fr;align-items:center}
+    .two.rev>figure{order:-1}}
+
+  /* terminal blocks */
+  .term{margin-top:22px;border:1px solid var(--line);border-radius:7px;overflow:hidden;
+    background:linear-gradient(180deg,#0d0f0c,#0a0b09)}
+  .term-bar{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);
+    font-family:var(--mono);font-size:12px;color:var(--muted);background:#0c0e0b}
+  .dot3{display:flex;gap:6px}.dot3 i{width:10px;height:10px;border-radius:50%;background:#2f332b}
+  .term-bar .ttl{margin-left:6px;letter-spacing:.04em}
+  .term pre{margin:0;padding:16px 18px;overflow-x:auto;font-family:var(--mono);
+    font-size:12.8px;line-height:1.62;color:#cfd2c6}
+  .term pre .k{color:var(--acid)}
+  .term pre .fail{color:var(--orange);font-weight:700}
+  .term pre .ok{color:var(--acid);font-weight:700}
+  .term pre .c{color:var(--dim)}
+  .term pre .cmd{color:#e9ecdf}
+  .scenrun{max-height:340px}
+
+  .grid3{display:grid;gap:16px;margin-top:26px;grid-template-columns:1fr}
+  @media(min-width:640px){.grid3{grid-template-columns:repeat(2,1fr)}}
+  @media(min-width:920px){.grid3{grid-template-columns:repeat(3,1fr)}}
+  .card{border:1px solid var(--line);border-radius:7px;padding:19px 19px 20px;background:var(--panel);
+    display:flex;flex-direction:column;gap:8px}
+  .card h3{font-family:var(--mono);font-size:13px;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--acid);font-weight:700}
+  .card p{font-size:14.5px;color:#c6c8bd}
+  .card .m{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .card code{color:var(--ink);background:var(--panel2);border:1px solid var(--line);
+    border-radius:4px;padding:1px 6px}
+
+  ul.ticks{list-style:none;margin-top:22px;display:flex;flex-direction:column;gap:13px;max-width:70ch}
+  ul.ticks li{position:relative;padding-left:26px;font-size:16px;color:#d0d2c7}
+  ul.ticks li::before{content:"›";position:absolute;left:2px;top:0;color:var(--acid);
+    font-family:var(--mono);font-weight:700}
+  ul.ticks li b,ul.ticks li em{color:var(--acid);font-style:normal;font-weight:600}
+  ul.ticks li code{color:var(--ink);background:var(--panel2);border:1px solid var(--line);
+    border-radius:4px;padding:1px 6px}
+
+  blockquote{margin-top:24px;border-left:3px solid var(--acid);background:var(--panel);
+    padding:20px 24px;border-radius:0 6px 6px 0}
+  blockquote p{font-family:var(--mono);font-size:14.5px;line-height:1.7;color:#dfe1d5}
+  blockquote .attr{margin-top:12px;font-family:var(--mono);font-size:12px;color:var(--muted);
+    letter-spacing:.04em}
+
+  /* claim-to-proof table */
+  .tablewrap{margin-top:26px;border:1px solid var(--line);border-radius:7px;overflow-x:auto}
+  table{border-collapse:collapse;width:100%;min-width:620px;font-size:14.5px}
+  th,td{text-align:left;padding:13px 16px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--muted);background:#0c0e0b}
+  tr:last-child td{border-bottom:0}
+  td code{font-family:var(--mono);font-size:12.5px;color:var(--acid)}
+  .st{font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase;
+    padding:3px 8px;border-radius:3px;white-space:nowrap}
+  .st.live{color:var(--acid);border:1px solid #37481d;background:rgba(200,255,61,.06)}
+  .st.nm{color:var(--muted);border:1px solid var(--line)}
+
+  .note{margin-top:26px;padding:16px 18px;border:1px dashed var(--line);border-radius:6px;
+    font-size:14px;color:var(--muted)}
+  .note b{color:var(--ink);font-weight:600}
+
+  footer{border-top:1px solid var(--line);padding:44px 0 66px;margin-top:20px}
+  .foot{display:flex;flex-wrap:wrap;gap:26px;justify-content:space-between;align-items:flex-start}
+  .foot .links{display:flex;flex-wrap:wrap;gap:9px}
+  .foot .tag{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--dim)}
+  .foot .tag .u{color:var(--acid)}
+</style>
+</head>
+<body>
+<div class="noise"></div>
+
+<nav>
+  <div class="nav-in">
+    <span class="brand"><span class="mark">BR</span> BLAST RADIUS</span>
+    <span class="nav-links">
+      <a class="btn ghost" href="#gate">The gate</a>
+      <a class="btn ghost" href="#codex">Built with Codex</a>
+      <a class="btn ghost" href="#proof">Claim-to-proof</a>
+      <a class="btn" href="https://github.com/Lockelamoree/Blast_Radius">Source</a>
+      <a class="btn solid" href="https://blastradius.max-gutowski.de">Play the demo →</a>
+    </span>
+  </div>
+</nav>
+
+<header class="hero wrap">
+  <p class="kick">AI-agent security · playable · built with Codex + GPT-5.6</p>
+  <h1>Don't get owned by <em>your own agent</em>.</h1>
+  <p class="sub">Your AI coding agent proposes shell commands, new dependencies, tool manifests and diffs all day and asks you to approve them. Approve the wrong one and you're owned. <b>Blast Radius</b> puts you in the operator's seat, grades your reasoning live with GPT-5.6, and — crucially — can never teach you something false. This page shows how it works, and lets you verify every claim yourself.</p>
+  <div class="cta">
+    <a class="btn solid" href="https://blastradius.max-gutowski.de">Play the live demo →</a>
+    <a class="btn" href="https://github.com/Lockelamoree/Blast_Radius">View the source</a>
+    <!-- TODO: replace with the published YouTube URL before submitting -->
+    <a class="btn" href="https://github.com/Lockelamoree/Blast_Radius#demo">Watch the 3-min demo</a>
+  </div>
+  <div class="proof">
+    <div><b>20</b><span>Verified scenarios</span></div>
+    <div><b>6</b><span>Threat families</span></div>
+    <div><b>GPT-5.6</b><span>Live reasoning grade</span></div>
+    <div><b>100%</b><span>Receipt-backed</span></div>
+  </div>
+</header>
+
+<!-- CORE LOOP -->
+<section class="wrap" id="loop">
+  <p class="eyebrow acid">The core loop</p>
+  <h2>You're the operator. Approve, sandbox, or reject.</h2>
+  <div class="two">
+    <div>
+      <p class="lead">Each round shows a realistic proposed agent action across six threat families — a slopsquatted <code>pip install</code>, a <code>curl | bash</code>, a skill manifest quietly reaching for <code>~/.ssh</code>, a poisoned diff. You make the call the way you would in your terminal, and you name the evidence tell in your own words.</p>
+      <ul class="ticks">
+        <li><b>Approve · sandbox · reject</b> — the same three choices your agent gives you</li>
+        <li>Write the <b>tell</b>: the concrete signal that justifies your call</li>
+        <li>The browser only ever receives presentation data — <b>never the answer key</b></li>
+      </ul>
+    </div>
+    <figure>
+      <img src="img/decision.png" alt="The Blast Radius decision card: a proposed agent command to run the repository unit tests without network access, with approve, sandbox and reject options and a prompt to name the tell.">
+      <figcaption><b>The decision card, live at blastradius.max-gutowski.de</b> — a real proposed agent action awaiting your call.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- LIVE GRADING -->
+<section class="wrap" id="grade">
+  <p class="eyebrow acid">Live GPT-5.6 grading</p>
+  <h2>Then GPT-5.6 grades your reasoning — live, with receipts.</h2>
+  <div class="two rev">
+    <div>
+      <p class="lead">Commit your decision and <b>GPT-5.6 “Sol”</b> fires a real call through the OpenAI Responses API with strict Structured Outputs, grades your free-form reasoning, and shows the receipts: concrete, link-checked evidence for why the verdict holds. The response id and latency are printed on screen, so a skeptic can confirm the call actually happened.</p>
+      <ul class="ticks">
+        <li>A genuine <code>resp_…</code> id + latency, rendered in the UI</li>
+        <li><b>Evidence receipts</b> with <code>INSPECT SOURCE</code> — no unsourced claims</li>
+        <li>A <b>second reviewer</b> that catches what deterministic keyword-matching missed</li>
+        <li>A Socratic follow-up + an “ask the coach” box (also GPT-5.6)</li>
+      </ul>
+    </div>
+    <figure>
+      <img src="img/verdict.png" alt="The graded verdict screen: GPT-5.6 Critique by Sol, a CORRECT stamp, 'You contained the blast radius', 100% tell coverage, evidence receipts with inspect source, a follow-up question, and a second-reviewer block.">
+      <figcaption><b>A live graded verdict</b> — SOL critique, 100% tell coverage, receipts, and a second-reviewer catch.</figcaption>
+    </figure>
+  </div>
+  <figure class="callout-img">
+    <img src="img/respid.png" alt="Close-up of the grade header: GPT-5.6 Critique Sol, gpt-5.6-sol effort medium response id resp_8d1676f 4.3 seconds, CORRECT.">
+    <figcaption>The grade header prints the model, reasoning-effort tier, the real <code>resp_8d1676f…</code> id, and the 4.3s latency.</figcaption>
+  </figure>
+</section>
+
+<!-- THE GATE (flagship) -->
+<section class="wrap" id="gate">
+  <p class="eyebrow">The correctness gate · the flagship</p>
+  <h2>It can’t teach you anything false. Watch it catch a fake.</h2>
+  <p class="lead">The trust boundary that makes a security game safe to learn from: <b>nothing reaches your screen unless it passes a deterministic correctness gate against verified ground truth.</b> To prove it isn’t just a claim, the app ships a live endpoint that <em>plants a hallucination into a real scenario</em> and asks the gate to sign off. The gate refuses — every time, with the specific reason. Below is the actual JSON, captured just now from the production route. Run it yourself; no account or key needed.</p>
+
+  <div class="term">
+    <div class="term-bar"><span class="dot3"><i></i><i></i><i></i></span><span class="ttl">case 1 — plant a fabricated “remote code execution backdoor” tell</span></div>
+<pre><span class="cmd">$ curl -s https://blastradius.max-gutowski.de/api/demo/gate-catch?case=tell</span>
+{
+  "case": "tell",
+  "planted_claim": "hidden remote code execution backdoor",
+  "passed": <span class="fail">false</span>,
+  "reasons": [
+    <span class="fail">"presented artifacts do not support declared tell: hidden remote code execution backdoor"</span>
+  ]
+}</pre>
+  </div>
+
+  <div class="term">
+    <div class="term-bar"><span class="dot3"><i></i><i></i><i></i></span><span class="ttl">case 2 — swap in an off-catalog, fabricated citation</span></div>
+<pre><span class="cmd">$ curl -s https://blastradius.max-gutowski.de/api/demo/gate-catch?case=citation</span>
+{
+  "case": "citation",
+  "planted_claim": "off-catalog security receipt",
+  "passed": <span class="fail">false</span>,
+  "reasons": [
+    <span class="fail">"evidence source is not approved for this template"</span>
+  ]
+}</pre>
+  </div>
+
+  <div class="term">
+    <div class="term-bar"><span class="dot3"><i></i><i></i><i></i></span><span class="ttl">case 3 — stack both lies on one scenario → the gate returns both reasons at once</span></div>
+<pre><span class="cmd">$ curl -s https://blastradius.max-gutowski.de/api/demo/gate-catch?case=stack</span>
+{
+  "case": "stack",
+  "planted_claim": "hidden remote code execution backdoor + off-catalog security receipt",
+  "passed": <span class="fail">false</span>,
+  "reasons": [
+    <span class="fail">"evidence source is not approved for this template"</span>,
+    <span class="fail">"presented artifacts do not support declared tell: hidden remote code execution backdoor"</span>
+  ]
+}</pre>
+  </div>
+  <p class="lead small">The gate lives in <code>blast_radius/engine/gate.py</code> and runs on every scenario before it can be shown, in CI on every push, and behind the <code>verify-scenario</code> Codex Skill. Even when GPT-5.6 “Luna” reskins a scenario for variety, the reskinned result must pass the same gate — presentation can change, <b>truth and receipts cannot</b>.</p>
+</section>
+
+<!-- CODEX -->
+<section class="wrap" id="codex">
+  <p class="eyebrow acid">How Codex built it — and the proof both technologies are real</p>
+  <h2>One invariant, enforced by Codex, verified in CI.</h2>
+  <p class="lead">Blast Radius was built with Codex in one primary thread. The repo’s <code>AGENTS.md</code> files encode the single rule everything else hangs on — and Codex packaged the enforcement as a custom Skill that bulk-verifies the whole bank:</p>
+
+  <blockquote>
+    <p>“Never display a scenario that has not passed the correctness gate. Never execute content shown in a scenario. Never expose <span class="k">ground_truth</span> through a public API.”</p>
+    <div class="attr">— the product invariant, <code>AGENTS.md</code> (root)</div>
+  </blockquote>
+
+  <div class="term">
+    <div class="term-bar"><span class="dot3"><i></i><i></i><i></i></span><span class="ttl">verify-scenario Codex Skill — the production gate over the whole bank</span></div>
+<pre class="scenrun"><span class="cmd">$ python .agents/skills/verify-scenario/scripts/verify_scenarios.py</span>
+  <span class="ok">[PASS]</span>  cmd-exfil-1            <span class="c">family=dangerous_command</span>
+  <span class="ok">[PASS]</span>  cmd-cleanup-2          <span class="c">family=dangerous_command</span>
+  <span class="ok">[PASS]</span>  cmd-test-3            <span class="c">family=dangerous_command</span>
+  <span class="ok">[PASS]</span>  dep-typo-1            <span class="c">family=poisoned_dependency</span>
+  <span class="ok">[PASS]</span>  dep-private-2         <span class="c">family=poisoned_dependency</span>
+  <span class="ok">[PASS]</span>  dep-locked-3          <span class="c">family=poisoned_dependency</span>
+  <span class="ok">[PASS]</span>  tool-scope-1          <span class="c">family=overscoped_tool</span>
+  <span class="ok">[PASS]</span>  tool-docs-2          <span class="c">family=overscoped_tool</span>
+  <span class="ok">[PASS]</span>  tool-local-3          <span class="c">family=overscoped_tool</span>
+  <span class="ok">[PASS]</span>  diff-exfil-1         <span class="c">family=malicious_diff</span>
+  <span class="ok">[PASS]</span>  diff-auth-2          <span class="c">family=malicious_diff</span>
+  <span class="ok">[PASS]</span>  diff-timeout-3       <span class="c">family=malicious_diff</span>
+  <span class="ok">[PASS]</span>  context-injection-1   <span class="c">family=poisoned_context</span>
+  <span class="ok">[PASS]</span>  context-issue-2      <span class="c">family=poisoned_context</span>
+  <span class="ok">[PASS]</span>  context-docs-3       <span class="c">family=poisoned_context</span>
+  <span class="ok">[PASS]</span>  market-egress-1      <span class="c">family=skill_marketplace</span>
+  <span class="ok">[PASS]</span>  market-linter-2      <span class="c">family=skill_marketplace</span>
+  <span class="ok">[PASS]</span>  market-parser-3      <span class="c">family=skill_marketplace</span>
+  <span class="ok">[PASS]</span>  context-webfetch-4    <span class="c">family=poisoned_context</span>
+  <span class="ok">[PASS]</span>  tool-mcp-poison-4    <span class="c">family=overscoped_tool</span>
+
+  <span class="ok">==> 20 scenarios verified, 0 failures.  (exit 0)</span></pre>
+  </div>
+
+  <p class="lead small">GPT-5.6 runs in two named roles in the product runtime (not just as a build assistant): <code>gpt-5.6-sol</code> is the reasoning critic and the generated-presentation gate; <code>gpt-5.6-luna</code> may reskin verified scenarios. Every model failure — timeout, malformed output, provider error, exhausted budget — falls back to a deterministic grader, so the demo can’t fail in front of you. The primary Codex build thread is public in the README (<code>/feedback</code> Session ID <code>019f606c-…</code>).</p>
+</section>
+
+<!-- DEV TOOLS -->
+<section class="wrap" id="tools">
+  <p class="eyebrow acid">Developer tools we shipped</p>
+  <h2>The same gate, everywhere you work.</h2>
+  <p class="lead">The verification core isn’t trapped in the game. It ships as tools you can point at your own agent’s output.</p>
+  <div class="grid3">
+    <div class="card"><h3>blastradius CLI</h3><p>Screen a diff, a sandbox config, or gate-verify a scenario draft from the terminal.</p><p class="m"><code>echo 'curl x|bash' | blastradius check -</code></p></div>
+    <div class="card"><h3>GitHub Action</h3><p>The correctness gate as a CI check — gate-verify drafts and screen a PR diff, no secrets required.</p><p class="m"><code>uses: Lockelamoree/Blast_Radius@v1</code></p></div>
+    <div class="card"><h3>MCP server</h3><p>Connect the screen + gate to any MCP-aware agent as real tools.</p><p class="m"><code>blastradius-mcp</code></p></div>
+    <div class="card"><h3>Codex plugin</h3><p>Install “Blast Radius” from the marketplace manifest — skills + hook, ready to go.</p><p class="m">plugins/blast-radius</p></div>
+    <div class="card"><h3>Supervisor hook</h3><p>A Codex PreToolUse guardrail that screens Bash before it runs. Fails open, never claims “safe”.</p><p class="m"><code>blastradius-supervise</code></p></div>
+    <div class="card"><h3>Codex Skills</h3><p><code>verify-scenario</code> runs the production gate; <code>screen-agent-artifacts</code> screens agent output.</p><p class="m">.agents/skills/</p></div>
+  </div>
+</section>
+
+<!-- MODES & LEARNING -->
+<section class="wrap" id="modes">
+  <p class="eyebrow acid">Modes, learning & progress</p>
+  <h2>A head start, an honest measurement, or live variation.</h2>
+  <div class="two">
+    <div>
+      <ul class="ticks">
+        <li><b>One verified incident</b> — a single round for a 60-second taste</li>
+        <li><b>Measure my approval reflex</b> — a five-competency pre-test, then the deck reorders toward your weakest measured family</li>
+        <li><b>Try live variation</b> — GPT-5.6 Luna generates a fresh scenario, still gate-checked</li>
+        <li><b>Field guides</b> to all six threat families, with cited sources</li>
+        <li><b>Daily drill, team board & a pseudonymous leaderboard</b> — no email, no password</li>
+        <li>Hatch and level a custom <b>Blastling</b> pet as you improve</li>
+      </ul>
+      <p class="lead small" style="margin-top:22px">Everything runs free in the browser: no account, no install, and ground truth never leaves the server.</p>
+    </div>
+    <figure>
+      <img src="img/landing.png" alt="The Blast Radius landing page: 'Size the risk before you approve', the proof stats, mode buttons for measuring approval reflex and live variation, and a live terminal showing an agent action being approved.">
+      <figcaption><b>The landing page</b> — modes, the proof strip, and a live agent-action terminal.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ARCHITECTURE -->
+<section class="wrap" id="arch">
+  <p class="eyebrow acid">Architecture</p>
+  <h2>Two paths, one trust boundary.</h2>
+  <p class="lead">The scenario path (bank → optional Luna reskin → deterministic gate → Sol gate) and the grading path (your decision → deterministic grade → Sol tell-match → verdict with receipts) meet at one rule: immutable ground truth and deterministic receipts never depend on a model having a good day.</p>
+  <figure>
+    <img src="img/architecture.svg" alt="Architecture diagram: the scenario path and the grading path, with the correctness gate as the trust boundary between them.">
+    <figcaption>The two-path trust boundary. The browser receives presentation data only.</figcaption>
+  </figure>
+</section>
+
+<!-- CLAIM TO PROOF -->
+<section class="wrap" id="proof">
+  <p class="eyebrow">Verify us without trusting us</p>
+  <h2>Claim-to-proof map.</h2>
+  <p class="lead">Every headline claim resolves to something you can inspect — no rebuild required.</p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Claim</th><th>Inspect it yourself</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>GPT-5.6 grades reasoning live in the runtime</td><td><code>GET /healthz</code> → <code>reasoning_grading:live</code>, <code>critic_model:gpt-5.6-sol</code>; the <code>resp_…</code> id in the verdict</td><td><span class="st live">Live</span></td></tr>
+        <tr><td>The gate rejects hallucinated content</td><td><code>GET /api/demo/gate-catch?case=tell|citation|stack</code> (shown above)</td><td><span class="st live">Live</span></td></tr>
+        <tr><td>Every scenario passes the gate</td><td><code>verify-scenario</code> Skill → 20/20, exit 0; runs in CI on every push</td><td><span class="st live">Live</span></td></tr>
+        <tr><td>Built with Codex, one primary thread</td><td>3× <code>AGENTS.md</code>, dated commits, <code>/feedback</code> Session ID in README</td><td><span class="st live">Live</span></td></tr>
+        <tr><td>Deterministic screen accuracy on a labeled corpus</td><td><code>GET /api/eval/detection</code> · <code>blastradius eval-detection</code> (offline)</td><td><span class="st live">Live</span></td></tr>
+        <tr><td>Measured learning delta (a developer improves)</td><td>A named consented tester’s pre→post score</td><td><span class="st nm">Not yet measured</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note"><b>Honesty note.</b> No learning-delta, latency, or productivity number is claimed anywhere without a captured artifact behind it. The one claim we can’t yet back — that a real developer measurably improves — is labeled <b>“Not yet measured,”</b> not asserted.</div>
+</section>
+
+<footer class="wrap">
+  <div class="foot">
+    <div class="links">
+      <a class="btn solid" href="https://blastradius.max-gutowski.de">Play the live demo →</a>
+      <a class="btn" href="https://github.com/Lockelamoree/Blast_Radius">Source (MIT)</a>
+      <a class="btn" href="https://github.com/Lockelamoree/Blast_Radius#readme">README</a>
+    </div>
+    <div class="tag">Built with Codex + GPT-5.6<br><span class="u">blastradius.max-gutowski.de</span> · free in your browser</div>
+  </div>
+</footer>
+
+</body>
+</html>
