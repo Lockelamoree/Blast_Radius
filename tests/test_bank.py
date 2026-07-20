@@ -113,3 +113,35 @@ def test_drill_pick_is_deterministic_and_respects_family(test_settings) -> None:
         day="2026-07-18", client_key="client-abc", family=ScenarioFamily.POISONED_DEPENDENCY
     )
     assert pinned.family == ScenarioFamily.POISONED_DEPENDENCY
+
+
+def test_drill_pick_excludes_recent_ids(test_settings) -> None:
+    bank = ScenarioBank(test_settings.data_dir)
+    first = bank.drill_pick(day="2026-07-18", client_key="client-abc")
+    # A replay that reports the just-served incident rotates onto a different one,
+    # so a judge replaying the drill does not see the same scenario twice in a row.
+    replay = bank.drill_pick(day="2026-07-18", client_key="client-abc", exclude={first.id})
+    assert replay.id != first.id
+    assert replay.id in bank.scenarios
+    # Excluding every scenario must not raise — the full set is restored (cycles).
+    restored = bank.drill_pick(
+        day="2026-07-18", client_key="client-abc", exclude=set(bank.scenarios)
+    )
+    assert restored.id in bank.scenarios
+
+
+def test_demo_order_exclude_rotates_member_but_keeps_family_coverage(test_settings) -> None:
+    bank = ScenarioBank(test_settings.data_dir)
+    deck = bank.demo_order(seed="session-a")
+    excluded = deck[0]  # a dangerous_command member; that family has 3 members
+    rotated = bank.demo_order(seed="session-a", exclude={excluded})
+    # Still one scenario per family, in the same canonical family order...
+    assert [bank.get(s).family for s in rotated] == [bank.get(s).family for s in deck]
+    assert len(rotated) == len(set(rotated)) == len(ScenarioFamily)
+    # ...but the just-seen member is rotated out.
+    assert rotated[0] != excluded
+    # Excluding an entire family's pool still represents that family (fallback).
+    family = bank.get(deck[1]).family
+    members = {sid for sid, sc in bank.scenarios.items() if sc.family == family}
+    covered = bank.demo_order(seed="session-a", exclude=members)
+    assert bank.get(covered[1]).family == family

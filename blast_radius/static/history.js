@@ -7,6 +7,9 @@
   const KEY = "blast-radius:v1";
   const CALLBACK_DAYS = 3;
   const MAX_SESSIONS = 30;
+  // Recently-seen scenario ids, kept only in this browser and sent transiently
+  // as an `exclude` hint so repeat playthroughs rotate off what was just seen.
+  const MAX_SEEN = 12;
   const $ = (selector) => document.querySelector(selector);
 
   function pad(n) {
@@ -33,7 +36,7 @@
   }
 
   function fresh() {
-    return { schema: 1, client_id: randomId(), sessions: [], streak: { count: 0, last_drill_date: null }, callbacks: [] };
+    return { schema: 1, client_id: randomId(), sessions: [], streak: { count: 0, last_drill_date: null }, callbacks: [], seen: [] };
   }
 
   function available() {
@@ -60,6 +63,7 @@
         sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
         streak: parsed.streak && typeof parsed.streak.count === "number" ? parsed.streak : { count: 0, last_drill_date: null },
         callbacks: Array.isArray(parsed.callbacks) ? parsed.callbacks : [],
+        seen: Array.isArray(parsed.seen) ? parsed.seen.slice(-MAX_SEEN) : [],
       };
     } catch (error) {
       return fresh();
@@ -99,6 +103,24 @@
     if (!store) return null;
     safeSave(store);
     return store.client_id;
+  }
+
+  // Recently-seen scenario ids for this browser, oldest first. Sent as a
+  // transient `exclude` hint when starting a session so repeat playthroughs
+  // rotate through the bank instead of repeating the last incident.
+  function recentlySeen() {
+    const store = safeLoad();
+    return store ? store.seen.slice() : [];
+  }
+
+  function recordSeen(scenarioId) {
+    if (!scenarioId) return;
+    const store = safeLoad();
+    if (!store) return;
+    store.seen = store.seen.filter((id) => id !== scenarioId);
+    store.seen.push(scenarioId);
+    if (store.seen.length > MAX_SEEN) store.seen = store.seen.slice(-MAX_SEEN);
+    safeSave(store);
   }
 
   function recordSessionHistory(results) {
@@ -216,6 +238,8 @@
   }
 
   window.historyClientKey = historyClientKey;
+  window.recentlySeen = recentlySeen;
+  window.recordSeen = recordSeen;
   window.recordSessionHistory = recordSessionHistory;
   window.recordDrillHistory = recordDrillHistory;
   window.dueCallbacks = dueCallbacks;

@@ -104,6 +104,9 @@ class CreateSessionRequest(BaseModel):
         max_length=40,
         pattern=r"^[A-Za-z0-9][A-Za-z0-9 ._-]{0,39}$",
     )
+    # Browser-local "recently seen" scenario ids (all modes). Used transiently to
+    # rotate repeat playthroughs away from just-seen scenarios; never persisted.
+    exclude: list[str] = Field(default_factory=list)
 
     @field_validator("family")
     @classmethod
@@ -111,6 +114,18 @@ class CreateSessionRequest(BaseModel):
         if value is not None:
             ScenarioFamily(value)  # raises ValueError -> 422 for unknown families
         return value
+
+    @field_validator("exclude")
+    @classmethod
+    def sanitize_exclude(cls, value: list[str]) -> list[str]:
+        # Keep only well-formed short ids and cap the list; never 422 on this
+        # advisory hint — just drop anything malformed.
+        cleaned = [
+            item
+            for item in value
+            if isinstance(item, str) and 0 < len(item) <= 48 and item.replace("-", "").isalnum()
+        ]
+        return cleaned[:40]
 
     @model_validator(mode="after")
     def drill_only_fields(self) -> "CreateSessionRequest":
@@ -813,20 +828,25 @@ def build_router(settings: Settings, engine: TrustEngine, store: SessionStore) -
         session_create_limiter.check(f"session-create:{client_host(request)}")
         uid = ensure_uid(request, response)
         session_id = str(uuid4())
+        # Browser-local recently-seen ids, kept only if they name real bank
+        # scenarios; used to rotate repeat playthroughs and never persisted.
+        excluded_ids = {sid for sid in payload.exclude if sid in engine.bank.scenarios}
         if payload.mode == "drill":
             # One bank round, no assessments; seeded per-day per-client so a
-            # returning browser gets a stable scenario within a day. The client
-            # key is used only to pick and is never stored on the session.
+            # returning browser gets a stable scenario within a day, but the
+            # recently-seen exclude rotates repeat drills off the last incident.
+            # The client key is used only to pick and is never stored on the session.
             family = ScenarioFamily(payload.family) if payload.family else None
             day = datetime.now(UTC).date().isoformat()
             scenario = engine.bank.drill_pick(
                 day=day,
                 client_key=payload.client_key or session_id,
                 family=family,
+                exclude=excluded_ids,
             )
             scenario_order = [scenario.id]
         else:
-            scenario_order = engine.bank.demo_order(seed=session_id)
+            scenario_order = engine.bank.demo_order(seed=session_id, exclude=excluded_ids)
         # Fall back to the user's saved nickname so a returning player is
         # attributed on the team board without re-typing it each run; an explicit
         # per-session handle still wins.

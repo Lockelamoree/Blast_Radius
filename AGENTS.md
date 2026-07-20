@@ -56,7 +56,10 @@ python -m venv .venv
     only server state. The UI always labels it "stored only in this browser" with a
     one-click clear, and the app stays fully functional when storage is unavailable. The
     random client key a browser may send when starting a daily drill is used transiently
-    for deterministic scenario selection and is never persisted or logged.
+    for deterministic scenario selection and is never persisted or logged. The browser's
+    recently-seen scenario ids are treated the same way: they ride along as a transient
+    `exclude` hint so repeat playthroughs rotate off just-seen scenarios, and are used only
+    for selection — never persisted or logged server-side.
   - **The team board.** A session MAY carry an optional, self-chosen operator handle (max
     40 chars, no emails, no auth, no password, never required to play). Finished sessions
     write a scores-only summary row (handle, mode, test scores, delta, rounds, competency

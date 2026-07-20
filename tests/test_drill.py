@@ -103,3 +103,27 @@ def test_drill_option_validation(client: TestClient) -> None:
     assert client.post("/api/sessions", json={"mode": "demo", "client_key": "abcdefgh"}).status_code == 422
     # bad client_key pattern -> 422
     assert client.post("/api/sessions", json={"mode": "drill", "client_key": "no"}).status_code == 422
+
+
+def _drill_scenario_id(client: TestClient, session_id: str) -> str:
+    return client.post(f"/api/sessions/{session_id}/rounds/next", json={}).json()["scenario"]["id"]
+
+
+def test_replay_excludes_the_last_incident(client: TestClient) -> None:
+    # Same browser + day is stable by default (spaced repetition)...
+    first = _start_drill(client, client_key="replay-client-1")
+    first_id = _drill_scenario_id(client, first["session_id"])
+    # ...but a replay that reports the just-seen id rotates onto a fresh incident,
+    # so a judge clicking "play again" does not get the same scenario back.
+    second = _start_drill(client, client_key="replay-client-1", exclude=[first_id])
+    assert _drill_scenario_id(client, second["session_id"]) != first_id
+
+
+def test_exclude_is_accepted_on_non_drill_modes(client: TestClient) -> None:
+    # exclude is a global anti-repeat hint (not a drill-only field), so it must
+    # be accepted for demo/live and must not shrink the six-round deck.
+    response = client.post(
+        "/api/sessions", json={"mode": "demo", "exclude": ["cmd-cleanup-2", "dep-typo-1"]}
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["rounds_total"] == 6
