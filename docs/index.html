@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Blast Radius — how it works, and how we prove it</title>
-<meta name="description" content="Blast Radius trains developers to operate AI coding agents. See the live GPT-5.6 grade, watch the correctness gate reject a planted fake, and read the proof for every claim.">
+<title>Blast Radius — how it works, and how I prove it</title>
+<meta name="description" content="I built Blast Radius to teach developers to operate AI coding agents safely. See the live GPT-5.6 grade, watch the correctness gate reject a planted fake, and verify every claim yourself.">
 <style>
   :root{
     --ink:#f4f1e8; --muted:#9d9a91; --dim:#6f6d66; --black:#090a09; --panel:#101210;
@@ -55,7 +55,8 @@
   h1{font-family:var(--serif);font-weight:400;font-size:clamp(42px,7.4vw,86px);line-height:.94;
     letter-spacing:-.03em;max-width:16ch}
   h1 em{color:var(--acid);font-style:normal}
-  .sub{margin-top:26px;max-width:60ch;font-size:clamp(16px,2vw,19px);color:#d6d8cd}
+  .sub{margin-top:26px;max-width:62ch;font-size:clamp(16px,2vw,19px);color:#d6d8cd}
+  .sub + .sub{margin-top:16px;font-size:16px;color:var(--muted)}
   .cta{margin-top:34px;display:flex;gap:12px;flex-wrap:wrap}
   .cta .btn{font-size:13px;padding:13px 20px}
 
@@ -150,11 +151,18 @@
     font-size:14px;color:var(--muted)}
   .note b{color:var(--ink);font-weight:600}
 
+  /* personal builder note */
+  .me{margin-top:8px;border:1px solid var(--line);border-left:3px solid var(--orange);
+    border-radius:0 7px 7px 0;background:var(--panel);padding:26px 28px}
+  .me p{max-width:70ch;font-size:16px;color:#d6d8cd}
+  .me p + p{margin-top:14px}
+  .me .sig{margin-top:18px;font-family:var(--mono);font-size:13px;color:var(--acid);letter-spacing:.04em}
+
   footer{border-top:1px solid var(--line);padding:44px 0 66px;margin-top:20px}
   .foot{display:flex;flex-wrap:wrap;gap:26px;justify-content:space-between;align-items:flex-start}
   .foot .links{display:flex;flex-wrap:wrap;gap:9px}
   .foot .tag{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;
-    color:var(--dim)}
+    color:var(--dim);text-align:right}
   .foot .tag .u{color:var(--acid)}
 </style>
 </head>
@@ -177,7 +185,8 @@
 <header class="hero wrap">
   <p class="kick">AI-agent security · playable · built with Codex + GPT-5.6</p>
   <h1>Don't get owned by <em>your own agent</em>.</h1>
-  <p class="sub">Your AI coding agent proposes shell commands, new dependencies, tool manifests and diffs all day and asks you to approve them. Approve the wrong one and you're owned. <b>Blast Radius</b> puts you in the operator's seat, grades your reasoning live with GPT-5.6, and — crucially — can never teach you something false. This page shows how it works, and lets you verify every claim yourself.</p>
+  <p class="sub">I'm both an IT-security and an AI enthusiast, and the same worry kept nagging me: your AI coding agent proposes shell commands, new dependencies, tool manifests and diffs all day — and it's so tempting to just auto-approve. Most of us aren't trained to catch the one request that owns us. So I built <b>Blast Radius</b> to make that reflex playable: you sit in the operator's seat, GPT-5.6 grades your reasoning live, and — the part I cared about most — it can never teach you something false.</p>
+  <p class="sub">Codex put the magic of building into everyone's hands. Blast Radius is about learning to handle that power — because with great power comes great responsibility. This page shows how it works, and lets you check every claim without taking my word for it.</p>
   <div class="cta">
     <a class="btn solid" href="https://blastradius.max-gutowski.de">Play the live demo →</a>
     <a class="btn" href="https://github.com/Lockelamoree/Blast_Radius">View the source</a>
@@ -198,7 +207,7 @@
   <h2>You're the operator. Approve, sandbox, or reject.</h2>
   <div class="two">
     <div>
-      <p class="lead">Each round shows a realistic proposed agent action across six threat families — a slopsquatted <code>pip install</code>, a <code>curl | bash</code>, a skill manifest quietly reaching for <code>~/.ssh</code>, a poisoned diff. You make the call the way you would in your terminal, and you name the evidence tell in your own words.</p>
+      <p class="lead">Each round I put a realistic proposed agent action in front of you, across six threat families — a slopsquatted <code>pip install</code>, a <code>curl | bash</code>, a skill manifest quietly reaching for <code>~/.ssh</code>, a poisoned diff. You make the call the way you would in your own terminal, and you name the evidence tell in your own words.</p>
       <ul class="ticks">
         <li><b>Approve · sandbox · reject</b> — the same three choices your agent gives you</li>
         <li>Write the <b>tell</b>: the concrete signal that justifies your call</li>
@@ -206,7 +215,7 @@
       </ul>
     </div>
     <figure>
-      <img src="img/decision.png" alt="The Blast Radius decision card: a proposed agent command to run the repository unit tests without network access, with approve, sandbox and reject options and a prompt to name the tell.">
+      <img src="img/decision.png" alt="The Blast Radius decision card: a proposed agent action to run the repository unit tests without network access, with approve, sandbox and reject options and a prompt to name the tell.">
       <figcaption><b>The decision card, live at blastradius.max-gutowski.de</b> — a real proposed agent action awaiting your call.</figcaption>
     </figure>
   </div>
@@ -218,7 +227,7 @@
   <h2>Then GPT-5.6 grades your reasoning — live, with receipts.</h2>
   <div class="two rev">
     <div>
-      <p class="lead">Commit your decision and <b>GPT-5.6 “Sol”</b> fires a real call through the OpenAI Responses API with strict Structured Outputs, grades your free-form reasoning, and shows the receipts: concrete, link-checked evidence for why the verdict holds. The response id and latency are printed on screen, so a skeptic can confirm the call actually happened.</p>
+      <p class="lead">Commit your decision and <b>GPT-5.6 “Sol”</b> fires a real call through the OpenAI Responses API with strict Structured Outputs, grades your free-form reasoning, and shows the receipts: concrete, link-checked evidence for why the verdict holds. I print the response id and the latency right in the UI, so you can confirm the call actually happened — you don't have to trust me.</p>
       <ul class="ticks">
         <li>A genuine <code>resp_…</code> id + latency, rendered in the UI</li>
         <li><b>Evidence receipts</b> with <code>INSPECT SOURCE</code> — no unsourced claims</li>
@@ -241,7 +250,7 @@
 <section class="wrap" id="gate">
   <p class="eyebrow">The correctness gate · the flagship</p>
   <h2>It can’t teach you anything false. Watch it catch a fake.</h2>
-  <p class="lead">The trust boundary that makes a security game safe to learn from: <b>nothing reaches your screen unless it passes a deterministic correctness gate against verified ground truth.</b> To prove it isn’t just a claim, the app ships a live endpoint that <em>plants a hallucination into a real scenario</em> and asks the gate to sign off. The gate refuses — every time, with the specific reason. Below is the actual JSON, captured just now from the production route. Run it yourself; no account or key needed.</p>
+  <p class="lead">This is the part I obsessed over. A security game that teaches you a <em>wrong</em> lesson is worse than no game at all — so I made it a rule: <b>nothing reaches your screen unless it passes a deterministic correctness gate against verified ground truth.</b> To prove that isn’t just a nice sentence, I ship a live endpoint that <em>plants a hallucination into a real scenario</em> and asks the gate to sign off. It refuses — every time, with the specific reason. Below is the actual JSON, captured from the production route. Run it yourself; no account or key needed.</p>
 
   <div class="term">
     <div class="term-bar"><span class="dot3"><i></i><i></i><i></i></span><span class="ttl">case 1 — plant a fabricated “remote code execution backdoor” tell</span></div>
@@ -282,14 +291,14 @@
   ]
 }</pre>
   </div>
-  <p class="lead small">The gate lives in <code>blast_radius/engine/gate.py</code> and runs on every scenario before it can be shown, in CI on every push, and behind the <code>verify-scenario</code> Codex Skill. Even when GPT-5.6 “Luna” reskins a scenario for variety, the reskinned result must pass the same gate — presentation can change, <b>truth and receipts cannot</b>.</p>
+  <p class="lead small">The gate lives in <code>blast_radius/engine/gate.py</code>, runs on every scenario before it can be shown, runs in CI on every push, and is exposed as the <code>verify-scenario</code> Codex Skill. Even when GPT-5.6 “Luna” reskins a scenario for variety, the result has to pass the same gate — presentation can change, <b>truth and receipts can’t</b>. This philosophy actually came out of a scary bug (see below): I’d rather over-engineer the honesty than ship you a confident lie.</p>
 </section>
 
 <!-- CODEX -->
 <section class="wrap" id="codex">
-  <p class="eyebrow acid">How Codex built it — and the proof both technologies are real</p>
+  <p class="eyebrow acid">How I built it with Codex — and why both technologies are real</p>
   <h2>One invariant, enforced by Codex, verified in CI.</h2>
-  <p class="lead">Blast Radius was built with Codex in one primary thread. The repo’s <code>AGENTS.md</code> files encode the single rule everything else hangs on — and Codex packaged the enforcement as a custom Skill that bulk-verifies the whole bank:</p>
+  <p class="lead">I built Blast Radius with Codex in one primary thread, starting July 14. Honestly, the biggest win was the <em>thinking</em>, not just the typing: I started with a planning session where I had Codex interview me about the idea, then we wrote everything into <code>.md</code> design docs so it could implement it structurally later — and I used review agents to challenge my own features before I committed them. For brainstorming and evaluating ideas, Codex has been a genuine gamechanger for me. The repo’s <code>AGENTS.md</code> files (root and nested) encode the one rule everything else hangs on, and I packaged the enforcement as a custom Skill that bulk-verifies the whole bank:</p>
 
   <blockquote>
     <p>“Never display a scenario that has not passed the correctness gate. Never execute content shown in a scenario. Never expose <span class="k">ground_truth</span> through a public API.”</p>
@@ -323,17 +332,24 @@
   <span class="ok">==> 20 scenarios verified, 0 failures.  (exit 0)</span></pre>
   </div>
 
-  <p class="lead small">GPT-5.6 runs in two named roles in the product runtime (not just as a build assistant): <code>gpt-5.6-sol</code> is the reasoning critic and the generated-presentation gate; <code>gpt-5.6-luna</code> may reskin verified scenarios. Every model failure — timeout, malformed output, provider error, exhausted budget — falls back to a deterministic grader, so the demo can’t fail in front of you. The primary Codex build thread is public in the README (<code>/feedback</code> Session ID <code>019f606c-…</code>).</p>
+  <p class="lead small">Codex also wrote adversarial regression tests against its own engine — truth drift, prompt injection, unsafe sandbox scope, duplicate-session mutation, model failure. GPT-5.6 runs in two named roles in the product runtime (not just as a build assistant): <code>gpt-5.6-sol</code> is the reasoning critic and the generated-presentation gate; <code>gpt-5.6-luna</code> reskins verified scenarios for variety. Every model failure — timeout, malformed output, provider error, exhausted budget — falls back to a deterministic grader, so the app can’t fail in front of you. My primary Codex build thread is public in the README (<code>/feedback</code> Session ID <code>019f606c-…</code>).</p>
+</section>
+
+<!-- THE HONEST BUG -->
+<section class="wrap" id="honesty">
+  <p class="eyebrow">The bug that became the philosophy</p>
+  <h2>The scariest bug never threw an error.</h2>
+  <p class="lead">My strict-output schema was subtly invalid, which meant every future keyed call would have silently <code>400</code>’d and fallen back to the deterministic grader — GPT-5.6 Sol would never actually have graded anything, and everything would still have looked green. Catching that turned into the whole project’s philosophy. I rebuilt the schemas (<code>extra="forbid"</code>, schema round-trip tests), gave <code>/healthz</code> a tri-state <code>reasoning_grading: live | key_present_unverified | off</code> backed by a real startup probe, made failed calls refund the token budget, and made the deploy script <b>refuse to deploy unless the critic is verifiably live</b>. The harder problem underneath — grading free-form human reasoning with an LLM <em>without letting the LLM author the truth</em> — is solved by the allowlist trust boundary above. It was a fun thought experiment, and Codex helped me a lot with it.</p>
 </section>
 
 <!-- DEV TOOLS -->
 <section class="wrap" id="tools">
-  <p class="eyebrow acid">Developer tools we shipped</p>
+  <p class="eyebrow acid">Developer tools I shipped</p>
   <h2>The same gate, everywhere you work.</h2>
-  <p class="lead">The verification core isn’t trapped in the game. It ships as tools you can point at your own agent’s output.</p>
+  <p class="lead">I didn’t want the verification core trapped inside the game, so I shipped it as tools you can point at your own agent’s output right now — in case you want to export the detection and use it for yourself. :)</p>
   <div class="grid3">
-    <div class="card"><h3>blastradius CLI</h3><p>Screen a diff, a sandbox config, or gate-verify a scenario draft from the terminal.</p><p class="m"><code>echo 'curl x|bash' | blastradius check -</code></p></div>
-    <div class="card"><h3>GitHub Action</h3><p>The correctness gate as a CI check — gate-verify drafts and screen a PR diff, no secrets required.</p><p class="m"><code>uses: Lockelamoree/Blast_Radius@v1</code></p></div>
+    <div class="card"><h3>blastradius CLI</h3><p>A pre-commit-style screen for a diff or sandbox config, or gate-verify a scenario draft — straight from the terminal.</p><p class="m"><code>echo 'curl x|bash' | blastradius check -</code></p></div>
+    <div class="card"><h3>GitHub Action</h3><p>The correctness gate as a CI check you can add to your own repo today — gate-verify drafts and screen a PR diff, no secrets required.</p><p class="m"><code>uses: Lockelamoree/Blast_Radius@v1</code></p></div>
     <div class="card"><h3>MCP server</h3><p>Connect the screen + gate to any MCP-aware agent as real tools.</p><p class="m"><code>blastradius-mcp</code></p></div>
     <div class="card"><h3>Codex plugin</h3><p>Install “Blast Radius” from the marketplace manifest — skills + hook, ready to go.</p><p class="m">plugins/blast-radius</p></div>
     <div class="card"><h3>Supervisor hook</h3><p>A Codex PreToolUse guardrail that screens Bash before it runs. Fails open, never claims “safe”.</p><p class="m"><code>blastradius-supervise</code></p></div>
@@ -343,17 +359,18 @@
 
 <!-- MODES & LEARNING -->
 <section class="wrap" id="modes">
-  <p class="eyebrow acid">Modes, learning & progress</p>
+  <p class="eyebrow acid">Modes, learning &amp; progress</p>
   <h2>A head start, an honest measurement, or live variation.</h2>
   <div class="two">
     <div>
+      <p class="lead">I wanted more than one way to learn with it, so there’s a whole cycle — and every question and answer, static or dynamically generated, is grounded in facts or otherwise rejected by the gate.</p>
       <ul class="ticks">
         <li><b>One verified incident</b> — a single round for a 60-second taste</li>
         <li><b>Measure my approval reflex</b> — a five-competency pre-test, then the deck reorders toward your weakest measured family</li>
-        <li><b>Try live variation</b> — GPT-5.6 Luna generates a fresh scenario, still gate-checked</li>
+        <li><b>Try live variation</b> — GPT-5.6 Luna generates a fresh scenario, still gate-checked and graded by Sol</li>
         <li><b>Field guides</b> to all six threat families, with cited sources</li>
-        <li><b>Daily drill, team board & a pseudonymous leaderboard</b> — no email, no password</li>
-        <li>Hatch and level a custom <b>Blastling</b> pet as you improve</li>
+        <li><b>Persistent or throwaway sessions</b>, a public leaderboard — no email, no password</li>
+        <li>…and a little <b>Blastling</b> pet editor, inspired by my very own Codex pet. Sorry — I had some fun with it :)</li>
       </ul>
       <p class="lead small" style="margin-top:22px">Everything runs free in the browser: no account, no install, and ground truth never leaves the server.</p>
     </div>
@@ -377,7 +394,7 @@
 
 <!-- CLAIM TO PROOF -->
 <section class="wrap" id="proof">
-  <p class="eyebrow">Verify us without trusting us</p>
+  <p class="eyebrow">Verify me without trusting me</p>
   <h2>Claim-to-proof map.</h2>
   <p class="lead">Every headline claim resolves to something you can inspect — no rebuild required.</p>
   <div class="tablewrap">
@@ -393,7 +410,18 @@
       </tbody>
     </table>
   </div>
-  <div class="note"><b>Honesty note.</b> No learning-delta, latency, or productivity number is claimed anywhere without a captured artifact behind it. The one claim we can’t yet back — that a real developer measurably improves — is labeled <b>“Not yet measured,”</b> not asserted.</div>
+  <div class="note"><b>Honesty note.</b> I don’t claim a learning-delta, latency, or productivity number anywhere without a captured artifact behind it. The one thing I can’t back yet — that a real developer measurably improves — I label <b>“Not yet measured,”</b> rather than assert it.</div>
+</section>
+
+<!-- BUILDER NOTE -->
+<section class="wrap" id="me">
+  <p class="eyebrow acid">Why I built this</p>
+  <h2>The most valuable thing an AI product can do is check its own work before you see it.</h2>
+  <div class="me">
+    <p>That generate-then-verify loop is the exact loop I think every developer now needs in their head each time an agent asks “approve?” — which is, of course, what the game teaches. Building the tool with the tool’s own lesson was the whole point. :D</p>
+    <p>What’s next: more scenarios, more learning material, and more useful tools to help the next generation of developers protect themselves from the threats that are emerging. I’ll keep developing the plugin, CLI and GitHub Action — and yes, I’ll be pushing the developers at my own company to use this. ;)</p>
+    <div class="sig">— Max · blastradius.max-gutowski.de</div>
+  </div>
 </section>
 
 <footer class="wrap">
