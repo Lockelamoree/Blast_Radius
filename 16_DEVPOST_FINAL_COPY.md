@@ -15,7 +15,7 @@
 ## Elevator pitch
 
 Blast Radius turns the hardest part of supervising a coding agent into a playable reflex.
-Its **20 receipt-linked scenarios** and **432-test verification suite** teach developers to
+Its **20 receipt-linked scenarios** and **436-test verification suite** teach developers to
 approve, sandbox, or reject proposed commands, dependencies, tool manifests, diffs, retrieved
 instructions, and marketplace skills—and to prove the call with evidence.
 

@@ -1,8 +1,8 @@
 # Final screenshot capture checklist
 
-The three `screen_*.png` files are stable staging placeholders. Overwrite them with live
-1200×800 PNG captures before submission; keep the filenames so README and Devpost links remain
-valid.
+The three `screen_*.png` files are live 1200×800 captures from the deployed app. If the UI
+changes materially, re-capture using the checklist below and keep the filenames so the README and
+Devpost links remain valid.
 
 1. `screen_decision.png` — show the Decision Card with an agent artifact, all three actions,
    and the evidence-tell prompt. Keep the artifact readable.

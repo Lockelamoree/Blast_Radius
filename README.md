@@ -1,7 +1,7 @@
 # Blast Radius
 
 **Blast Radius is my browser game for practicing safe approval decisions around AI coding
-agents — backed by 20 receipt-linked scenarios and 432 automated tests.** You inspect a proposed
+agents — backed by 20 receipt-linked scenarios and 436 automated tests.** You inspect a proposed
 command, dependency, tool manifest, diff, retrieved instruction, or marketplace skill; choose
 **approve**, **sandbox**, or **reject**; then name the evidence tell. The verdict scores your
 action, your tell coverage, and—when it applies—the exact sandbox policy, with direct evidence for
@@ -46,6 +46,9 @@ Here's what actually ships today:
 - 20 curated, receipt-backed scenarios across six threat families — including retrieval
   (web-fetch) prompt injection and MCP tool-description poisoning.
 - A mandatory deterministic pre-display gate and a visible planted-defect self-catch.
+- **Fresh on every replay** — a browser-local recently-seen list rotates selection so repeat
+  playthroughs cycle the bank: the drill serves a new incident each play, demo varies the
+  within-family scenario, and live avoids recently-seen anchors. Nothing is persisted server-side.
 - A six-round judge mode that never depends on generation and reorders only the unplayed
   verified deck toward the learner's weakest measured competency.
 - Distinct five-question pre- and post-assessments, one question per competency, with stable
@@ -303,7 +306,7 @@ specific file with `blastradius check --rules path/to/rules.toml`, or ignore rul
 .\.venv\Scripts\python -m build --wheel
 ```
 
-Current baseline: **432 automated tests** on 2026-07-19, plus native Ubuntu checks that exercise
+Current baseline: **436 automated tests** on 2026-07-20, plus native Ubuntu checks that exercise
 the composite Action and its fail-closed shell paths.
 
 Before submission, verify every verdict receipt points directly to a healthy source:
@@ -525,7 +528,7 @@ verify it against immutable truth, then expose direct evidence. Concrete contrib
   than maintaining a second checker.
 - Adversarial regression tests for truth drift, prompt injection, unsafe sandbox scope,
   duplicate session mutation, model failure, receipt safety, and deterministic artifact screening.
-- CI that runs Ruff, the 432-test suite, the 20-scenario verifier, wheel construction, and
+- CI that runs Ruff, the 436-test suite, the 20-scenario verifier, wheel construction, and
   packaged-resource checks on supported Python versions.
 
 The visible merge at `494a258` reconciles parallel Codex workstreams after the integrity-tab

@@ -171,6 +171,7 @@ answer, static or dynamically generated, is grounded in facts or otherwise rejec
 - **One verified incident** — a single round for a 60-second taste
 - **Measure my approval reflex** — a five-competency pre-test, then the deck reorders toward your weakest measured family
 - **Try live variation** — GPT-5.6 Luna generates a fresh scenario, still gate-checked and graded by Sol
+- **Fresh on replay** — replaying any track rotates through the bank (a browser-local recently-seen hint, never persisted server-side), so you don't get the same scenario twice in a row
 - **Field guides** to all six threat families, with cited sources
 - **Persistent or throwaway sessions**, a public leaderboard — no email, no password
 - …and a little **Blastling** pet editor, inspired by my very own Codex pet. Sorry — I had some fun with it :)
