@@ -16,6 +16,30 @@ are inert strings and are never executed.
 
 ![The decision screen: a proposed agent action, three color-coded calls, and the tell prompt](assets/thumb_decision.png)
 
+## Why I built this
+
+I'm both an IT-security and an AI enthusiast, and the same worry kept nagging me: tools like Codex
+have put the magic of building into everyone's hands — but auto-approving every action your agent
+proposes is tempting, and most people aren't aware of the risk. Prompt injection is OWASP's #1 LLM
+risk, with real CVEs and stolen credentials to prove it, yet nobody trains the one reflex that stops
+it: knowing which of your agent's requests to trust. Every security game out there trains the
+*attacker* — nobody was training the *operator*. So I built the operator's seat, and tried to make it
+genuinely fun, with a bit of my security-background flavour.
+
+The rule I cared about most: **nothing reaches your screen unless it passes a correctness gate
+against verified ground truth**, so the game can't teach you a hallucinated lesson. That principle
+actually came out of a scary bug — a subtly invalid output schema that would have silently disabled
+live GPT-5.6 grading while everything still looked green (the story is in *Production deployment and
+proof capture* below). After catching it, "no claim ships before its receipt" became the whole
+philosophy. Codex was a genuine gamechanger here, especially for the thinking: I started with a
+planning session, had it interview me about the idea, wrote everything into design docs it could
+implement structurally, and used review agents to challenge my own features before I shipped them.
+
+With great power comes great responsibility. What's next: more scenarios, more learning material, and
+more tools to help the next generation of developers protect themselves from the threats that are
+emerging — I'll keep building out the CLI, GitHub Action and Codex plugin, and yes, I'll be pushing
+the developers at my own company to use this. ;)
+
 ## What is shipped
 
 - 20 curated, receipt-backed scenarios across six threat families — including retrieval
