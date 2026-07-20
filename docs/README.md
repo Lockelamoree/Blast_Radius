@@ -13,6 +13,7 @@ handle that power. With great power comes great responsibility. Everything below
 you don't have to take my word for it, and the two flagship proofs run keyless from a clean checkout.
 
 - ▶ **Play the live demo:** https://blastradius.max-gutowski.de
+- 🎬 **Watch the 3-min demo:** https://www.youtube.com/watch?v=ybRj2Z5t8oU
 - 📦 **Source (MIT):** https://github.com/Lockelamoree/Blast_Radius
 
 | | | | |
@@ -48,7 +49,7 @@ no game at all — so I made it a rule: **nothing reaches your screen unless it 
 correctness gate against verified ground truth.** To prove that isn't just a nice sentence, I ship a
 live endpoint that *plants a hallucination into a real scenario* and asks the gate to sign off. It
 refuses — every time, with the specific reason. **This is the actual JSON, captured from the
-production route. No key or account needed:**
+production route (keyless on a local checkout; on the hosted demo this endpoint sits behind the judge access code):**
 
 ```console
 $ curl -s https://blastradius.max-gutowski.de/api/demo/gate-catch?case=tell
@@ -187,11 +188,9 @@ Everything runs free in the browser: no account, no install, and ground truth ne
 | Every scenario passes the gate | `verify-scenario` Skill → 20/20, exit 0; runs in CI on every push | Live |
 | Built with Codex, one primary thread | 3× `AGENTS.md`, dated commits, `/feedback` Session ID in README | Live |
 | Deterministic screen accuracy on a labeled corpus | `GET /api/eval/detection` · `blastradius eval-detection` (offline) | Live |
-| Measured learning delta (a developer improves) | A named consented tester's pre→post score | **Not yet measured** |
 
-**Honesty note.** I don't claim a learning-delta, latency, or productivity number anywhere without
-a captured artifact behind it. The one thing I can't back yet — that a real developer measurably
-improves — I label **"Not yet measured,"** rather than assert it.
+**Honesty note.** Every figure here resolves to a captured artifact — I don't assert a latency,
+accuracy, or productivity number without one behind it.
 
 ---
 

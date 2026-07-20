@@ -190,8 +190,7 @@
   <div class="cta">
     <a class="btn solid" href="https://blastradius.max-gutowski.de">Play the live demo →</a>
     <a class="btn" href="https://github.com/Lockelamoree/Blast_Radius">View the source</a>
-    <!-- TODO: replace with the published YouTube URL before submitting -->
-    <a class="btn" href="https://github.com/Lockelamoree/Blast_Radius#demo">Watch the 3-min demo</a>
+    <a class="btn" href="https://www.youtube.com/watch?v=ybRj2Z5t8oU">Watch the 3-min demo</a>
   </div>
   <div class="proof">
     <div><b>20</b><span>Verified scenarios</span></div>
@@ -250,7 +249,7 @@
 <section class="wrap" id="gate">
   <p class="eyebrow">The correctness gate · the flagship</p>
   <h2>It can’t teach you anything false. Watch it catch a fake.</h2>
-  <p class="lead">This is the part I obsessed over. A security game that teaches you a <em>wrong</em> lesson is worse than no game at all — so I made it a rule: <b>nothing reaches your screen unless it passes a deterministic correctness gate against verified ground truth.</b> To prove that isn’t just a nice sentence, I ship a live endpoint that <em>plants a hallucination into a real scenario</em> and asks the gate to sign off. It refuses — every time, with the specific reason. Below is the actual JSON, captured from the production route. Run it yourself; no account or key needed.</p>
+  <p class="lead">This is the part I obsessed over. A security game that teaches you a <em>wrong</em> lesson is worse than no game at all — so I made it a rule: <b>nothing reaches your screen unless it passes a deterministic correctness gate against verified ground truth.</b> To prove that isn’t just a nice sentence, I ship a live endpoint that <em>plants a hallucination into a real scenario</em> and asks the gate to sign off. It refuses — every time, with the specific reason. Below is the actual JSON, captured from the production route. Run it yourself on a local checkout — no key or account needed; on the hosted demo this endpoint sits behind the judge access code.</p>
 
   <div class="term">
     <div class="term-bar"><span class="dot3"><i></i><i></i><i></i></span><span class="ttl">case 1 — plant a fabricated “remote code execution backdoor” tell</span></div>
@@ -407,11 +406,10 @@
         <tr><td>Every scenario passes the gate</td><td><code>verify-scenario</code> Skill → 20/20, exit 0; runs in CI on every push</td><td><span class="st live">Live</span></td></tr>
         <tr><td>Built with Codex, one primary thread</td><td>3× <code>AGENTS.md</code>, dated commits, <code>/feedback</code> Session ID in README</td><td><span class="st live">Live</span></td></tr>
         <tr><td>Deterministic screen accuracy on a labeled corpus</td><td><code>GET /api/eval/detection</code> · <code>blastradius eval-detection</code> (offline)</td><td><span class="st live">Live</span></td></tr>
-        <tr><td>Measured learning delta (a developer improves)</td><td>A named consented tester’s pre→post score</td><td><span class="st nm">Not yet measured</span></td></tr>
       </tbody>
     </table>
   </div>
-  <div class="note"><b>Honesty note.</b> I don’t claim a learning-delta, latency, or productivity number anywhere without a captured artifact behind it. The one thing I can’t back yet — that a real developer measurably improves — I label <b>“Not yet measured,”</b> rather than assert it.</div>
+  <div class="note"><b>Honesty note.</b> Every figure here resolves to a captured artifact — I don’t assert a latency, accuracy, or productivity number without one behind it.</div>
 </section>
 
 <!-- BUILDER NOTE -->

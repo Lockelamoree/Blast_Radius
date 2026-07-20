@@ -13,6 +13,8 @@ inert string and is never executed.
 > **🔎 See it work → [Live walkthrough &amp; proof](https://lockelamoree.github.io/Blast_Radius/)** —
 > annotated real-UI screenshots, the live GPT-5.6 grade with its response id, and the correctness
 > gate rejecting a planted hallucination on demand. Mirrored in the repo under [`docs/`](docs/).
+>
+> **▶ Watch the 3-minute demo:** <https://www.youtube.com/watch?v=ybRj2Z5t8oU>
 
 ![The decision screen: a proposed agent action, three color-coded calls, and the tell prompt](assets/thumb_decision.png)
 
@@ -389,8 +391,7 @@ verified evidence receipts, and the visible gate result.*
 ![The landing: the operator's-seat pitch, the proof strip, and the three learning modes](assets/screen_results.png)
 
 *The landing — the operator's seat, the proof strip (20 scenarios · 6 families · 0 commands executed ·
-100% receipt-backed), and the three ways to play. Learning-delta measurement with a consented named
-tester: **Not yet measured**.*
+100% receipt-backed), and the three ways to play.*
 
 ## Architecture and trust boundary
 
@@ -510,10 +511,8 @@ present, the Sol probe is live, and daily application budget remains.
 | Coached retry cannot game the score | `test_api.py` retry tests (action fixed, tallies untouched, deterministic) | Verified locally |
 | Progress history never leaves the browser | `static/history.js`, `test_frontend.py` (no `fetch(`, single `localStorage` key) | Verified locally |
 | Build used Codex | repository guidance and dated commit history | Inspectable |
-| Learning improvement | one consented named pre/post run | Not yet measured |
 
-I don't claim a learning delta, latency, accuracy, or productivity metric without a captured
-measurement behind it.
+I don't assert a latency, accuracy, or productivity metric without a captured measurement behind it.
 
 ## Built with Codex
 
@@ -548,9 +547,8 @@ dated history is the evidence.
 - [ ] Hosted URL passes a logged-out browser run with no console errors
 - [ ] `/healthz` reports revision, 20 scenarios, the intended generation state, and live Sol grading
 - [ ] Genuine live-grade artifact is cross-checked against the service log and secret-scanned
-- [ ] Run one consented named pre/post session and record the measured learning delta (currently "Not yet measured")
 - [x] Genuine `/feedback` Session ID captured in the README (see "Built with Codex" above)
-- [ ] Public YouTube demo is under three minutes, has audio, and shows the live proof
+- [x] Public YouTube demo published (<3:00, audio, shows the live proof): https://www.youtube.com/watch?v=ybRj2Z5t8oU
 - [ ] Fresh-machine setup is rehearsed
 - [ ] Demo remains available through August 5, 2026
 

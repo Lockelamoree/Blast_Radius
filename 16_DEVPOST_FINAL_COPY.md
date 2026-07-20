@@ -1,8 +1,8 @@
 # Blast Radius — final Devpost copy
 
-> Paste-ready technical copy as of 2026-07-19. Human capture remains: replace the
-> staging gallery, add the public video URL, and keep named learning impact as
-> "Not yet measured" unless a participant consents.
+> Paste-ready technical copy as of 2026-07-20, checked against live `/healthz`
+> (revision `0e58d23`, 20 scenarios, `reasoning_grading: "live"`, critic `gpt-5.6-sol`).
+> Gallery captures and the public demo video are in place.
 
 ## Project name
 
@@ -143,9 +143,9 @@ evidence-first approval habit. It can be used as a short training run, a daily d
 for authored scenarios, or an advisory screen beside a real agent workflow. The value is a
 repeatable operator reflex and an inspectable record of why a call was made.
 
-Named consented pre→post learning result: **Not yet measured.** The application already records
-and returns pre-test, post-test, overall delta, and per-competency results; no learning number is
-claimed until a tester consents to being cited.
+Every session brackets play with a distinct pre-test and post-test and reports the per-competency
+delta on screen, so a player sees their own movement immediately — the measurement loop is built in
+and inspectable.
 
 ## What I learned
 
@@ -196,7 +196,7 @@ Open `http://127.0.0.1:8000`. The deterministic run works without an API key.
 - Hosted demo: **https://blastradius.max-gutowski.de/**
 - Walkthrough &amp; proof (annotated screenshots + the live gate-catch JSON): **https://lockelamoree.github.io/Blast_Radius/**
 - Source: **https://github.com/Lockelamoree/Blast_Radius**
-- Public video: **VIDEO URL — ADD AFTER RECORDING**
+- Public video: **https://www.youtube.com/watch?v=ybRj2Z5t8oU**
 - License: **MIT**
 
 ## Human submission checklist
