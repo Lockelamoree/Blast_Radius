@@ -7,6 +7,11 @@ command, dependency, tool manifest, diff, retrieved instruction, or marketplace 
 action, your tell coverage, and—when it applies—the exact sandbox policy, with direct evidence for
 every scenario.
 
+**What makes it different:** it's an AI-security trainer whose *own* AI-generated content can never
+become a source of security misinformation — nothing reaches your screen unless it passes a
+deterministic correctness gate against verified ground truth. That's the golden thread, and the
+whole build hangs off it.
+
 I built it for the OpenAI Build Week 2026 Developer Tools track. Every scenario command is an
 inert string and is never executed.
 

@@ -204,7 +204,7 @@ answer, static or dynamically generated, is grounded in facts or otherwise rejec
 - **Persistent or throwaway sessions**, a public leaderboard — no email, no password
 - …and a little **Blastling** pet editor, inspired by my very own Codex pet. Sorry — I had some fun with it :)
 
-Everything runs free in the browser: no account, no install, and ground truth never leaves the server.
+Everything runs free in the browser: no signup, no install, and ground truth never leaves the server.
 
 ## 8 · Claim-to-proof map — verify me without trusting me
 
