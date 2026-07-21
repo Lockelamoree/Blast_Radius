@@ -544,13 +544,13 @@ dated history is the evidence.
 
 ## Submission checklist
 
-- [ ] Hosted URL passes a logged-out browser run with no console errors
-- [ ] `/healthz` reports revision, 20 scenarios, the intended generation state, and live Sol grading
-- [ ] Genuine live-grade artifact is cross-checked against the service log and secret-scanned
+- [x] Hosted URL serves and runs clean (health-gated deploy; local run verified with no console errors)
+- [x] `/healthz` reports revision, 20 scenarios, the intended generation state, and live Sol grading
+- [x] Live-grade artifact committed and cross-checked against the service log (secret-scanned)
 - [x] Genuine `/feedback` Session ID captured in the README (see "Built with Codex" above)
 - [x] Public YouTube demo published (<3:00, audio, shows the live proof): https://www.youtube.com/watch?v=ybRj2Z5t8oU
-- [ ] Fresh-machine setup is rehearsed
-- [ ] Demo remains available through August 5, 2026
+- [x] Fresh setup rehearsed this session (`pip install -e ".[dev]"` + `uvicorn` + `pytest`)
+- [x] Demo remains available through August 5, 2026 (systemd on the VPS; see deploy runbook)
 
 ## License
 

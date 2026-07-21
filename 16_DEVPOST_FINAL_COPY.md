@@ -199,10 +199,18 @@ Open `http://127.0.0.1:8000`. The deterministic run works without an API key.
 - Public video: **https://www.youtube.com/watch?v=ybRj2Z5t8oU**
 - License: **MIT**
 
-## Human submission checklist
+## Human submission checklist (Devpost UI)
 
-- Paste this copy into the Developer Tools track submission.
-- Put the supplied judge access code in Devpost's testing-access field.
-- Replace the three gallery PNGs with live captures.
-- Add the public video URL after recording.
-- Confirm the Devpost page is submitted and the hosted demo remains available through August 5.
+Done:
+- [x] Gallery images are real live 1200×800 captures
+- [x] Public video published; URL added above (`youtube.com/watch?v=ybRj2Z5t8oU`)
+- [x] Judge access code placed in Devpost's testing-access field
+- [x] Repo is public (`github.com/Lockelamoree/Blast_Radius`) — no email sharing needed
+
+Remaining (clicks in the Devpost form):
+- [ ] Paste the description/story + these links into the Developer Tools track submission
+- [ ] Paste the YouTube link into Devpost's dedicated **video** field
+- [ ] Enter the `/feedback` Session ID `019f606c-081a-7911-ba7b-114168f91dd1` in the form
+- [ ] Add team members (if any) and confirm they **accepted** their invites
+- [ ] Mark the submission **Submitted** (green tag on My Projects) — not a draft
+- [ ] Keep the hosted demo up through August 5, 2026
