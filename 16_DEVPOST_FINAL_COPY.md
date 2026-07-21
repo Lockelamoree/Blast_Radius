@@ -1,8 +1,8 @@
 # Blast Radius — final Devpost copy
 
-> Paste-ready technical copy as of 2026-07-20, checked against live `/healthz`
-> (revision `0e58d23`, 20 scenarios, `reasoning_grading: "live"`, critic `gpt-5.6-sol`).
-> Gallery captures and the public demo video are in place.
+> Paste-ready technical copy, checked against live `/healthz`
+> (20 scenarios, `reasoning_grading: "live"`, critic `gpt-5.6-sol`; the live revision is whatever
+> `/healthz` reports right now). Gallery captures and the public demo video are in place.
 
 ## Project name
 
@@ -120,9 +120,8 @@ revision, hashed session correlation, raw application grade, and receipt SHA-256
 
 ## Screens
 
-The gallery uses stable paths so the three live captures can be replaced without editing this
-copy. The current images are annotated staging assets; replace them with final live screenshots
-before submission.
+The gallery uses stable paths. The three images are real 1200×800 captures from the live app —
+the Decision Card, the graded Verdict Stamp with receipts, and the landing.
 
 ![Decision Card: review an agent proposal, choose approve/sandbox/reject, and name the evidence tell](https://raw.githubusercontent.com/Lockelamoree/Blast_Radius/main/assets/screen_decision.png)
 
