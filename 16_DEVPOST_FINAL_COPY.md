@@ -132,9 +132,9 @@ before submission.
 
 *Verdict Stamp — scored reasoning, verified receipts, and the gate result.*
 
-![Results and mastery: pre-to-post change, competency map, and next practice target](https://raw.githubusercontent.com/Lockelamoree/Blast_Radius/main/assets/screen_results.png)
+![The landing: the operator's-seat pitch, the proof strip, and the three ways to play](https://raw.githubusercontent.com/Lockelamoree/Blast_Radius/main/assets/screen_results.png)
 
-*Results and mastery — measured competency change and the next weakest-area practice target.*
+*The landing — the operator's seat, the proof strip (20 scenarios · 6 families · 0 commands executed · 100% receipt-backed), and the three ways to play.*
 
 ## Potential impact
 
