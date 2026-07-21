@@ -3,14 +3,15 @@
 > **Best viewed as the hosted showcase → https://lockelamoree.github.io/Blast_Radius/**
 > (brand-styled, one scroll). This page is the same content, rendered in the repo.
 
-I'm both an IT-security and an AI enthusiast, and the same worry kept nagging me: your AI coding
-agent proposes shell commands, new dependencies, tool manifests and diffs all day — and it's so
-tempting to just auto-approve. Most of us aren't trained to catch the one request that owns us.
-So I built **Blast Radius** to make that reflex playable: you sit in the operator's seat, GPT-5.6
-grades your reasoning live, and — the part I cared about most — it can never teach you something
-false. Codex put the magic of building into everyone's hands; Blast Radius is about learning to
-handle that power. With great power comes great responsibility. Everything below is inspectable —
-you don't have to take my word for it, and the two flagship proofs run keyless from a clean checkout.
+I'm both an IT-security and an AI enthusiast, so this one kept nagging me: your AI coding agent
+proposes shell commands, new dependencies, tool manifests and diffs all day long — and honestly,
+it's so tempting to just hit approve. Most of us aren't really trained to catch the one request
+that owns us. So I built **Blast Radius** to make that reflex playable: you sit in the operator's
+seat, GPT-5.6 grades your reasoning live, and — the part I cared about most — it can never teach you
+something false. Codex put the magic of building into everyone's hands; Blast Radius is about
+learning to handle that power. With great power comes great responsibility. :) Everything below is
+inspectable — you don't have to take my word for it, and the two flagship proofs run keyless from a
+clean checkout.
 
 - ▶ **Play the live demo:** https://blastradius.max-gutowski.de
 - 🎬 **Watch the 3-min demo:** https://www.youtube.com/watch?v=ybRj2Z5t8oU

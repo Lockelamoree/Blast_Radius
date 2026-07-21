@@ -20,26 +20,28 @@ inert string and is never executed.
 
 ## Why I built this
 
-I'm both an IT-security and an AI enthusiast, and the same worry kept nagging me: tools like Codex
-have put the magic of building into everyone's hands — but auto-approving every action your agent
-proposes is tempting, and most people aren't aware of the risk. Prompt injection is OWASP's #1 LLM
-risk, with real CVEs and stolen credentials to prove it, yet nobody trains the one reflex that stops
-it: knowing which of your agent's requests to trust. Every security game out there trains the
-*attacker* — nobody was training the *operator*. So I built the operator's seat, and tried to make it
-genuinely fun, with a bit of my security-background flavour.
+I'm both an IT-security and an AI enthusiast, so I keep thinking about the new threats coming at
+people who use AI tools like Codex. Honestly, just auto-approving every action your agent proposes
+is really tempting — and most users aren't aware of the risk. Prompt injection is OWASP's #1 LLM
+risk right now, with real CVEs and stolen credentials to prove it, and yet nobody trains the one
+reflex that actually stops it: knowing which of your agent's requests to trust. Every security game
+out there trains the attacker. Nobody was training the operator. So I built the operator's seat —
+and I tried to make it genuinely fun, with a bit of my security background mixed in.
 
-The rule I cared about most: **nothing reaches your screen unless it passes a correctness gate
-against verified ground truth**, so the game can't teach you a hallucinated lesson. That principle
-actually came out of a scary bug — a subtly invalid output schema that would have silently disabled
-live GPT-5.6 grading while everything still looked green — and nothing on the surface would have
-told me. After catching it, "no claim ships before its receipt" became the whole philosophy. Codex was a genuine gamechanger here, especially for the thinking: I started with a
-planning session, had it interview me about the idea, wrote everything into design docs it could
-implement structurally, and used review agents to challenge my own features before I shipped them.
+The thing I cared about most: **nothing reaches your screen unless it passes a correctness gate
+against verified ground truth**, so the game can't teach you a hallucinated lesson. That rule
+actually came out of a pretty scary bug — my strict-output schema was subtly invalid, which would
+have silently switched GPT-5.6 grading off while everything still looked totally fine. Nothing on
+the surface would've told me. After I caught that, "no claim ships before its receipt" basically
+became the whole philosophy. Codex was a genuine gamechanger for me here, especially for the
+thinking part: I started with a planning session, had it ask me questions about the idea, wrote
+everything down in design docs it could implement later, and used review agents to challenge my own
+features before I shipped them.
 
-With great power comes great responsibility. What's next: more scenarios, more learning material, and
-more tools to help the next generation of developers protect themselves from the threats that are
-emerging — I'll keep building out the CLI, GitHub Action and Codex plugin, and yes, I'll be pushing
-the developers at my own company to use this. ;)
+With great power comes great responsibility. :) What's next? Probably more scenarios, more learning
+material, and more tools to help the next generation of developers protect themselves. I'll keep
+building out the CLI, GitHub Action and Codex plugin — and yes, I'll definitely be pushing the
+developers at my own company to use this. ;)
 
 ## What is shipped
 
